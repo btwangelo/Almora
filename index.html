@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ALMORA — Where every story finds a home</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Inter:wght@400;600&display=swap">
+<style>
+:root{--bg:#121214;--sf:#1e1e22;--sf2:#2a2a30;--tx:#f2eefc;--mu:#9d98b0;--ac:#b13df5;--ac2:#4b2bc4;--lv:#e2d9fa;--bd:#33333b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f6f2fd;--sf:#fff;--sf2:#ece5fa;--tx:#1b1528;--mu:#6c6482;--bd:#d9cff0}}
+:root[data-theme="light"]{--bg:#f6f2fd;--sf:#fff;--sf2:#ece5fa;--tx:#1b1528;--mu:#6c6482;--bd:#d9cff0}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 Inter,system-ui,sans-serif}
+a{color:inherit;text-decoration:none}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--bd);padding:10px 14px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.logo{font:700 26px Fredoka,sans-serif;color:var(--ac2);display:flex;align-items:center;letter-spacing:1px}
+.logo svg{width:30px;height:28px;margin:0 1px}
+nav{display:flex;gap:4px;overflow-x:auto;flex:1}
+nav a{padding:6px 12px;border-radius:99px;color:var(--mu);white-space:nowrap;font-weight:600}
+nav a.on{background:var(--ac2);color:#fff}
+input,select,textarea,button{font:inherit;color:var(--tx);background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:8px 10px}
+button{cursor:pointer;background:var(--ac2);border:0;color:#fff;font-weight:600}
+button.g{background:var(--sf2);color:var(--tx)}button.d{background:#a3243b}
+main{max-width:1000px;margin:0 auto;padding:14px}
+h2{font-size:18px;margin:22px 0 10px;border-left:4px solid var(--ac);padding-left:10px}
+.row{display:flex;gap:12px;overflow-x:auto;padding-bottom:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.card{display:block;min-width:130px}.row .card{width:130px}
+.cv{aspect-ratio:2/3;border-radius:12px;background:var(--sf2) center/cover;position:relative;overflow:hidden;display:flex;align-items:flex-end}
+.cv b{font:700 40px Fredoka;color:#fff;text-shadow:0 2px 6px #000;padding:0 6px}
+.cv i{position:absolute;top:6px;right:6px;background:#000a;color:#fff;font-style:normal;font-size:12px;padding:2px 7px;border-radius:99px}
+.t{margin:6px 0 2px;font-weight:600;font-size:14px;line-height:1.2}
+.ch{display:flex;justify-content:space-between;background:var(--sf);border-radius:8px;padding:6px 9px;margin-top:4px;font-size:13px}
+.ch span{color:var(--mu)}.new{color:#ff4d6d;font-size:11px;font-weight:700}
+.empty{background:var(--sf);border:1px dashed var(--bd);border-radius:14px;padding:22px;text-align:center;color:var(--mu)}
+.box{background:var(--sf);border:1px solid var(--bd);border-radius:14px;padding:14px;margin:12px 0}
+.box label{display:block;margin:8px 0 3px;color:var(--mu);font-size:13px}
+.box input,.box select,.box textarea{width:100%}
+.hero{display:flex;gap:16px;flex-wrap:wrap}.hero .cv{width:170px}.hero>div:last-child{flex:1;min-width:230px}
+.pill{display:inline-block;background:var(--sf2);border-radius:99px;padding:2px 10px;font-size:12px;margin:0 4px 4px 0}
+.act{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.stars span{font-size:24px;cursor:pointer;color:var(--bd)}.stars .on{color:#f5b73d}
+.rd{max-width:var(--w,720px);margin:0 auto}.rd img{display:block;width:100%;min-height:200px;background:var(--sf)}
+.bar{position:sticky;top:calc(env(safe-area-inset-top,0px) + 54px);z-index:4;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg);padding:8px 0}
+.th{display:flex;gap:8px;align-items:center;margin:6px 0}.th img{width:40px;height:56px;object-fit:cover;border-radius:6px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ac2);color:#fff;padding:10px 16px;border-radius:12px;display:none;z-index:9;max-width:90%}
+footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+<a class="logo" href="#home" aria-label="ALMORA">Alm<svg viewBox="0 0 100 92"><path d="M8 8l32 14c14-5 26-5 40 0l12-14 4 40c-2 20-14 34-34 40-24-3-40-18-46-38z" fill="#050508" transform="translate(-2 0)"/><path d="M50 36l4 9h10l-8 6 3 10-9-6-9 6 3-10-8-6h10z" fill="#e2d9fa" transform="translate(-6 -2) scale(.9)"/><path d="M62 38c10-5 18-3 20 0-4 12-12 18-20 16z" fill="#b13df5"/></svg>ra</a>
+<nav id="nav"></nav>
+<input id="q" placeholder="Pesquisar…" style="flex:1;min-width:120px">
+<button class="g" id="th" title="Tema">◐</button>
+</header>
+<main id="app"></main>
+<footer>ALMORA — Where every story finds a home.</footer>
+<div id="toast"></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let S={works:[],prog:{},lib:{},fav:{},rate:{},pin:null},unlocked=false,draft=[];
+try{Object.assign(S,JSON.parse(localStorage.getItem('almora')||'{}'))}catch(e){}
+const save=()=>{try{localStorage.setItem('almora',JSON.stringify(S));return true}catch(e){toast('Armazenamento cheio. Remova obras/imagens.');return false}};
+function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3200)}
+const W=id=>S.works.find(w=>w.id===id);
+const last=w=>w.chapters.length?Math.max(...w.chapters.map(c=>c.date)):w.created;
+const ago=d=>{const h=(Date.now()-d)/36e5;return h<1?'agora':h<24?Math.floor(h)+' h atrás':h<48?'1 dia atrás':h<720?Math.floor(h/24)+' dias atrás':new Date(d).toLocaleDateString('pt-BR')};
+const cover=w=>w.cover?`style="background-image:url(${w.cover})"`:'';
+const card=(w,extra='',rank)=>`<a class="card" href="#obra/${w.id}"><div class="cv" ${cover(w)}>${rank?`<b>${rank}</b>`:''}${w.reads?`<i>👁 ${w.reads}</i>`:''}</div><div class="t">${esc(w.title)}</div>${extra}</a>`;
+const sec=(t,ws,fn)=>`<h2>${t}</h2>`+(ws.length?fn(ws):`<div class="empty">Nenhuma obra ainda.</div>`);
+const rowOf=ws=>`<div class="row">${ws.map((w,i)=>card(w,'',i+1)).join('')}</div>`;
+const gridOf=ws=>`<div class="grid">${ws.map(w=>card(w)).join('')}</div>`;
+const upd=ws=>`<div class="grid">${ws.map(w=>card(w,[...w.chapters].sort((a,b)=>b.date-a.date).slice(0,2).map(c=>`<div class="ch"><b>Capítulo ${esc(c.n)}${Date.now()-c.date<864e5*3?' <span class="new">New</span>':''}</b><span>${ago(c.date)}</span></div>`).join(''))).join('')}</div>`;
+const pub=()=>S.works.filter(w=>!w.archived);
+function nav(r){$('#nav').innerHTML=[['home','Início'],['bl','BL'],['gl','GL'],['explorar','Explorar'],['atualizacoes','Atualizações'],['biblioteca','Minha biblioteca'],['studio','Studio']].map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}">${t}</a>`).join('')}
+function home(){const p=pub(),byR=[...p].sort((a,b)=>(b.reads||0)-(a.reads||0)),byU=[...p].sort((a,b)=>last(b)-last(a));
+return (p.length?'':`<div class="empty"><b>Bem-vindo(a) à ALMORA.</b><br>O catálogo está vazio. Cadastre a primeira obra no <a href="#studio" style="color:var(--ac)"><u>ALMORA STUDIO</u></a>.</div>`)+
+sec('Popular hoje',byR.filter(w=>w.reads).slice(0,10),rowOf)+sec('Últimas atualizações',byU.filter(w=>w.chapters.length).slice(0,12),upd)+
+sec('BL em destaque',byU.filter(w=>w.cat==='BL').slice(0,8),rowOf)+sec('GL em destaque',byU.filter(w=>w.cat==='GL').slice(0,8),rowOf)+
+sec('Recém-adicionadas',[...p].sort((a,b)=>b.created-a.created).slice(0,8),rowOf)+sec('Concluídas',p.filter(w=>w.status==='Concluída').slice(0,8),rowOf)}
+function catalog(cat,t){const q=($('#q').value||'').toLowerCase().trim();
+const f=pub().filter(w=>(!cat||w.cat===cat)&&(!q||[w.title,w.alt,w.author,w.illus,w.genres,w.synopsis].join(' ').toLowerCase().includes(q)));
+return `<h2>${t}</h2><div class="act"><select id="st" onchange="ren()"><option value="">Status: todos</option><option>Em andamento</option><option>Concluída</option><option>Pausada</option></select><select id="or" onchange="ren()"><option value="u">Atualizadas recentemente</option><option value="r">Mais lidas</option><option value="a">Ordem alfabética</option><option value="n">Mais recentes</option><option value="s">Melhor avaliadas</option></select></div>`+(()=>{const st=($('#st')||{}).value||'',or=($('#or')||{}).value||'u';
+let l=f.filter(w=>!st||w.status===st);const rt=w=>(S.rate[w.id]||0);
+l.sort(or==='a'?(a,b)=>a.title.localeCompare(b.title):or==='r'?(a,b)=>(b.reads||0)-(a.reads||0):or==='n'?(a,b)=>b.created-a.created:or==='s'?(a,b)=>rt(b)-rt(a):(a,b)=>last(b)-last(a));
+return l.length?gridOf(l):`<div class="empty">Nada encontrado.</div>`})()}
+function obra(id){const w=W(id);if(!w)return`<div class="empty">Obra não encontrada.</div>`;
+const lp=S.prog[id],cs=[...w.chapters].sort((a,b)=>a.n-b.n),r=S.rate[id]||0,ls=S.lib[id]||'';
+return `<div class="hero"><div class="cv" ${cover(w)}></div><div><h1 style="margin:0">${esc(w.title)}</h1><div style="color:var(--mu)">${esc(w.alt)}</div>
+<div style="margin:8px 0"><span class="pill">${w.cat}</span><span class="pill">${esc(w.status)}</span><span class="pill">${esc(w.age)}</span>${(w.genres||'').split(',').filter(x=>x.trim()).map(g=>`<span class="pill">${esc(g.trim())}</span>`).join('')}</div>
+<div>Autor: ${esc(w.author||'—')} · Ilustrador: ${esc(w.illus||'—')}</div><div>${cs.length} capítulos · 👁 ${w.reads||0} leituras</div>
+<div class="stars" id="stars">${[1,2,3,4,5].map(i=>`<span class="${i<=r?'on':''}" onclick="rate('${id}',${i})">★</span>`).join('')}</div>
+<div class="act">${cs.length?`<button onclick="location.hash='#ler/${id}/${lp?lp.n:cs[0].n}'">${lp?'Continuar lendo (cap. '+esc(lp.n)+')':'Começar a ler'}</button>`:''}
+<button class="g" onclick="fav('${id}')">${S.fav[id]?'♥ Favorita':'♡ Favoritar'}</button>
+<select onchange="lib('${id}',this.value)"><option value="">+ Biblioteca</option>${['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'].map(x=>`<option ${ls===x?'selected':''}>${x}</option>`).join('')}</select>
+<button class="g" onclick="share('${id}')">Compartilhar</button></div></div></div>
+<h2>Sinopse</h2><p>${esc(w.synopsis||'Sem sinopse.')}</p>
+<h2>Capítulos</h2>${cs.length?[...cs].reverse().map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>Capítulo ${esc(c.n)}${c.title?' — '+esc(c.title):''}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join(''):'<div class="empty">Sem capítulos publicados.</div>'}`}
+function rate(id,n){S.rate[id]=n;save();ren()}
+function fav(id){S.fav[id]=!S.fav[id];save();ren()}
+function lib(id,v){if(v)S.lib[id]=v;else delete S.lib[id];save();toast('Biblioteca atualizada')}
+function share(id){const u=location.href.split('#')[0]+'#obra/'+id;navigator.clipboard?.writeText(u).then(()=>toast('Link copiado'),()=>toast(u))}
+function biblio(){const L=['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'];
+const fv=pub().filter(w=>S.fav[w.id]);return sec('Favoritas',fv,gridOf)+L.map(l=>sec(l,pub().filter(w=>S.lib[w.id]===l),gridOf)).join('')}
+let obs;
+function reader(id,n){const w=W(id),c=w&&w.chapters.find(c=>String(c.n)===n);if(!c)return`<div class="empty">Capítulo não encontrado.</div>`;
+const cs=[...w.chapters].sort((a,b)=>a.n-b.n),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
+if(p.n!==c.n){w.reads=(w.reads||0)+1}p.n=c.n;if(!p.read.includes(c.n))p.read.push(c.n);save();
+const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}'"`:'disabled'}>◀</button><button class="g" ${cs[i+1]?`onclick="location.hash='#ler/${id}/${cs[i+1].n}'"`:'disabled'}>▶</button>`;
+setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){S.prog[id].pg=+e.target.dataset.i;save()}}),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
+return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>Cap. ${esc(c.n)}</span><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
+<div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
+/* STUDIO */
+const sha=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('');
+async function pin(){const v=$('#pin').value;if(v.length<6)return toast('Use ao menos 6 caracteres');const h=await sha(v);if(!S.pin){S.pin=h;save();unlocked=true}else if(S.pin===h)unlocked=true;else return toast('Senha incorreta');ren()}
+function studio(){if(!unlocked)return `<div class="box" style="max-width:380px;margin:30px auto"><h2 style="margin-top:0">ALMORA STUDIO</h2><p style="color:var(--mu)">${S.pin?'Digite a senha do Studio.':'Primeiro acesso: crie a senha de superadministrador deste navegador.'}</p><input id="pin" type="password" placeholder="Senha"><div class="act"><button onclick="pin()">${S.pin?'Entrar':'Criar senha'}</button></div></div>`;
+return `<h2>ALMORA STUDIO</h2><div class="act"><button class="g" onclick="unlocked=false;ren()">Sair</button><button class="g" onclick="bk()">Exportar backup (sem imagens)</button></div>
+<div class="box"><b>Nova obra</b><label>Título</label><input id="n_t"><label>Título alternativo</label><input id="n_a"><label>Categoria</label><select id="n_c"><option>BL</option><option>GL</option></select>
+<label>Autor</label><input id="n_au"><label>Ilustrador</label><input id="n_il"><label>Gêneros (separados por vírgula)</label><input id="n_g"><label>Classificação</label><select id="n_ag"><option>Livre</option><option>14+</option><option>16+</option><option>18+</option></select>
+<label>Status</label><select id="n_s"><option>Em andamento</option><option>Concluída</option><option>Pausada</option></select><label>Titular dos direitos / licença (obrigatório)</label><input id="n_l" placeholder="Ex.: obra própria; licença X até 2027">
+<label>Sinopse</label><textarea id="n_sy" rows="3"></textarea><label>Capa</label><input id="n_cv" type="file" accept="image/*"><div class="act"><button onclick="addW()">Cadastrar obra</button></div></div>
+<div class="box"><b>Novo capítulo</b><label>Obra</label><select id="c_w">${S.works.map(w=>`<option value="${w.id}">${esc(w.title)}</option>`).join('')}</select><label>Número</label><input id="c_n" type="number" step="0.5"><label>Título (opcional)</label><input id="c_t">
+<label>Páginas (várias imagens)</label><input id="c_f" type="file" accept="image/*" multiple onchange="pages(this)"><div id="dr"></div><div class="act"><button onclick="addC()">Publicar capítulo</button></div></div>
+<h2>Obras</h2>${S.works.map(w=>`<div class="box"><b>${esc(w.title)}</b> · ${w.cat} · ${w.chapters.length} cap. ${w.archived?'(arquivada)':''}<div class="act"><button class="g" onclick="arch('${w.id}')">${w.archived?'Restaurar':'Arquivar'}</button><button class="d" onclick="delW('${w.id}')">Excluir</button></div>${w.chapters.map(c=>`<div class="ch">Cap. ${esc(c.n)} (${c.pages.length} pág.)<button class="d" onclick="delC('${w.id}','${c.n}')">✕</button></div>`).join('')}</div>`).join('')||'<div class="empty">Nenhuma obra.</div>'}
+<div class="box"><b>ALMORA TRANSLATE</b><p style="color:var(--mu)">OCR e tradução por IA exigem servidor e chaves de API (nunca no navegador). Ainda não conectado.</p></div>`}
+function comp(f,mw){return new Promise(r=>{const fr=new FileReader();fr.onload=()=>{const i=new Image();i.onload=()=>{const k=Math.min(1,mw/i.width),c=document.createElement('canvas');c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);r(c.toDataURL('image/jpeg',.7))};i.onerror=()=>r(null);i.src=fr.result};fr.readAsDataURL(f)})}
+async function pages(el){draft=(await Promise.all([...el.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(f=>comp(f,900)))).filter(Boolean);drawD()}
+function drawD(){$('#dr').innerHTML=draft.map((s,i)=>`<div class="th"><img src="${s}"><span>Pág. ${i+1}</span><button class="g" onclick="mv(${i},-1)">↑</button><button class="g" onclick="mv(${i},1)">↓</button><button class="d" onclick="draft.splice(${i},1);drawD()">✕</button></div>`).join('')}
+function mv(i,d){const j=i+d;if(j<0||j>=draft.length)return;[draft[i],draft[j]]=[draft[j],draft[i]];drawD()}
+async function addW(){const t=$('#n_t').value.trim();if(!t)return toast('Informe o título');if(!$('#n_l').value.trim())return toast('Informe titular/licença');const f=$('#n_cv').files[0];
+S.works.push({id:Date.now().toString(36),title:t,alt:$('#n_a').value,cat:$('#n_c').value,author:$('#n_au').value,illus:$('#n_il').value,genres:$('#n_g').value,age:$('#n_ag').value,status:$('#n_s').value,rights:$('#n_l').value,synopsis:$('#n_sy').value,cover:f?await comp(f,400):'',created:Date.now(),reads:0,chapters:[]});if(save()){toast('Obra cadastrada');ren()}else S.works.pop()}
+function addC(){const id=$('#c_w').value,n=$('#c_n').value,w=W(id);if(!w||n==='')return toast('Escolha obra e número');if(!draft.length)return toast('Adicione páginas');if(w.chapters.some(c=>String(c.n)===n))return toast('Número já existe');
+w.chapters.push({n:+n,title:$('#c_t').value,date:Date.now(),pages:draft});if(save()){draft=[];toast('Capítulo publicado');ren()}else w.chapters.pop()}
+const arch=id=>{const w=W(id);w.archived=!w.archived;save();ren()},delW=id=>{if(confirm('Excluir obra?')){S.works=S.works.filter(w=>w.id!==id);save();ren()}},delC=(id,n)=>{if(confirm('Excluir capítulo?')){const w=W(id);w.chapters=w.chapters.filter(c=>String(c.n)!==n);save();ren()}};
+function bk(){const d=JSON.stringify({...S,works:S.works.map(w=>({...w,cover:'',chapters:w.chapters.map(c=>({...c,pages:c.pages.length}))}))},null,1);navigator.clipboard?.writeText(d);toast('Backup copiado')}
+function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
+A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():home();
+document.title=r==='obra'&&W(a)?W(a).title+' — ALMORA':'ALMORA — Where every story finds a home'}
+addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
+$('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
+$('#th').onclick=()=>{const d=document.documentElement,c=getComputedStyle(d).getPropertyValue('--bg').trim()==='#121214';d.dataset.theme=c?'light':'dark'};
+ren();
+</script>
+</body>
+</html>
