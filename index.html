@@ -200,6 +200,18 @@ addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
 $('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
 $('#th').onclick=()=>{const d=document.documentElement,c=getComputedStyle(d).getPropertyValue('--bg').trim()==='#121214';d.dataset.theme=c?'light':'dark'};
 ren();initAuth();
+almoraDB
+  .from('works')
+  .select('id')
+  .limit(1)
+  .then(({ error }) => {
+    alert(
+      error
+        ? 'Erro na conexão: ' + error.message
+        : 'ALMORA conectada ao Supabase!'
+    );
+  })
+  .catch(error => alert('Falha: ' + error.message));
 </script>
 </body>
 </html>
