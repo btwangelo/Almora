@@ -128,48 +128,137 @@ return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.tit
 <div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
 /* CONTA / AUTH (Firebase Authentication) */
 /* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
-const FB_CONFIG={apiKey:"",authDomain:"",projectId:"",appId:""};
-const FB_OK=!!FB_CONFIG.apiKey;
-let fb=null,user=null,authMode='in';
-const authErr=e=>({'auth/invalid-email':'E-mail inválido.','auth/missing-password':'Informe a senha.','auth/weak-password':'Senha fraca (mínimo 6 caracteres).','auth/email-already-in-use':'Este e-mail já está cadastrado.','auth/invalid-credential':'E-mail ou senha incorretos.','auth/user-not-found':'E-mail ou senha incorretos.','auth/wrong-password':'E-mail ou senha incorretos.','auth/too-many-requests':'Muitas tentativas. Tente novamente mais tarde.','auth/popup-closed-by-user':'Login com Google cancelado.','auth/popup-blocked':'Pop-up bloqueado pelo navegador.','auth/unauthorized-domain':'Domínio não autorizado no Firebase.','auth/network-request-failed':'Falha de rede.'}[e.code]||'Erro: '+(e.code||e.message));
+
+let user=null,authMode='in';
+
+const authErr=e=>{
+  const msgs={
+    'invalid_credentials':'E-mail ou senha incorretos.',
+    'weak_password':'Senha fraca.',
+    'email_exists':'Este e-mail já está cadastrado.',
+    'user_already_exists':'Este e-mail já está cadastrado.',
+    'over_email_send_rate_limit':'Muitas tentativas. Tente novamente mais tarde.'
+  };
+  return msgs[e.code]||msgs[e.message]||'Erro: '+(e.message||'Tente novamente.');
+};
+
 async function initAuth(){
-if(!FB_OK)return;
-try{const B='https://www.gstatic.com/firebasejs/10.12.2/';
-const app=await import(B+'firebase-app.js'),au=await import(B+'firebase-auth.js');
-const a=au.getAuth(app.initializeApp(FB_CONFIG));a.languageCode='pt-BR';
-fb={a,...au};
-au.onAuthStateChanged(a,u=>{user=u;head();if((location.hash.slice(1)||'home').split('/')[0]==='conta')ren()});
-}catch(e){toast('Falha ao iniciar login: '+e.message)}}
-function head(){$('#acc').innerHTML=`<button class="g" type="button">${user?esc((user.displayName||user.email||'Conta').split(/[ @]/)[0]):'Entrar'}</button>`}
+  try{
+    const {data,error}=await almoraDB.auth.getSession();
+    if(error)throw error;
+    user=data.session?.user||null;
+    head();
+
+    almoraDB.auth.onAuthStateChange((event,session)=>{
+      user=session?.user||null;
+      head();
+      if((location.hash.slice(1)||'home').split('/')[0]==='conta')ren();
+    });
+  }catch(e){
+    toast('Falha ao iniciar login: '+e.message);
+  }
+}
+
+function head(){
+  const nome=user?.user_metadata?.display_name||user?.email||'Conta';
+  $('#acc').innerHTML=`<button class="g" type="button">${user?esc(nome.split(/[ @]/)[0]):'Entrar'}</button>`;
+}
+
 function conta(){
-if(!FB_OK)return `<div class="box" style="max-width:420px;margin:30px auto"><h2 style="margin-top:0">Conta</h2><p style="color:var(--mu)">O login ainda não foi configurado. Preencha <code>FB_CONFIG</code> no código com os dados do seu projeto Firebase e ative os provedores <b>E-mail/senha</b> e <b>Google</b> em Authentication.</p></div>`;
-if(user)return `<div class="box" style="max-width:420px;margin:30px auto"><h2 style="margin-top:0">Minha conta</h2>
-<p><b>${esc(user.displayName||'Leitor(a)')}</b><br><span style="color:var(--mu)">${esc(user.email)}</span></p>
-${!user.emailVerified&&user.providerData.some(p=>p.providerId==='password')?`<p style="color:#f5b73d">E-mail ainda não verificado.</p><div class="act"><button class="g" onclick="verif()">Reenviar e-mail de verificação</button></div>`:''}
-<div class="act"><button class="d" onclick="out()">Sair</button></div></div>`;
-const up=authMode==='up';
-return `<div class="box" style="max-width:420px;margin:30px auto"><h2 style="margin-top:0">${up?'Criar conta':'Entrar'}</h2>
-<div class="tabs"><button class="${up?'g':'on'}" onclick="authMode='in';ren()">Entrar</button><button class="${up?'on':'g'}" onclick="authMode='up';ren()">Cadastrar</button></div>
-<button class="gbtn" onclick="goog()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>${up?'Cadastrar':'Entrar'} com Google</button>
-<div class="sep">ou com e-mail</div>
-<form onsubmit="event.preventDefault();mail()">
-${up?`<label>Nome</label><input id="a_n" autocomplete="name">`:''}
-<label>E-mail</label><input id="a_e" type="email" autocomplete="email" required>
-<label>Senha</label><input id="a_p" type="password" autocomplete="${up?'new-password':'current-password'}" minlength="6" required>
-${up?`<label>Confirmar senha</label><input id="a_p2" type="password" autocomplete="new-password" required>`:''}
-<div class="act"><button type="submit" style="flex:1">${up?'Criar conta':'Entrar'}</button></div></form>
-${up?'':`<button class="lnk" onclick="reset()">Esqueci minha senha</button>`}</div>`}
-async function mail(){const e=$('#a_e').value.trim(),p=$('#a_p').value;
-try{if(authMode==='up'){if(p!==$('#a_p2').value)return toast('As senhas não coincidem.');
-const c=await fb.createUserWithEmailAndPassword(fb.a,e,p),n=$('#a_n').value.trim();
-if(n)await fb.updateProfile(c.user,{displayName:n});
-fb.sendEmailVerification(c.user).catch(()=>{});toast('Conta criada! Enviamos um e-mail de verificação.');}
-else{await fb.signInWithEmailAndPassword(fb.a,e,p);toast('Bem-vindo(a) de volta!')}
-location.hash='#home'}catch(x){toast(authErr(x))}}
-async function goog(){try{await fb.signInWithPopup(fb.a,new fb.GoogleAuthProvider());toast('Login realizado');location.hash='#home'}catch(x){toast(authErr(x))}}
-async function reset(){const e=$('#a_e').value.trim();if(!e)return toast('Digite seu e-mail acima.');try{await fb.sendPasswordResetEmail(fb.a,e);toast('Enviamos o link de redefinição para seu e-mail.')}catch(x){toast(authErr(x))}}
-async function verif(){try{await fb.sendEmailVerification(user);toast('E-mail de verificação enviado.')}catch(x){toast(authErr(x))}}
-async function out(){await fb.signOut(fb.a);toast('Você saiu da conta')}
+  if(user){
+    const nome=user.user_metadata?.display_name||'Leitor(a)';
+    return `<div class="box" style="max-width:420px;margin:30px auto">
+      <h2 style="margin-top:0">Minha conta</h2>
+      <p><b>${esc(nome)}</b><br>
+      <span style="color:var(--mu)">${esc(user.email||'')}</span></p>
+      <div class="act"><button class="d" onclick="out()">Sair</button></div>
+    </div>`;
+  }
+
+  const up=authMode==='up';
+
+  return `<div class="box" style="max-width:420px;margin:30px auto">
+    <h2 style="margin-top:0">${up?'Criar conta':'Entrar'}</h2>
+    <div class="tabs">
+      <button class="${up?'g':'on'}" onclick="authMode='in';ren()">Entrar</button>
+      <button class="${up?'on':'g'}" onclick="authMode='up';ren()">Cadastrar</button>
+    </div>
+    <div class="sep">ou com e-mail</div>
+    <form onsubmit="event.preventDefault();mail()">
+      ${up?`<label>Nome</label><input id="a_n" autocomplete="name">`:''}
+      <label>E-mail</label>
+      <input id="a_e" type="email" autocomplete="email" required>
+      <label>Senha</label>
+      <input id="a_p" type="password" autocomplete="${up?'new-password':'current-password'}" minlength="6" required>
+      ${up?`<label>Confirmar senha</label><input id="a_p2" type="password" autocomplete="new-password" required>`:''}
+      <div class="act"><button type="submit" style="flex:1">${up?'Criar conta':'Entrar'}</button></div>
+    </form>
+    ${up?'':`<button class="lnk" onclick="reset()">Esqueci minha senha</button>`}
+  </div>`;
+}
+
+async function mail(){
+  const e=$('#a_e').value.trim();
+  const p=$('#a_p').value;
+
+  try{
+    if(authMode==='up'){
+      if(p!==$('#a_p2').value)return toast('As senhas não coincidem.');
+
+      const n=$('#a_n').value.trim();
+
+      const {data,error}=await almoraDB.auth.signUp({
+        email:e,
+        password:p,
+        options:{data:{display_name:n}}
+      });
+
+      if(error)throw error;
+      user=data.user;
+      toast('Conta criada com sucesso!');
+    }else{
+      const {data,error}=await almoraDB.auth.signInWithPassword({
+        email:e,
+        password:p
+      });
+
+      if(error)throw error;
+      user=data.user;
+      toast('Bem-vindo(a) de volta!');
+    }
+
+    location.hash='#home';
+  }catch(x){
+    toast(authErr(x));
+  }
+}
+
+async function goog(){
+  toast('O login com Google será configurado posteriormente.');
+}
+
+async function reset(){
+  const e=$('#a_e').value.trim();
+  if(!e)return toast('Digite seu e-mail acima.');
+
+  try{
+    const {error}=await almoraDB.auth.resetPasswordForEmail(e,{
+      redirectTo:location.origin+location.pathname
+    });
+    if(error)throw error;
+    toast('Se o e-mail estiver cadastrado, enviaremos um link de recuperação.');
+  }catch(x){
+    toast(authErr(x));
+  }
+}
+
+async function out(){
+  const {error}=await almoraDB.auth.signOut();
+  if(error)return toast(authErr(error));
+  user=null;
+  toast('Você saiu da conta');
+  }
+      
 /* STUDIO */
 const sha=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('');
 async function pin(){const v=$('#pin').value;if(v.length<6)return toast('Use ao menos 6 caracteres');const h=await sha(v);if(!S.pin){S.pin=h;save();unlocked=true}else if(S.pin===h)unlocked=true;else return toast('Senha incorreta');ren()}
