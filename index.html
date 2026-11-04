@@ -43,6 +43,10 @@ h2{font-size:18px;margin:22px 0 10px;border-left:4px solid var(--ac);padding-lef
 .rd{max-width:var(--w,720px);margin:0 auto}.rd img{display:block;width:100%;min-height:200px;background:var(--sf)}
 .bar{position:sticky;top:calc(env(safe-area-inset-top,0px) + 54px);z-index:4;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg);padding:8px 0}
 .th{display:flex;gap:8px;align-items:center;margin:6px 0}.th img{width:40px;height:56px;object-fit:cover;border-radius:6px}
+.gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;color:#1f1f1f;border:1px solid #dadce0}
+.sep{display:flex;align-items:center;gap:10px;color:var(--mu);font-size:13px;margin:12px 0}.sep:before,.sep:after{content:"";flex:1;height:1px;background:var(--bd)}
+.tabs{display:flex;gap:6px;margin-bottom:8px}.tabs button{flex:1}.tabs button.on{background:var(--ac2);color:#fff}
+.lnk{background:none;border:0;color:var(--ac);padding:4px 0;text-decoration:underline;font-weight:400}
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ac2);color:#fff;padding:10px 16px;border-radius:12px;display:none;z-index:9;max-width:90%}
 footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
 </style>
@@ -52,6 +56,7 @@ footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
 <a class="logo" href="#home" aria-label="ALMORA">Alm<svg viewBox="0 0 100 92"><path d="M8 8l32 14c14-5 26-5 40 0l12-14 4 40c-2 20-14 34-34 40-24-3-40-18-46-38z" fill="#050508" transform="translate(-2 0)"/><path d="M50 36l4 9h10l-8 6 3 10-9-6-9 6 3-10-8-6h10z" fill="#e2d9fa" transform="translate(-6 -2) scale(.9)"/><path d="M62 38c10-5 18-3 20 0-4 12-12 18-20 16z" fill="#b13df5"/></svg>ra</a>
 <nav id="nav"></nav>
 <input id="q" placeholder="Pesquisar…" style="flex:1;min-width:120px">
+<a id="acc" href="#conta"><button class="g" type="button">Entrar</button></a>
 <button class="g" id="th" title="Tema">◐</button>
 </header>
 <main id="app"></main>
@@ -111,6 +116,50 @@ const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}
 setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){S.prog[id].pg=+e.target.dataset.i;save()}}),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
 return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>Cap. ${esc(c.n)}</span><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
 <div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
+/* CONTA / AUTH (Firebase Authentication) */
+/* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
+const FB_CONFIG={apiKey:"",authDomain:"",projectId:"",appId:""};
+const FB_OK=!!FB_CONFIG.apiKey;
+let fb=null,user=null,authMode='in';
+const authErr=e=>({'auth/invalid-email':'E-mail inválido.','auth/missing-password':'Informe a senha.','auth/weak-password':'Senha fraca (mínimo 6 caracteres).','auth/email-already-in-use':'Este e-mail já está cadastrado.','auth/invalid-credential':'E-mail ou senha incorretos.','auth/user-not-found':'E-mail ou senha incorretos.','auth/wrong-password':'E-mail ou senha incorretos.','auth/too-many-requests':'Muitas tentativas. Tente novamente mais tarde.','auth/popup-closed-by-user':'Login com Google cancelado.','auth/popup-blocked':'Pop-up bloqueado pelo navegador.','auth/unauthorized-domain':'Domínio não autorizado no Firebase.','auth/network-request-failed':'Falha de rede.'}[e.code]||'Erro: '+(e.code||e.message));
+async function initAuth(){
+if(!FB_OK)return;
+try{const B='https://www.gstatic.com/firebasejs/10.12.2/';
+const app=await import(B+'firebase-app.js'),au=await import(B+'firebase-auth.js');
+const a=au.getAuth(app.initializeApp(FB_CONFIG));a.languageCode='pt-BR';
+fb={a,...au};
+au.onAuthStateChanged(a,u=>{user=u;head();if((location.hash.slice(1)||'home').split('/')[0]==='conta')ren()});
+}catch(e){toast('Falha ao iniciar login: '+e.message)}}
+function head(){$('#acc').innerHTML=`<button class="g" type="button">${user?esc((user.displayName||user.email||'Conta').split(/[ @]/)[0]):'Entrar'}</button>`}
+function conta(){
+if(!FB_OK)return `<div class="box" style="max-width:420px;margin:30px auto"><h2 style="margin-top:0">Conta</h2><p style="color:var(--mu)">O login ainda não foi configurado. Preencha <code>FB_CONFIG</code> no código com os dados do seu projeto Firebase e ative os provedores <b>E-mail/senha</b> e <b>Google</b> em Authentication.</p></div>`;
+if(user)return `<div class="box" style="max-width:420px;margin:30px auto"><h2 style="margin-top:0">Minha conta</h2>
+<p><b>${esc(user.displayName||'Leitor(a)')}</b><br><span style="color:var(--mu)">${esc(user.email)}</span></p>
+${!user.emailVerified&&user.providerData.some(p=>p.providerId==='password')?`<p style="color:#f5b73d">E-mail ainda não verificado.</p><div class="act"><button class="g" onclick="verif()">Reenviar e-mail de verificação</button></div>`:''}
+<div class="act"><button class="d" onclick="out()">Sair</button></div></div>`;
+const up=authMode==='up';
+return `<div class="box" style="max-width:420px;margin:30px auto"><h2 style="margin-top:0">${up?'Criar conta':'Entrar'}</h2>
+<div class="tabs"><button class="${up?'g':'on'}" onclick="authMode='in';ren()">Entrar</button><button class="${up?'on':'g'}" onclick="authMode='up';ren()">Cadastrar</button></div>
+<button class="gbtn" onclick="goog()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.9 6.1C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.8 7.2l7.5 5.8c4.4-4.1 7.1-10.1 7.1-17.5z"/><path fill="#FBBC05" d="M10.5 28.7c-.5-1.4-.8-3-.8-4.7s.3-3.2.8-4.7l-7.9-6.1C.9 16.4 0 20.1 0 24s.9 7.6 2.6 10.8l7.9-6.1z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.5-5.8c-2.1 1.4-4.9 2.3-8.4 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6.1C6.5 42.6 14.6 48 24 48z"/></svg>${up?'Cadastrar':'Entrar'} com Google</button>
+<div class="sep">ou com e-mail</div>
+<form onsubmit="event.preventDefault();mail()">
+${up?`<label>Nome</label><input id="a_n" autocomplete="name">`:''}
+<label>E-mail</label><input id="a_e" type="email" autocomplete="email" required>
+<label>Senha</label><input id="a_p" type="password" autocomplete="${up?'new-password':'current-password'}" minlength="6" required>
+${up?`<label>Confirmar senha</label><input id="a_p2" type="password" autocomplete="new-password" required>`:''}
+<div class="act"><button type="submit" style="flex:1">${up?'Criar conta':'Entrar'}</button></div></form>
+${up?'':`<button class="lnk" onclick="reset()">Esqueci minha senha</button>`}</div>`}
+async function mail(){const e=$('#a_e').value.trim(),p=$('#a_p').value;
+try{if(authMode==='up'){if(p!==$('#a_p2').value)return toast('As senhas não coincidem.');
+const c=await fb.createUserWithEmailAndPassword(fb.a,e,p),n=$('#a_n').value.trim();
+if(n)await fb.updateProfile(c.user,{displayName:n});
+fb.sendEmailVerification(c.user).catch(()=>{});toast('Conta criada! Enviamos um e-mail de verificação.');}
+else{await fb.signInWithEmailAndPassword(fb.a,e,p);toast('Bem-vindo(a) de volta!')}
+location.hash='#home'}catch(x){toast(authErr(x))}}
+async function goog(){try{await fb.signInWithPopup(fb.a,new fb.GoogleAuthProvider());toast('Login realizado');location.hash='#home'}catch(x){toast(authErr(x))}}
+async function reset(){const e=$('#a_e').value.trim();if(!e)return toast('Digite seu e-mail acima.');try{await fb.sendPasswordResetEmail(fb.a,e);toast('Enviamos o link de redefinição para seu e-mail.')}catch(x){toast(authErr(x))}}
+async function verif(){try{await fb.sendEmailVerification(user);toast('E-mail de verificação enviado.')}catch(x){toast(authErr(x))}}
+async function out(){await fb.signOut(fb.a);toast('Você saiu da conta')}
 /* STUDIO */
 const sha=async s=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s)))].map(b=>b.toString(16).padStart(2,'0')).join('');
 async function pin(){const v=$('#pin').value;if(v.length<6)return toast('Use ao menos 6 caracteres');const h=await sha(v);if(!S.pin){S.pin=h;save();unlocked=true}else if(S.pin===h)unlocked=true;else return toast('Senha incorreta');ren()}
@@ -135,12 +184,12 @@ w.chapters.push({n:+n,title:$('#c_t').value,date:Date.now(),pages:draft});if(sav
 const arch=id=>{const w=W(id);w.archived=!w.archived;save();ren()},delW=id=>{if(confirm('Excluir obra?')){S.works=S.works.filter(w=>w.id!==id);save();ren()}},delC=(id,n)=>{if(confirm('Excluir capítulo?')){const w=W(id);w.chapters=w.chapters.filter(c=>String(c.n)!==n);save();ren()}};
 function bk(){const d=JSON.stringify({...S,works:S.works.map(w=>({...w,cover:'',chapters:w.chapters.map(c=>({...c,pages:c.pages.length}))}))},null,1);navigator.clipboard?.writeText(d);toast('Backup copiado')}
 function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
-A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():home();
+A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():home();
 document.title=r==='obra'&&W(a)?W(a).title+' — ALMORA':'ALMORA — Where every story finds a home'}
 addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
 $('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
 $('#th').onclick=()=>{const d=document.documentElement,c=getComputedStyle(d).getPropertyValue('--bg').trim()==='#121214';d.dataset.theme=c?'light':'dark'};
-ren();
+ren();initAuth();
 </script>
 </body>
 </html>
