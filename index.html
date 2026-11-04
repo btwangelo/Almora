@@ -50,6 +50,16 @@ h2{font-size:18px;margin:22px 0 10px;border-left:4px solid var(--ac);padding-lef
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ac2);color:#fff;padding:10px 16px;border-radius:12px;display:none;z-index:9;max-width:90%}
 footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
+<script>
+const ALMORA_URL = https://mcdinntggkanmsqubozn.supabase.co/rest/v1/;
+const ALMORA_KEY = sb_publishable_dbymLTRkJyrohmyCjS6aPA_25sOAS61;
+
+const almoraDB = window.supabase.createClient(
+  ALMORA_URL,
+  ALMORA_KEY
+);
+</script>
 </head>
 <body>
 <header>
