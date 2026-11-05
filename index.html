@@ -142,20 +142,109 @@ const authErr=e=>{
   return msgs[e.code]||msgs[e.message]||'Erro: '+(e.message||'Tente novamente.');
 };
 
+async function loadCatalog(){
+  try{
+    const [
+      {data:works,error:worksError},
+      {data:chapters,error:chaptersError},
+      {data:pages,error:pagesError}
+    ] = await Promise.all([
+      almoraDB.from('works').select('*').order('created_at',{ascending:false}),
+      almoraDB.from('chapters').select('*').order('chapter_number'),
+      almoraDB.from('pages').select('*').order('page_number')
+    ]);
+
+    if(worksError)throw worksError;
+    if(chaptersError)throw chaptersError;
+    if(pagesError)throw pagesError;
+
+    const oldWorks=S.works||[];
+    const pageGroups={};
+
+    pages.forEach(p=>{
+      if(!pageGroups[p.chapter_id])pageGroups[p.chapter_id]=[];
+      pageGroups[p.chapter_id].push(p);
+    });
+
+    const chapterGroups={};
+
+    chapters.forEach(c=>{
+      if(!chapterGroups[c.work_id])chapterGroups[c.work_id]=[];
+
+      const chapterPages=(pageGroups[c.id]||[])
+        .sort((a,b)=>a.page_number-b.page_number)
+        .map(p=>p.image_url);
+
+      chapterGroups[c.work_id].push({
+        id:c.id,
+        n:Number(c.chapter_number),
+        title:c.title||'',
+        date:new Date(c.created_at).getTime(),
+        pages:chapterPages
+      });
+    });
+
+    const remoteWorks=works.map(w=>{
+      const old=oldWorks.find(x=>x.id===w.id);
+
+      return {
+        id:w.id,
+        title:w.title,
+        alt:w.alternative_title||'',
+        cat:w.work_type,
+        author:w.author_name||'',
+        illus:w.illustrator||'',
+        genres:(w.genre||[]).join(', '),
+        age:w.age_rating,
+        status:w.work_status||'Em andamento',
+        rights:w.rights_holder||'',
+        synopsis:w.synopsis||'',
+        cover:w.cover_url||'',
+        created:new Date(w.created_at).getTime(),
+        reads:old?.reads||0,
+        archived:old?.archived||false,
+        chapters:chapterGroups[w.id]||[]
+      };
+    });
+
+    const remoteIds=new Set(remoteWorks.map(w=>w.id));
+    const localOnly=oldWorks.filter(w=>!remoteIds.has(w.id));
+
+    S.works=[...remoteWorks,...localOnly];
+
+  }catch(e){
+    console.error('Erro ao carregar catálogo:',e);
+    toast('Erro ao carregar catálogo: '+e.message);
+  }
+}
+
 async function initAuth(){
   try{
     const {data,error}=await almoraDB.auth.getSession();
     if(error)throw error;
+
     user=data.session?.user||null;
     head();
+
+    await loadCatalog();
+    ren();
 
     almoraDB.auth.onAuthStateChange((event,session)=>{
       user=session?.user||null;
       head();
-      if((location.hash.slice(1)||'home').split('/')[0]==='conta')ren();
+
+      if(event==='SIGNED_IN' || event==='SIGNED_OUT'){
+        loadCatalog().then(()=>{
+          ren();
+        });
+      }else if((location.hash.slice(1)||'home').split('/')[0]==='conta'){
+        ren();
+      }
     });
+
   }catch(e){
-    toast('Falha ao iniciar login: '+e.message);
+    toast('Falha ao iniciar: '+e.message);
+    console.error(e);
   }
 }
 
