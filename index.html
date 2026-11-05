@@ -293,8 +293,67 @@ function comp(f,mw){return new Promise(r=>{const fr=new FileReader();fr.onload=(
 async function pages(el){draft=(await Promise.all([...el.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(f=>comp(f,900)))).filter(Boolean);drawD()}
 function drawD(){$('#dr').innerHTML=draft.map((s,i)=>`<div class="th"><img src="${s}"><span>Pág. ${i+1}</span><button class="g" onclick="mv(${i},-1)">↑</button><button class="g" onclick="mv(${i},1)">↓</button><button class="d" onclick="draft.splice(${i},1);drawD()">✕</button></div>`).join('')}
 function mv(i,d){const j=i+d;if(j<0||j>=draft.length)return;[draft[i],draft[j]]=[draft[j],draft[i]];drawD()}
-async function addW(){const t=$('#n_t').value.trim();if(!t)return toast('Informe o título');if(!$('#n_l').value.trim())return toast('Informe titular/licença');const f=$('#n_cv').files[0];
-S.works.push({id:Date.now().toString(36),title:t,alt:$('#n_a').value,cat:$('#n_c').value,author:$('#n_au').value,illus:$('#n_il').value,genres:$('#n_g').value,age:$('#n_ag').value,status:$('#n_s').value,rights:$('#n_l').value,synopsis:$('#n_sy').value,cover:f?await comp(f,400):'',created:Date.now(),reads:0,chapters:[]});if(save()){toast('Obra cadastrada');ren()}else S.works.pop()}
+async function addW(){
+  const t=$('#n_t').value.trim();
+  const rights=$('#n_l').value.trim();
+  if(!t)return toast('Informe o título');
+  if(!rights)return toast('Informe titular/licença');
+  if(!user)return toast('Entre na conta administrativa');
+
+  const f=$('#n_cv').files[0];
+  let cover='';
+
+  try{
+    if(f){
+      const name=f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+      const path=user.id+'/'+Date.now()+'-'+name;
+      const {data,error}=await almoraDB.storage
+        .from('work-covers')
+        .upload(path,f,{contentType:f.type,upsert:false});
+      if(error)throw error;
+      cover=almoraDB.storage.from('work-covers').getPublicUrl(data.path).data.publicUrl;
+    }
+
+    const payload={
+      title:t,
+      alternative_title:$('#n_a').value.trim(),
+      work_type:$('#n_c').value,
+      author_name:$('#n_au').value.trim(),
+      illustrator:$('#n_il').value.trim(),
+      genre:$('#n_g').value.split(',').map(x=>x.trim()).filter(Boolean),
+      age_rating:$('#n_ag').value,
+      status:'published',
+      work_status:$('#n_s').value,
+      rights_holder:rights,
+      synopsis:$('#n_sy').value.trim(),
+      cover_url:cover,
+      created_by:user.id
+    };
+
+    const {data,error}=await almoraDB
+      .from('works')
+      .insert(payload)
+      .select()
+      .single();
+
+    if(error)throw error;
+
+    S.works.push({
+      id:data.id,title:data.title,alt:data.alternative_title||'',
+      cat:data.work_type,author:data.author_name||'',
+      illus:data.illustrator||'',genres:(data.genre||[]).join(', '),
+      age:data.age_rating,status:data.work_status,rights:data.rights_holder,
+      synopsis:data.synopsis||'',cover:data.cover_url||'',
+      created:Date.now(),reads:0,chapters:[]
+    });
+
+    save();
+    toast('Obra cadastrada e publicada!');
+    ren();
+  }catch(e){
+    toast('Erro ao cadastrar: '+e.message);
+  }
+}
 function addC(){const id=$('#c_w').value,n=$('#c_n').value,w=W(id);if(!w||n==='')return toast('Escolha obra e número');if(!draft.length)return toast('Adicione páginas');if(w.chapters.some(c=>String(c.n)===n))return toast('Número já existe');
 w.chapters.push({n:+n,title:$('#c_t').value,date:Date.now(),pages:draft});if(save()){draft=[];toast('Capítulo publicado');ren()}else w.chapters.pop()}
 const arch=id=>{const w=W(id);w.archived=!w.archived;save();ren()},delW=id=>{if(confirm('Excluir obra?')){S.works=S.works.filter(w=>w.id!==id);save();ren()}},delC=(id,n)=>{if(confirm('Excluir capítulo?')){const w=W(id);w.chapters=w.chapters.filter(c=>String(c.n)!==n);save();ren()}};
