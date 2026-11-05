@@ -354,8 +354,90 @@ async function addW(){
     toast('Erro ao cadastrar: '+e.message);
   }
 }
-function addC(){const id=$('#c_w').value,n=$('#c_n').value,w=W(id);if(!w||n==='')return toast('Escolha obra e número');if(!draft.length)return toast('Adicione páginas');if(w.chapters.some(c=>String(c.n)===n))return toast('Número já existe');
-w.chapters.push({n:+n,title:$('#c_t').value,date:Date.now(),pages:draft});if(save()){draft=[];toast('Capítulo publicado');ren()}else w.chapters.pop()}
+
+async function addC(){
+  const id=$('#c_w').value;
+  const n=$('#c_n').value;
+  const w=W(id);
+  const title=$('#c_t').value.trim();
+
+  if(!user)return toast('Entre na conta administrativa');
+  if(!w||n==='')return toast('Escolha obra e número');
+  if(!draft.length)return toast('Adicione páginas');
+  if(w.chapters.some(c=>String(c.n)===n))
+    return toast('Número já existe');
+
+  const btn=document.querySelector('#app button[onclick="addC()"]');
+  if(btn){btn.disabled=true;btn.textContent='Enviando páginas...';}
+
+  try{
+    const uploaded=[];
+
+    for(let i=0;i<draft.length;i++){
+      const blob=await fetch(draft[i]).then(r=>r.blob());
+      const path=`${user.id}/${id}/${Date.now()}-${i+1}.jpg`;
+
+      const {data,error}=await almoraDB.storage
+        .from('chapter-pages')
+        .upload(path,blob,{
+          contentType:'image/jpeg',
+          upsert:false
+        });
+
+      if(error)throw error;
+
+      const url=almoraDB.storage
+        .from('chapter-pages')
+        .getPublicUrl(data.path).data.publicUrl;
+
+      uploaded.push({page_number:i+1,image_url:url});
+    }
+
+    const {data:chapter,error:chapterError}=await almoraDB
+      .from('chapters')
+      .insert({
+        work_id:id,
+        chapter_number:Number(n),
+        title:title||null,
+        status:'published'
+      })
+      .select()
+      .single();
+
+    if(chapterError)throw chapterError;
+
+    const pageRows=uploaded.map(p=>({
+      chapter_id:chapter.id,
+      page_number:p.page_number,
+      image_url:p.image_url
+    }));
+
+    const {error:pagesError}=await almoraDB
+      .from('pages')
+      .insert(pageRows);
+
+    if(pagesError)throw pagesError;
+
+    w.chapters.push({
+      id:chapter.id,
+      n:Number(n),
+      title,
+      date:Date.now(),
+      pages:uploaded.map(p=>p.image_url)
+    });
+
+    draft=[];
+    save();
+    toast('Capítulo publicado com sucesso!');
+    ren();
+
+  }catch(e){
+    toast('Erro ao publicar capítulo: '+e.message);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Publicar capítulo';}
+  }
+    }
+    
 const arch=id=>{const w=W(id);w.archived=!w.archived;save();ren()},delW=id=>{if(confirm('Excluir obra?')){S.works=S.works.filter(w=>w.id!==id);save();ren()}},delC=(id,n)=>{if(confirm('Excluir capítulo?')){const w=W(id);w.chapters=w.chapters.filter(c=>String(c.n)!==n);save();ren()}};
 function bk(){const d=JSON.stringify({...S,works:S.works.map(w=>({...w,cover:'',chapters:w.chapters.map(c=>({...c,pages:c.pages.length}))}))},null,1);navigator.clipboard?.writeText(d);toast('Backup copiado')}
 function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
