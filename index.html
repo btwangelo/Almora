@@ -464,7 +464,42 @@ function comp(f,mw){return new Promise(r=>{const fr=new FileReader();fr.onload=(
 async function pages(el){draft=(await Promise.all([...el.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(f=>comp(f,900)))).filter(Boolean);drawD()}
 function drawD(){$('#dr').innerHTML=draft.map((s,i)=>`<div class="th"><img src="${s}"><span>Pág. ${i+1}</span><button class="g" onclick="mv(${i},-1)">↑</button><button class="g" onclick="mv(${i},1)">↓</button><button class="d" onclick="draft.splice(${i},1);drawD()">✕</button></div>`).join('')}
 function mv(i,d){const j=i+d;if(j<0||j>=draft.length)return;[draft[i],draft[j]]=[draft[j],draft[i]];drawD()}
-async function addW(){
+  async function almoraUploadToR2(file) {
+  const { data: { session }, error } = await almoraDB.auth.getSession();
+
+  if (error) throw error;
+  if (!session) throw new Error('Faça login novamente.');
+
+  const form = new FormData();
+  form.append('file', file);
+
+  const response = await fetch(
+    'https://almora-storage.kauansousa353.workers.dev/upload',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`
+      },
+      body: form
+    }
+  );
+
+  const text = await response.text();
+  let result = {};
+
+  try {
+    result = JSON.parse(text);
+  } catch {}
+
+  if (!response.ok) {
+    throw new Error(result.error || text || 'Erro ao enviar imagem.');
+  }
+
+  if (!result.url) throw new Error('URL da imagem não recebida.');
+
+  return result.url;
+  }
+  async function addW(){
   const t=$('#n_t').value.trim();
   const rights=$('#n_l').value.trim();
   if(!t)return toast('Informe o título');
