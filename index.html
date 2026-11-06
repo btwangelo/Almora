@@ -1581,13 +1581,23 @@ window.almoraSaveProfile = async function() {
 
         return `
           <article class="almora-comment">
-            <div class="almora-comment-head">
-              <a class="almora-comment-author"
-                 href="#perfil/${c.user_id}">
-                ${esc(name)}
-              </a>
-              <span class="almora-comment-date">${esc(date)}</span>
-            </div>
+  <div class="almora-comment-head">
+    <a class="almora-comment-author"
+       href="#perfil/${c.user_id}">
+      ${p.avatar_url ? `
+        <img class="almora-comment-avatar"
+             src="${esc(p.avatar_url)}"
+             alt=""
+             onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+      ` : ''}
+      <span class="almora-comment-avatar-fallback"
+            style="display:${p.avatar_url ? 'none' : 'grid'}">
+        👤
+      </span>
+      <span>${esc(name)}</span>
+    </a>
+    <span class="almora-comment-date">${esc(date)}</span>
+  </div>
 
             <div class="almora-comment-body">${esc(c.body)}</div>
 
@@ -1772,6 +1782,27 @@ window.almoraSaveProfile = async function() {
   };
 })();
         </script>
+  
+  .almora-comment-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+}
+
+.almora-comment-avatar,
+.almora-comment-avatar-fallback {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.almora-comment-avatar-fallback {
+  background: var(--bd);
+  place-items: center;
+}
   
 <style>
 /* ALMORA — Comentários por capítulo */
