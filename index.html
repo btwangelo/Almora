@@ -967,6 +967,275 @@ a:active {
   }
 }
 </style>
-  
+
+<style>
+/* ALMORA — Perfis públicos */
+
+.almora-profile {
+  max-width: 720px;
+  margin: 25px auto;
+}
+
+.almora-profile-head {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 18px;
+  padding: 22px;
+}
+
+.almora-avatar {
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--sf2);
+  border: 2px solid var(--ac);
+}
+
+.almora-profile-info {
+  flex: 1;
+  min-width: 180px;
+}
+
+.almora-profile-info h1 {
+  margin: 0;
+  font-size: 23px;
+}
+
+.almora-username {
+  color: var(--ac);
+  font-size: 14px;
+}
+
+.almora-bio {
+  color: var(--mu);
+  white-space: pre-wrap;
+  margin-top: 14px;
+}
+
+.almora-profile form {
+  margin-top: 18px;
+}
+
+.almora-profile form label {
+  display: block;
+  margin: 12px 0 4px;
+  color: var(--mu);
+}
+
+.almora-profile form input,
+.almora-profile form textarea {
+  width: 100%;
+}
+
+.almora-profile-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+}
+</style>
+
+<script>
+(() => {
+  let currentProfile = null;
+  let profileRequest = 0;
+
+  const oldNav = window.nav;
+
+  window.nav = function(route) {
+    oldNav(route);
+
+    if (user) {
+      const active = route === 'perfil' ? 'on' : '';
+      $('#nav').insertAdjacentHTML(
+        'beforeend',
+        `<a href="#perfil" class="${active}">Perfil</a>`
+      );
+    }
+  };
+
+  async function loadProfile(id) {
+    const request = ++profileRequest;
+    const app = $('#app');
+
+    app.innerHTML = '<div class="empty">Carregando perfil...</div>';
+
+    try {
+      const { data, error } = await almoraDB
+        .from('profiles')
+        .select('id,username,display_name,avatar_url,bio,created_at')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (request !== profileRequest) return;
+      if (error) throw error;
+
+      if (!data) {
+        app.innerHTML = '<div class="empty">Perfil não encontrado.</div>';
+        return;
+      }
+
+      currentProfile = data;
+
+      const own = user && user.id === data.id;
+      const name = data.display_name || 'Leitor(a)';
+      const username = data.username || 'leitor';
+      const avatar = data.avatar_url || '';
+
+      app.innerHTML = `
+        <section class="almora-profile">
+          <div class="almora-profile-head">
+            ${avatar
+              ? `<img class="almora-avatar"
+                  src="${esc(avatar)}"
+                  alt="Foto de perfil"
+                  onerror="this.style.display='none'">`
+              : `<div class="almora-avatar"
+                  style="display:grid;place-items:center">
+                  <span style="font-size:36px">♧</span>
+                </div>`}
+
+            <div class="almora-profile-info">
+              <h1>${esc(name)}</h1>
+              <div class="almora-username">
+                @${esc(username)}
+              </div>
+              <div style="color:var(--mu);font-size:12px">
+                Leitor(a) da ALMORA
+              </div>
+            </div>
+          </div>
+
+          <div class="almora-bio">
+            ${esc(data.bio || 'Este leitor ainda não escreveu uma biografia.')}
+          </div>
+
+          <div class="almora-profile-actions">
+            ${own ? `
+              <button onclick="almoraEditProfile()">
+                Editar perfil
+              </button>
+              <button class="g" onclick="out()">
+                Sair da conta
+              </button>
+            ` : ''}
+
+            <button class="g"
+              onclick="almoraShareProfile('${data.id}')">
+              Compartilhar perfil
+            </button>
+          </div>
+        </section>
+      `;
+    } catch (error) {
+      if (request !== profileRequest) return;
+      app.innerHTML =
+        '<div class="empty">Não foi possível carregar o perfil: ' +
+        esc(error.message) + '</div>';
+    }
+  }
+
+  window.almoraEditProfile = function() {
+    if (!currentProfile || !user ||
+        currentProfile.id !== user.id) return;
+
+    $('#app').innerHTML = `
+      <section class="almora-profile">
+        <h2>Editar perfil</h2>
+
+        <form onsubmit="event.preventDefault();almoraSaveProfile()">
+          <label>Nome de exibição</label>
+          <input id="profile_name"
+            maxlength="60"
+            required
+            value="${esc(currentProfile.display_name || '')}">
+
+          <label>Foto de perfil (URL da imagem)</label>
+          <input id="profile_avatar"
+            type="url"
+            value="${esc(currentProfile.avatar_url || '')}"
+            placeholder="https://...">
+
+          <label>Biografia</label>
+          <textarea id="profile_bio"
+            rows="5"
+            maxlength="300"
+            placeholder="Conte um pouco sobre você...">${esc(currentProfile.bio || '')}</textarea>
+
+          <div class="almora-profile-actions">
+            <button type="submit">Salvar alterações</button>
+            <button type="button" class="g"
+              onclick="ren()">Cancelar</button>
+          </div>
+        </form>
+      </section>
+    `;
+  };
+
+  window.almoraSaveProfile = async function() {
+    if (!user || !currentProfile ||
+        currentProfile.id !== user.id) return;
+
+    const name = $('#profile_name').value.trim();
+    const avatar = $('#profile_avatar').value.trim();
+    const bio = $('#profile_bio').value.trim();
+
+    if (!name) return toast('Informe seu nome de exibição.');
+
+    try {
+      const { error } = await almoraDB
+        .from('profiles')
+        .update({
+          display_name: name,
+          avatar_url: avatar || null,
+          bio: bio || null
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast('Perfil atualizado com sucesso!');
+      await loadProfile(user.id);
+    } catch (error) {
+      toast('Erro ao atualizar perfil: ' + error.message);
+    }
+  };
+
+  window.almoraShareProfile = function(id) {
+    const url = location.origin + location.pathname + '#perfil/' + id;
+
+    navigator.clipboard?.writeText(url)
+      .then(() => toast('Link do perfil copiado!'))
+      .catch(() => toast(url));
+  };
+
+  const oldRender = window.ren;
+
+  window.ren = function(...args) {
+    oldRender.apply(this, args);
+
+    const [route, id] = location.hash.slice(1).split('/');
+
+    if (route === 'perfil') {
+      setTimeout(() => {
+        const target = id || user?.id;
+
+        if (!target) {
+          $('#app').innerHTML =
+            '<div class="empty">Entre na sua conta para acessar seu perfil. <a href="#conta">Entrar</a></div>';
+          return;
+        }
+
+        loadProfile(target);
+      }, 230);
+    }
+  };
+})();
+</script>
 </body>
 </html>
