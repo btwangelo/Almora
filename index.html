@@ -1846,6 +1846,391 @@ a:active {
   };
 })();
 </script>
+
+<style>
+/* ALMORA — Central de moderação */
+.almora-mod {
+  margin: 24px 0;
+  padding: 16px;
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 16px;
+}
+.almora-mod-card {
+  margin: 14px 0;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+}
+.almora-mod-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.almora-mod-meta {
+  color: var(--mu);
+  font-size: 12px;
+  margin: 7px 0;
+}
+.almora-mod-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 10px;
+  background: var(--sf);
+  border-radius: 9px;
+  margin: 10px 0;
+}
+.almora-mod-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.almora-mod-actions button {
+  flex: 1;
+  min-width: 130px;
+}
+.almora-mod-status {
+  font-size: 12px;
+  color: var(--mu);
+  border: 1px solid var(--bd);
+  border-radius: 99px;
+  padding: 4px 9px;
+}
+.almora-mod select {
+  width: 100%;
+  margin: 10px 0;
+}
+</style>
+
+<script>
+(() => {
+  const originalStudio = window.studio;
+
+  if (typeof originalStudio !== 'function') {
+    console.error('ALMORA: função Studio não encontrada.');
+    return;
+  }
+
+  const statusName = status => ({
+    pending: 'Pendente',
+    resolved: 'Analisada',
+    rejected: 'Rejeitada'
+  }[status] || status || 'Pendente');
+
+  const reasonName = reason => ({
+    '1': 'Ofensa ou assédio',
+    '2': 'Discurso de ódio',
+    '3': 'Spam',
+    '4': 'Spoiler',
+    '5': 'Outro'
+  }[String(reason)] || reason || 'Não informado');
+
+  window.studio = function(...args) {
+    const html = originalStudio.apply(this, args);
+
+    if (!unlocked) return html;
+
+    return html + `
+      <section class="almora-mod" id="almora-moderation">
+        <h2>Central de moderação</h2>
+        <p style="color:var(--mu)">
+          Gerencie denúncias e comentários da comunidade.
+        </p>
+
+        <label for="almora-report-filter">Filtrar denúncias</label>
+        <select id="almora-report-filter"
+          onchange="almoraLoadReports()">
+          <option value="pending">Pendentes</option>
+          <option value="all">Todas</option>
+          <option value="resolved">Analisadas</option>
+          <option value="rejected">Rejeitadas</option>
+        </select>
+
+        <div id="almora-report-list">
+          <div class="empty">Carregando denúncias...</div>
+        </div>
+
+        <button class="g" style="width:100%;margin-top:12px"
+          onclick="almoraLoadReports()">
+          Atualizar denúncias
+        </button>
+      </section>
+    `;
+  };
+
+  async function verifyAdmin() {
+    if (!user) return false;
+
+    const { data, error } = await almoraDB
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (error) throw error;
+
+    return ['admin', 'superadmin'].includes(data?.role);
+  }
+
+  window.almoraLoadReports = async function() {
+    const mount = document.getElementById('almora-report-list');
+    if (!mount) return;
+
+    mount.innerHTML =
+      '<div class="empty">Carregando denúncias...</div>';
+
+    try {
+      if (!await verifyAdmin()) {
+        mount.innerHTML =
+          '<div class="empty">Acesso restrito à administração.</div>';
+        return;
+      }
+
+      const filter =
+        document.getElementById('almora-report-filter')?.value || 'pending';
+
+      let query = almoraDB
+        .from('reports')
+        .select('id,reporter_id,comment_id,work_id,reason,details,status,created_at')
+        .order('created_at', { ascending: false });
+
+      if (filter !== 'all') {
+        query = query.eq('status', filter);
+      }
+
+      const { data: reports, error } = await query;
+      if (error) throw error;
+
+      if (!reports?.length) {
+        mount.innerHTML =
+          '<div class="empty">Nenhuma denúncia nesta categoria.</div>';
+        return;
+      }
+
+      const commentIds = [...new Set(
+        reports.map(r => r.comment_id).filter(Boolean)
+      )];
+
+      const workIds = [...new Set(
+        reports.map(r => r.work_id).filter(Boolean)
+      )];
+
+      const profileIds = [...new Set(
+        reports.map(r => r.reporter_id).filter(Boolean)
+      )];
+
+      const [commentResult, workResult, profileResult] =
+        await Promise.all([
+          commentIds.length
+            ? almoraDB.from('comments')
+                .select('id,body,user_id,status')
+                .in('id', commentIds)
+            : Promise.resolve({ data: [], error: null }),
+
+          workIds.length
+            ? almoraDB.from('works')
+                .select('id,title')
+                .in('id', workIds)
+            : Promise.resolve({ data: [], error: null }),
+
+          profileIds.length
+            ? almoraDB.from('profiles')
+                .select('id,username,display_name')
+                .in('id', profileIds)
+            : Promise.resolve({ data: [], error: null })
+        ]);
+
+      if (commentResult.error) throw commentResult.error;
+      if (workResult.error) throw workResult.error;
+      if (profileResult.error) throw profileResult.error;
+
+      const comments = Object.fromEntries(
+        (commentResult.data || []).map(c => [c.id, c])
+      );
+
+      const works = Object.fromEntries(
+        (workResult.data || []).map(w => [w.id, w])
+      );
+
+      const profiles = Object.fromEntries(
+        (profileResult.data || []).map(p => [p.id, p])
+      );
+
+      mount.innerHTML = reports.map(report => {
+        const comment = comments[report.comment_id];
+        const work = works[report.work_id];
+        const reporter = profiles[report.reporter_id];
+
+        const reporterName =
+          reporter?.display_name ||
+          reporter?.username ||
+          'Leitor(a)';
+
+        const date = new Date(report.created_at)
+          .toLocaleString('pt-BR');
+
+        const pending = report.status === 'pending';
+
+        return `
+          <article class="almora-mod-card">
+            <div class="almora-mod-head">
+              <b>${esc(work?.title || 'Obra não identificada')}</b>
+              <span class="almora-mod-status">
+                ${esc(statusName(report.status))}
+              </span>
+            </div>
+
+            <div class="almora-mod-meta">
+              Denunciado em ${esc(date)}
+            </div>
+
+            <div class="almora-mod-meta">
+              Denunciante:
+              <a href="#perfil/${report.reporter_id}"
+                style="color:var(--ac)">
+                ${esc(reporterName)}
+              </a>
+            </div>
+
+            <div class="almora-mod-meta">
+              Motivo: <b>${esc(reasonName(report.reason))}</b>
+            </div>
+
+            ${report.details ? `
+              <div class="almora-mod-meta">
+                Detalhes da denúncia:
+              </div>
+              <div class="almora-mod-body">
+                ${esc(report.details)}
+              </div>
+            ` : ''}
+
+            <div class="almora-mod-meta">
+              Comentário denunciado:
+            </div>
+
+            <div class="almora-mod-body">
+              ${comment
+                ? esc(comment.body)
+                : 'O comentário não está mais disponível.'}
+            </div>
+
+            ${comment ? `
+              <div class="almora-mod-meta">
+                Situação do comentário:
+                ${esc(comment.status)}
+              </div>
+            ` : ''}
+
+            ${pending ? `
+              <div class="almora-mod-actions">
+                ${comment ? `
+                  <button class="d"
+                    onclick="almoraModerateReport('${report.id}','remove')">
+                    Remover comentário
+                  </button>
+                  <button class="g"
+                    onclick="almoraModerateReport('${report.id}','keep')">
+                    Manter comentário
+                  </button>
+                ` : ''}
+                <button class="g"
+                  onclick="almoraModerateReport('${report.id}','reject')">
+                  Rejeitar denúncia
+                </button>
+              </div>
+            ` : ''}
+          </article>
+        `;
+      }).join('');
+
+    } catch (error) {
+      console.error('Erro na central de moderação:', error);
+      mount.innerHTML =
+        '<div class="empty">Não foi possível carregar as denúncias: ' +
+        esc(error.message) + '</div>';
+    }
+  };
+
+  window.almoraModerateReport = async function(reportId, action) {
+    try {
+      if (!await verifyAdmin()) {
+        return toast('Acesso restrito à administração.');
+      }
+
+      const messages = {
+        remove: 'Remover o comentário e aprovar a denúncia?',
+        keep: 'Manter o comentário e encerrar a denúncia?',
+        reject: 'Rejeitar esta denúncia?'
+      };
+
+      if (!confirm(messages[action] || 'Confirmar ação?')) return;
+
+      const { data: report, error: reportError } = await almoraDB
+        .from('reports')
+        .select('id,comment_id')
+        .eq('id', reportId)
+        .single();
+
+      if (reportError) throw reportError;
+
+      if (action === 'remove' && report.comment_id) {
+        const { error } = await almoraDB
+          .from('comments')
+          .update({
+            status: 'hidden',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', report.comment_id);
+
+        if (error) throw error;
+      }
+
+      const newStatus =
+        action === 'reject' ? 'rejected' : 'resolved';
+
+      const { error: updateError } = await almoraDB
+        .from('reports')
+        .update({ status: newStatus })
+        .eq('id', reportId);
+
+      if (updateError) throw updateError;
+
+      toast(
+        action === 'remove'
+          ? 'Comentário removido da visualização pública.'
+          : action === 'keep'
+            ? 'Denúncia encerrada. Comentário mantido.'
+            : 'Denúncia rejeitada.'
+      );
+
+      await window.almoraLoadReports();
+
+    } catch (error) {
+      console.error('Erro ao moderar denúncia:', error);
+      toast('Erro na moderação: ' + error.message);
+    }
+  };
+
+  const oldRender = window.ren;
+
+  window.ren = function(...args) {
+    oldRender.apply(this, args);
+
+    if (location.hash.slice(1).split('/')[0] === 'studio' && unlocked) {
+      setTimeout(() => {
+        if (document.getElementById('almora-report-list')) {
+          window.almoraLoadReports();
+        }
+      }, 250);
+    }
+  };
+})();
+</script>
   
 </body>
 </html>
