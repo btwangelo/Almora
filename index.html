@@ -3148,6 +3148,138 @@ window.almoraSavePrivacy = async function() {
   }
 })();
 </script>
+
+<style>
+/* ALMORA — Selos da equipe */
+.almora-staff-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  vertical-align: middle;
+  margin-left: 5px;
+}
+
+.almora-staff-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid currentColor;
+}
+
+.almora-badge-owner {
+  color: #e5b94f;
+  background: #e5b94f18;
+}
+
+.almora-badge-admin {
+  color: #b77aff;
+  background: #b77aff18;
+}
+
+.almora-badge-moderator {
+  color: #55c6a0;
+  background: #55c6a018;
+}
+
+.almora-badge-translator {
+  color: #65a9ed;
+  background: #65a9ed18;
+}
+
+.almora-badge-editor {
+  color: #ed91bd;
+  background: #ed91bd18;
+}
+
+.almora-badge-reviewer {
+  color: #d5a46d;
+  background: #d5a46d18;
+}
+</style>
+
+<script>
+(() => {
+  const roles = {
+    owner: {
+      label: 'Dono',
+      icon: '♛'
+    },
+    admin: {
+      label: 'Administrador',
+      icon: '✦'
+    },
+    moderator: {
+      label: 'Moderador',
+      icon: '✧'
+    },
+    translator: {
+      label: 'Tradutor',
+      icon: '✎'
+    },
+    editor: {
+      label: 'Editor',
+      icon: '✒'
+    },
+    reviewer: {
+      label: 'Revisor',
+      icon: '✓'
+    }
+  };
+
+  window.almoraLoadStaffBadges = async function(ids) {
+    const uniqueIds = [...new Set(ids || [])];
+    const result = {};
+
+    if (!uniqueIds.length) return result;
+
+    const { data, error } = await almoraDB
+      .from('staff_roles')
+      .select('user_id,role_key')
+      .in('user_id', uniqueIds);
+
+    if (error) throw error;
+
+    (data || []).forEach(item => {
+      const role = roles[item.role_key];
+      if (!role) return;
+
+      if (!result[item.user_id]) {
+        result[item.user_id] = [];
+      }
+
+      result[item.user_id].push({
+        key: item.role_key,
+        label: role.label,
+        icon: role.icon
+      });
+    });
+
+    return result;
+  };
+
+  window.almoraRenderStaffBadges = function(userBadges) {
+    if (!userBadges || !userBadges.length) return '';
+
+    return `
+      <span class="almora-staff-badges">
+        ${userBadges.map(b => `
+          <span
+            class="almora-staff-badge almora-badge-${b.key}"
+            title="${esc(b.label)}"
+          >${esc(b.icon)} ${esc(b.label)}</span>
+        `).join('')}
+      </span>
+    `;
+  };
+})();
+</script>
   
 </body>
 </html>
