@@ -1549,11 +1549,12 @@ window.almoraSaveProfile = async function() {
     try {
       const { data, error } = await almoraDB
         .from('comments')
-        .select('id,user_id,work_id,body,created_at,updated_at')
+        
         .eq('work_id', workId)
         .is('chapter_id', null)
-        .order('created_at', { ascending: true });
-
+        .order('is_pinned', { ascending: false })
+.order('created_at', { ascending: true });
+.select('id,user_id,work_id,body,created_at,updated_at,is_pinned')
       if (error) throw error;
       if (!document.getElementById(mountId)) return;
 
@@ -1580,7 +1581,11 @@ window.almoraSaveProfile = async function() {
         const own = user && user.id === c.user_id;
 
         return `
-          <article class="almora-comment">
+          <article class="almora-comment"
+  data-comment-id="${c.id}"
+  data-work-id="${workId}"
+  data-comment-type="work"
+  data-is-pinned="${c.is_pinned ? 'true' : 'false'}">
   <div class="almora-comment-head">
     <a class="almora-comment-author"
        href="#perfil/${c.user_id}">
@@ -1882,10 +1887,11 @@ window.almoraSaveProfile = async function() {
     try {
       const { data, error } = await almoraDB
         .from('comments')
-        .select('id,user_id,body,created_at')
+        .select('id,user_id,body,created_at,is_pinned')
         .eq('work_id', workId)
         .eq('chapter_id', chapterId)
-        .order('created_at', { ascending: true });
+        .order('is_pinned', { ascending: false })
+.order('created_at', { ascending: true });
 
       if (error) throw error;
       if (!document.getElementById('almora-chapter-comments')) return;
@@ -1910,7 +1916,12 @@ window.almoraSaveProfile = async function() {
         const own = user && user.id === c.user_id;
 
         return `
-          <article class="almora-chapter-comment">
+          <article class="almora-chapter-comment"
+  data-comment-id="${c.id}"
+  data-work-id="${workId}"
+  data-chapter-id="${chapterId}"
+  data-comment-type="chapter"
+  data-is-pinned="${c.is_pinned ? 'true' : 'false'}">
             <div class="almora-chapter-comment-head">
               <a class="almora-chapter-comment-author"
    href="#perfil/${c.user_id}">
