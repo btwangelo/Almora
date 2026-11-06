@@ -1237,5 +1237,303 @@ a:active {
   };
 })();
 </script>
+
+<style>
+/* ALMORA — Comentários das obras */
+.almora-comments {
+  margin: 28px 0;
+  padding-top: 12px;
+}
+.almora-comment {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  padding: 13px;
+  margin: 10px 0;
+}
+.almora-comment-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.almora-comment-author {
+  color: var(--ac);
+  font-weight: 600;
+}
+.almora-comment-date {
+  color: var(--mu);
+  font-size: 11px;
+}
+.almora-comment-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 10px 0;
+}
+.almora-comment-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.almora-comment-actions button {
+  font-size: 12px;
+  padding: 5px 9px;
+}
+.almora-comment-form textarea {
+  display: block;
+  width: 100%;
+  min-height: 95px;
+  margin: 10px 0;
+  resize: vertical;
+}
+.almora-comment-form button {
+  width: 100%;
+}
+</style>
+
+<script>
+(() => {
+  const originalObra = window.obra;
+
+  if (typeof originalObra !== 'function') {
+    console.error('ALMORA: função obra não encontrada.');
+    return;
+  }
+
+  const mountId = 'almora-work-comments';
+
+  async function loadWorkComments(workId) {
+    const mount = document.getElementById(mountId);
+    if (!mount) return;
+
+    mount.innerHTML = '<div class="empty">Carregando comentários...</div>';
+
+    try {
+      const { data, error } = await almoraDB
+        .from('comments')
+        .select('id,user_id,work_id,body,created_at,updated_at')
+        .eq('work_id', workId)
+        .is('chapter_id', null)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (!document.getElementById(mountId)) return;
+
+      const ids = [...new Set((data || []).map(c => c.user_id))];
+      let profiles = {};
+
+      if (ids.length) {
+        const result = await almoraDB
+          .from('profiles')
+          .select('id,username,display_name,avatar_url')
+          .in('id', ids);
+
+        if (result.error) throw result.error;
+
+        (result.data || []).forEach(p => {
+          profiles[p.id] = p;
+        });
+      }
+
+      const comments = (data || []).map(c => {
+        const p = profiles[c.user_id] || {};
+        const name = p.display_name || p.username || 'Leitor(a)';
+        const date = new Date(c.created_at).toLocaleString('pt-BR');
+        const own = user && user.id === c.user_id;
+
+        return `
+          <article class="almora-comment">
+            <div class="almora-comment-head">
+              <a class="almora-comment-author"
+                 href="#perfil/${c.user_id}">
+                ${esc(name)}
+              </a>
+              <span class="almora-comment-date">${esc(date)}</span>
+            </div>
+
+            <div class="almora-comment-body">${esc(c.body)}</div>
+
+            <div class="almora-comment-actions">
+              ${own ? `
+                <button class="g"
+                  onclick="almoraEditComment('${c.id}','${workId}')">
+                  Editar
+                </button>
+                <button class="d"
+                  onclick="almoraDeleteComment('${c.id}','${workId}')">
+                  Excluir
+                </button>
+              ` : user ? `
+                <button class="g"
+                  onclick="almoraReportComment('${c.id}','${workId}')">
+                  Denunciar
+                </button>
+              ` : ''}
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      mount.innerHTML = `
+        <h2>Comentários (${data.length})</h2>
+        ${comments || '<div class="empty">Ainda não há comentários. Seja o primeiro!</div>'}
+
+        ${user ? `
+          <form class="almora-comment-form"
+            onsubmit="event.preventDefault();almoraSubmitComment('${workId}')">
+            <label for="almora-comment-body">
+              Deixe seu comentário
+            </label>
+            <textarea id="almora-comment-body"
+              maxlength="2000"
+              required
+              placeholder="O que você achou desta obra?"></textarea>
+            <button type="submit">Publicar comentário</button>
+          </form>
+        ` : `
+          <div class="empty">
+            <a href="#conta" style="color:var(--ac)">
+              Entre na sua conta
+            </a>
+            para comentar.
+          </div>
+        `}
+      `;
+    } catch (error) {
+      console.error('Erro nos comentários:', error);
+      const target = document.getElementById(mountId);
+      if (target) {
+        target.innerHTML =
+          '<div class="empty">Não foi possível carregar os comentários.</div>';
+      }
+    }
+  }
+
+  window.almoraSubmitComment = async function(workId) {
+    if (!user) return toast('Entre na sua conta para comentar.');
+
+    const field = document.getElementById('almora-comment-body');
+    const body = field?.value.trim();
+
+    if (!body) return toast('Escreva um comentário.');
+
+    try {
+      const { error } = await almoraDB
+        .from('comments')
+        .insert({
+          user_id: user.id,
+          work_id: workId,
+          chapter_id: null,
+          body
+        });
+
+      if (error) throw error;
+
+      toast('Comentário publicado!');
+      await loadWorkComments(workId);
+    } catch (error) {
+      toast('Erro ao publicar comentário: ' + error.message);
+    }
+  };
+
+  window.almoraEditComment = async function(id, workId) {
+    const { data, error } = await almoraDB
+      .from('comments')
+      .select('body')
+      .eq('id', id)
+      .single();
+
+    if (error) return toast('Não foi possível abrir o comentário.');
+
+    const body = prompt('Edite seu comentário:', data.body);
+    if (body === null) return;
+    if (!body.trim()) return toast('O comentário não pode ficar vazio.');
+
+    try {
+      const result = await almoraDB
+        .from('comments')
+        .update({
+          body: body.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (result.error) throw result.error;
+
+      toast('Comentário atualizado!');
+      await loadWorkComments(workId);
+    } catch (error) {
+      toast('Erro ao editar: ' + error.message);
+    }
+  };
+
+  window.almoraDeleteComment = async function(id, workId) {
+    if (!confirm('Deseja excluir este comentário?')) return;
+
+    try {
+      const { error } = await almoraDB
+        .from('comments')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast('Comentário excluído.');
+      await loadWorkComments(workId);
+    } catch (error) {
+      toast('Erro ao excluir: ' + error.message);
+    }
+  };
+
+  window.almoraReportComment = async function(id, workId) {
+    if (!user) return toast('Entre na sua conta para denunciar.');
+
+    const reason = prompt(
+      'Motivo da denúncia:\n' +
+      '1 - Ofensa ou assédio\n' +
+      '2 - Discurso de ódio\n' +
+      '3 - Spam\n' +
+      '4 - Spoiler\n' +
+      '5 - Outro'
+    );
+
+    if (!reason?.trim()) return;
+
+    const details = prompt('Detalhes adicionais (opcional):') || '';
+
+    try {
+      const { error } = await almoraDB
+        .from('reports')
+        .insert({
+          reporter_id: user.id,
+          comment_id: id,
+          work_id: workId,
+          reason: reason.trim(),
+          details: details.trim() || null
+        });
+
+      if (error) throw error;
+
+      toast('Denúncia enviada para análise.');
+    } catch (error) {
+      toast('Erro ao enviar denúncia: ' + error.message);
+    }
+  };
+
+  window.obra = function(id) {
+    const html = originalObra(id);
+
+    setTimeout(() => loadWorkComments(id), 0);
+
+    return html + `
+      <section class="almora-comments" id="${mountId}">
+        <h2>Comentários</h2>
+        <div class="empty">Carregando...</div>
+      </section>
+    `;
+  };
+})();
+        </script>
 </body>
 </html>
