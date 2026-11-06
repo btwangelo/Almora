@@ -2941,18 +2941,25 @@ window.almoraSaveProfile = async function() {
 
   // Consulta a autorização diretamente no Supabase
   async function checkAdmin() {
+  const previousAdminStatus = adminStatus;
+
+  if (typeof user === 'undefined' || !user) {
     adminStatus = false;
 
-    if (typeof user === 'undefined' || !user) {
+    if (previousAdminStatus !== adminStatus) {
       window.ren();
-      return;
     }
 
-    const { data, error } = await almoraDB.rpc('is_admin');
+    return;
+  }
 
-    adminStatus = !error && data === true;
+  const { data, error } = await almoraDB.rpc('is_admin');
 
+  adminStatus = !error && data === true;
+
+  if (previousAdminStatus !== adminStatus) {
     window.ren();
+  }
   }
 
   // Verifica ao iniciar e quando a autenticação mudar
