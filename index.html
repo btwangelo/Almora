@@ -577,18 +577,7 @@ async function addC(){
       const blob=await fetch(draft[i]).then(r=>r.blob());
       const path=`${user.id}/${id}/${Date.now()}-${i+1}.jpg`;
 
-      const {data,error}=await almoraDB.storage
-        .from('chapter-pages')
-        .upload(path,blob,{
-          contentType:'image/jpeg',
-          upsert:false
-        });
-
-      if(error)throw error;
-
-      const url=almoraDB.storage
-        .from('chapter-pages')
-        .getPublicUrl(data.path).data.publicUrl;
+      const url = await almoraUploadToR2(blob);
 
       uploaded.push({page_number:i+1,image_url:url});
     }
