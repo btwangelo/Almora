@@ -1550,11 +1550,14 @@ window.almoraSaveProfile = async function() {
       const { data, error } = await almoraDB
         .from('comments')
         
-        .eq('work_id', workId)
-        .is('chapter_id', null)
-        .order('is_pinned', { ascending: false })
-.order('created_at', { ascending: true });
-.select('id,user_id,work_id,body,created_at,updated_at,is_pinned')
+        const { data, error } = await almoraDB
+  .from('comments')
+  .select('id,user_id,work_id,body,created_at,updated_at,is_pinned')
+  .eq('work_id', workId)
+  .is('chapter_id', null)
+  .order('is_pinned', { ascending: false })
+  .order('created_at', { ascending: true });
+      
       if (error) throw error;
       if (!document.getElementById(mountId)) return;
 
