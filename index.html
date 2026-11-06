@@ -1167,11 +1167,14 @@ a:active {
           <div class="almora-profile-actions">
             ${own ? `
               <button onclick="almoraEditProfile()">
-                Editar perfil
-              </button>
-              <button class="g" onclick="out()">
-                Sair da conta
-              </button>
+  Editar perfil
+</button>
+<button class="g" onclick="almoraOpenPrivacy()">
+  Privacidade
+</button>
+<button class="g" onclick="out()">
+  Sair da conta
+</button>
             ` : ''}
 
             <button class="g"
