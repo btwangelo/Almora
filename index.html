@@ -780,5 +780,126 @@ ren();initAuth();
   }, 700);
 })();
 </script>
+
+<style>
+/* ALMORA — carregamento de imagens */
+
+@keyframes almoraShimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.cv {
+  background-color: var(--sf2);
+  position: relative;
+  overflow: hidden;
+}
+
+.cv.almora-cover-loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 20%,
+    #ffffff18 45%,
+    #ffffff35 50%,
+    #ffffff18 55%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  animation: almoraShimmer 1.5s infinite;
+  pointer-events: none;
+}
+
+.cv.almora-cover-ready::after {
+  opacity: 0;
+  transition: opacity .35s ease;
+}
+
+.rd img {
+  opacity: 0;
+  transition: opacity .45s ease;
+}
+
+.rd img.almora-img-ready {
+  opacity: 1;
+}
+
+.rd img.almora-img-error {
+  opacity: .5;
+  background: var(--sf2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cv.almora-cover-loading::after {
+    animation: none;
+  }
+  .rd img {
+    transition: none;
+  }
+}
+</style>
+
+<script>
+(() => {
+  function prepareImages(root = document) {
+    root.querySelectorAll('.cv').forEach(el => {
+      const bg = getComputedStyle(el).backgroundImage;
+      const match = bg.match(/url\(["']?(.*?)["']?\)/);
+
+      if (!match) {
+        el.classList.remove('almora-cover-loading');
+        el.classList.add('almora-cover-ready');
+        return;
+      }
+
+      if (el.dataset.almoraChecked === 'yes') return;
+      el.dataset.almoraChecked = 'yes';
+      el.classList.add('almora-cover-loading');
+
+      const img = new Image();
+
+      img.onload = () => {
+        el.classList.remove('almora-cover-loading');
+        el.classList.add('almora-cover-ready');
+      };
+
+      img.onerror = () => {
+        el.classList.remove('almora-cover-loading');
+        el.classList.add('almora-cover-ready');
+      };
+
+      img.src = match[1];
+    });
+
+    root.querySelectorAll('.rd img').forEach(img => {
+      if (img.dataset.almoraChecked === 'yes') return;
+      img.dataset.almoraChecked = 'yes';
+
+      if (img.complete && img.naturalWidth > 0) {
+        img.classList.add('almora-img-ready');
+      } else {
+        img.addEventListener('load', () => {
+          img.classList.add('almora-img-ready');
+        }, { once: true });
+
+        img.addEventListener('error', () => {
+          img.classList.add('almora-img-error');
+        }, { once: true });
+      }
+    });
+  }
+
+  prepareImages();
+
+  const app = document.querySelector('#app');
+
+  if (app) {
+    new MutationObserver(() => prepareImages(app))
+      .observe(app, { childList: true, subtree: true });
+  }
+})();
+</script>
 </body>
 </html>
