@@ -1895,9 +1895,9 @@ window.almoraSaveProfile = async function() {
 
       if (ids.length) {
         const result = await almoraDB
-          .from('profiles')
-          .select('id,username,display_name')
-          .in('id', ids);
+  .from('profiles')
+  .select('id,username,display_name,avatar_url')
+  .in('id', ids);
 
         if (result.error) throw result.error;
         (result.data || []).forEach(p => profiles[p.id] = p);
