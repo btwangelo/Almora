@@ -76,7 +76,23 @@ const almoraDB = window.supabase.createClient(
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S={works:[],prog:{},lib:{},fav:{},rate:{},pin:null},unlocked=false,draft=[];
 try{Object.assign(S,JSON.parse(localStorage.getItem('almora')||'{}'))}catch(e){}
-const save=()=>{try{localStorage.setItem('almora',JSON.stringify(S));return true}catch(e){toast('Armazenamento cheio. Remova obras/imagens.');return false}};
+
+const save=()=>{
+  try{
+    const personalData={
+      prog:S.prog||{},
+      lib:S.lib||{},
+      fav:S.fav||{},
+      rate:S.rate||{}
+    };
+    localStorage.setItem('almora',JSON.stringify(personalData));
+    return true;
+  }catch(e){
+    toast('Não foi possível salvar seus dados pessoais.');
+    return false;
+  }
+};
+
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3200)}
 const W=id=>S.works.find(w=>w.id===id);
 const last=w=>w.chapters.length?Math.max(...w.chapters.map(c=>c.date)):w.created;
@@ -436,7 +452,6 @@ async function addW(){
       created:Date.now(),reads:0,chapters:[]
     });
 
-    save();
     toast('Obra cadastrada e publicada!');
     ren();
   }catch(e){
@@ -516,7 +531,6 @@ async function addC(){
     });
 
     draft=[];
-    save();
     toast('Capítulo publicado com sucesso!');
     ren();
 
