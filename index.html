@@ -158,7 +158,23 @@ const rowOf=ws=>`<div class="row">${ws.map((w,i)=>card(w,'',i+1)).join('')}</div
 const gridOf=ws=>`<div class="grid">${ws.map(w=>card(w)).join('')}</div>`;
 const upd=ws=>`<div class="grid">${ws.map(w=>card(w,[...w.chapters].sort((a,b)=>b.date-a.date).slice(0,2).map(c=>`<div class="ch"><b>Capítulo ${esc(c.n)}${Date.now()-c.date<864e5*3?' <span class="new">New</span>':''}</b><span>${ago(c.date)}</span></div>`).join(''))).join('')}</div>`;
 const pub=()=>S.works.filter(w=>!w.archived);
-function nav(r){$('#nav').innerHTML=[['home','Início'],['bl','BL'],['gl','GL'],['explorar','Explorar'],['atualizacoes','Atualizações'],['biblioteca','Minha biblioteca'],['studio','Studio']].map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}">${t}</a>`).join('')}
+function nav(r){
+  const links=[
+    ['home','Início'],
+    ['bl','BL'],
+    ['gl','GL'],
+    ['explorar','Explorar'],
+    ['atualizacoes','Atualizações'],
+    ['biblioteca','Minha biblioteca'],
+    ['studio','Studio']
+  ];
+
+  if(user) links.push(['perfil','Perfil']);
+
+  $('#nav').innerHTML=links
+    .map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}">${t}</a>`)
+    .join('');
+  }
 function home(){const p=pub(),byR=[...p].sort((a,b)=>(b.reads||0)-(a.reads||0)),byU=[...p].sort((a,b)=>last(b)-last(a));
 return (p.length?'':`<div class="empty"><b>Bem-vindo(a) à ALMORA.</b><br>O catálogo está vazio. Cadastre a primeira obra no <a href="#studio" style="color:var(--ac)"><u>ALMORA STUDIO</u></a>.</div>`)+
 sec('Popular hoje',byR.filter(w=>w.reads).slice(0,10),rowOf)+sec('Últimas atualizações',byU.filter(w=>w.chapters.length).slice(0,12),upd)+
