@@ -629,6 +629,38 @@ function almoraFilterChapterWorks(){
     select.value=selected;
   }
 }
+  function drawD(){
+  const box=$('#dr');
+  if(!box)return;
+
+  if(!draft.length){
+    box.innerHTML='';
+    return;
+  }
+
+  box.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;margin-top:12px">
+      ${draft.map((src,i)=>`
+        <div style="background:var(--sf2);padding:6px;border-radius:8px;text-align:center">
+          <img src="${src}" style="width:100%;aspect-ratio:2/3;object-fit:contain;border-radius:5px">
+          <small>Página ${i+1}</small>
+          <div style="display:flex;gap:4px;margin-top:5px">
+            <button type="button" class="g" onclick="moveDraft(${i},-1)" ${i===0?'disabled':''}>←</button>
+            <button type="button" class="g" onclick="moveDraft(${i},1)" ${i===draft.length-1?'disabled':''}>→</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+function moveDraft(index,direction){
+  const target=index+direction;
+  if(target<0||target>=draft.length)return;
+
+  [draft[index],draft[target]]=[draft[target],draft[index]];
+  drawD();
+                                     }
 async function pages(el){
   const files=[...el.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
   if(!files.length)return;
