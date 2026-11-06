@@ -1535,5 +1535,317 @@ a:active {
   };
 })();
         </script>
+  
+<style>
+/* ALMORA — Comentários por capítulo */
+.almora-chapter-comments {
+  max-width: 720px;
+  margin: 32px auto;
+  padding-top: 18px;
+  border-top: 1px solid var(--bd);
+}
+.almora-chapter-comment {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  padding: 13px;
+  margin: 10px 0;
+}
+.almora-chapter-comment-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.almora-chapter-comment-author {
+  color: var(--ac);
+  font-weight: 600;
+}
+.almora-chapter-comment-date {
+  color: var(--mu);
+  font-size: 11px;
+}
+.almora-chapter-comment-body {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 10px 0;
+}
+.almora-chapter-comment-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.almora-chapter-comment-actions button {
+  font-size: 12px;
+  padding: 5px 9px;
+}
+.almora-chapter-comment-form textarea {
+  width: 100%;
+  min-height: 95px;
+  margin: 10px 0;
+  display: block;
+}
+.almora-chapter-comment-form button {
+  width: 100%;
+}
+</style>
+
+<script>
+(() => {
+  let renderTimer;
+
+  async function loadChapterComments(workId, chapterId) {
+    const mount = document.getElementById('almora-chapter-comments');
+    if (!mount) return;
+
+    mount.innerHTML = '<div class="empty">Carregando comentários...</div>';
+
+    try {
+      const { data, error } = await almoraDB
+        .from('comments')
+        .select('id,user_id,body,created_at')
+        .eq('work_id', workId)
+        .eq('chapter_id', chapterId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      if (!document.getElementById('almora-chapter-comments')) return;
+
+      const ids = [...new Set((data || []).map(c => c.user_id))];
+      const profiles = {};
+
+      if (ids.length) {
+        const result = await almoraDB
+          .from('profiles')
+          .select('id,username,display_name')
+          .in('id', ids);
+
+        if (result.error) throw result.error;
+        (result.data || []).forEach(p => profiles[p.id] = p);
+      }
+
+      const comments = (data || []).map(c => {
+        const p = profiles[c.user_id] || {};
+        const name = p.display_name || p.username || 'Leitor(a)';
+        const date = new Date(c.created_at).toLocaleString('pt-BR');
+        const own = user && user.id === c.user_id;
+
+        return `
+          <article class="almora-chapter-comment">
+            <div class="almora-chapter-comment-head">
+              <a class="almora-chapter-comment-author"
+                 href="#perfil/${c.user_id}">
+                ${esc(name)}
+              </a>
+              <span class="almora-chapter-comment-date">
+                ${esc(date)}
+              </span>
+            </div>
+
+            <div class="almora-chapter-comment-body">
+              ${esc(c.body)}
+            </div>
+
+            <div class="almora-chapter-comment-actions">
+              ${own ? `
+                <button class="g"
+                  onclick="almoraEditChapterComment('${c.id}','${workId}','${chapterId}')">
+                  Editar
+                </button>
+                <button class="d"
+                  onclick="almoraDeleteChapterComment('${c.id}','${workId}','${chapterId}')">
+                  Excluir
+                </button>
+              ` : user ? `
+                <button class="g"
+                  onclick="almoraReportChapterComment('${c.id}','${workId}')">
+                  Denunciar
+                </button>
+              ` : ''}
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      mount.innerHTML = `
+        <h2>Comentários deste capítulo (${data.length})</h2>
+        ${comments || '<div class="empty">Ainda não há comentários neste capítulo.</div>'}
+
+        ${user ? `
+          <form class="almora-chapter-comment-form"
+            onsubmit="event.preventDefault();almoraSubmitChapterComment('${workId}','${chapterId}')">
+            <label for="almora-chapter-comment-body">
+              Comente este capítulo
+            </label>
+            <textarea id="almora-chapter-comment-body"
+              maxlength="2000"
+              required
+              placeholder="O que você achou deste capítulo?"></textarea>
+            <button type="submit">Publicar comentário</button>
+          </form>
+        ` : `
+          <div class="empty">
+            <a href="#conta" style="color:var(--ac)">
+              Entre na sua conta
+            </a> para comentar.
+          </div>
+        `}
+      `;
+    } catch (error) {
+      console.error('Erro nos comentários do capítulo:', error);
+      const target = document.getElementById('almora-chapter-comments');
+      if (target) {
+        target.innerHTML =
+          '<div class="empty">Não foi possível carregar os comentários.</div>';
+      }
+    }
+  }
+
+  window.almoraSubmitChapterComment = async function(workId, chapterId) {
+    if (!user) return toast('Entre na sua conta para comentar.');
+
+    const field = document.getElementById('almora-chapter-comment-body');
+    const body = field?.value.trim();
+
+    if (!body) return toast('Escreva um comentário.');
+
+    try {
+      const { error } = await almoraDB
+        .from('comments')
+        .insert({
+          user_id: user.id,
+          work_id: workId,
+          chapter_id: chapterId,
+          body
+        });
+
+      if (error) throw error;
+
+      toast('Comentário publicado!');
+      await loadChapterComments(workId, chapterId);
+    } catch (error) {
+      toast('Erro ao publicar: ' + error.message);
+    }
+  };
+
+  window.almoraEditChapterComment = async function(id, workId, chapterId) {
+    const { data, error } = await almoraDB
+      .from('comments')
+      .select('body')
+      .eq('id', id)
+      .single();
+
+    if (error) return toast('Não foi possível abrir o comentário.');
+
+    const body = prompt('Edite seu comentário:', data.body);
+
+    if (body === null) return;
+    if (!body.trim()) return toast('O comentário não pode ficar vazio.');
+
+    try {
+      const result = await almoraDB
+        .from('comments')
+        .update({
+          body: body.trim(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', id);
+
+      if (result.error) throw result.error;
+
+      toast('Comentário atualizado!');
+      await loadChapterComments(workId, chapterId);
+    } catch (error) {
+      toast('Erro ao editar: ' + error.message);
+    }
+  };
+
+  window.almoraDeleteChapterComment = async function(id, workId, chapterId) {
+    if (!confirm('Deseja excluir este comentário?')) return;
+
+    try {
+      const { error } = await almoraDB
+        .from('comments')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast('Comentário excluído.');
+      await loadChapterComments(workId, chapterId);
+    } catch (error) {
+      toast('Erro ao excluir: ' + error.message);
+    }
+  };
+
+  window.almoraReportChapterComment = async function(id, workId) {
+    if (!user) return toast('Entre na sua conta para denunciar.');
+
+    const reason = prompt(
+      'Motivo da denúncia:\n1 - Ofensa ou assédio\n2 - Discurso de ódio\n3 - Spam\n4 - Spoiler\n5 - Outro'
+    );
+
+    if (!reason?.trim()) return;
+
+    const details = prompt('Detalhes adicionais (opcional):') || '';
+
+    try {
+      const { error } = await almoraDB
+        .from('reports')
+        .insert({
+          reporter_id: user.id,
+          comment_id: id,
+          work_id: workId,
+          reason: reason.trim(),
+          details: details.trim() || null
+        });
+
+      if (error) throw error;
+
+      toast('Denúncia enviada para análise.');
+    } catch (error) {
+      toast('Erro ao denunciar: ' + error.message);
+    }
+  };
+
+  const originalRender = window.ren;
+  if (typeof originalRender !== 'function') return;
+
+  window.ren = function(...args) {
+    originalRender.apply(this, args);
+
+    clearTimeout(renderTimer);
+    renderTimer = setTimeout(() => {
+      const [route, workId, chapterNumber] =
+        location.hash.slice(1).split('/');
+
+      if (route !== 'ler' || !workId || !chapterNumber) return;
+
+      const work = W(workId);
+      const chapter = work?.chapters.find(
+        c => String(c.n) === String(chapterNumber)
+      );
+
+      if (!chapter?.id) return;
+
+      const app = document.getElementById('app');
+      if (!app) return;
+
+      document.getElementById('almora-chapter-comments')?.remove();
+
+      const section = document.createElement('section');
+      section.id = 'almora-chapter-comments';
+      section.className = 'almora-chapter-comments';
+      section.innerHTML =
+        '<div class="empty">Carregando comentários...</div>';
+
+      app.appendChild(section);
+      loadChapterComments(workId, chapter.id);
+    }, 380);
+  };
+})();
+</script>
+  
 </body>
 </html>
