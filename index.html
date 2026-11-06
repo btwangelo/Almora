@@ -1110,13 +1110,15 @@ a:active {
   let currentProfile = null;
   let profileRequest = 0;
 
+  // Adiciona o acesso ao perfil no menu.
   const oldNav = window.nav;
 
   window.nav = function(route) {
     oldNav(route);
 
-    if (user) {
+    if (user && !document.querySelector('#nav a[href="#perfil"]')) {
       const active = route === 'perfil' ? 'on' : '';
+
       $('#nav').insertAdjacentHTML(
         'beforeend',
         `<a href="#perfil" class="${active}">Perfil</a>`
@@ -1124,16 +1126,53 @@ a:active {
     }
   };
 
+  // Carrega um perfil.
   async function loadProfile(id) {
     const request = ++profileRequest;
     const app = $('#app');
 
-    app.innerHTML = '<div class="empty">Carregando perfil...</div>';
+    app.innerHTML =
+      '<div class="empty">Carregando perfil...</div>';
 
     try {
+      const own = user && user.id === id;
+
+      // Verifica a privacidade do perfil.
+      const { data: privacy, error: privacyError } =
+        await almoraDB
+          .from('profile_privacy')
+          .select('profile_public')
+          .eq('user_id', id)
+          .maybeSingle();
+
+      if (request !== profileRequest) return;
+      if (privacyError) throw privacyError;
+
+      if (privacy &&
+          privacy.profile_public === false &&
+          !own) {
+        currentProfile = null;
+
+        app.innerHTML = `
+          <section class="almora-profile">
+            <div class="empty">
+              <h2>🔒 Este perfil é privado</h2>
+              <p>
+                O proprietário deste perfil escolheu
+                limitar sua visualização.
+              </p>
+            </div>
+          </section>
+        `;
+        return;
+      }
+
+      // Busca os dados do perfil.
       const { data, error } = await almoraDB
         .from('profiles')
-        .select('id,username,display_name,avatar_url,bio,created_at')
+        .select(
+          'id,username,display_name,avatar_url,bio,created_at'
+        )
         .eq('id', id)
         .maybeSingle();
 
@@ -1141,35 +1180,45 @@ a:active {
       if (error) throw error;
 
       if (!data) {
-        app.innerHTML = '<div class="empty">Perfil não encontrado.</div>';
+        currentProfile = null;
+        app.innerHTML =
+          '<div class="empty">Perfil não encontrado.</div>';
         return;
       }
 
       currentProfile = data;
 
-      const own = user && user.id === data.id;
       const name = data.display_name || 'Leitor(a)';
       const username = data.username || 'leitor';
       const avatar = data.avatar_url || '';
 
       app.innerHTML = `
         <section class="almora-profile">
+
           <div class="almora-profile-head">
-            ${avatar
-              ? `<img class="almora-avatar"
-                  src="${esc(avatar)}"
-                  alt="Foto de perfil"
-                  onerror="this.style.display='none'">`
-              : `<div class="almora-avatar"
-                  style="display:grid;place-items:center">
-                  <span style="font-size:36px">♧</span>
-                </div>`}
+            ${
+              avatar
+                ? `
+                  <img class="almora-avatar"
+                    src="${esc(avatar)}"
+                    alt="Foto de perfil"
+                    onerror="this.style.display='none'">
+                `
+                : `
+                  <div class="almora-avatar"
+                    style="display:grid;place-items:center">
+                    <span style="font-size:36px">♧</span>
+                  </div>
+                `
+            }
 
             <div class="almora-profile-info">
               <h1>${esc(name)}</h1>
+
               <div class="almora-username">
                 @${esc(username)}
               </div>
+
               <div style="color:var(--mu);font-size:12px">
                 Leitor(a) da ALMORA
               </div>
@@ -1177,123 +1226,70 @@ a:active {
           </div>
 
           <div class="almora-bio">
-            ${esc(data.bio || 'Este leitor ainda não escreveu uma biografia.')}
+            ${esc(
+              data.bio ||
+              'Este leitor ainda não escreveu uma biografia.'
+            )}
           </div>
 
           <div class="almora-profile-actions">
-            ${own ? `
-              <button onclick="almoraEditProfile()">
-  Editar perfil
-</button>
-<button class="g" onclick="almoraOpenPrivacy()">
-  Privacidade
-</button>
-<button class="g" onclick="out()">
-  Sair da conta
-</button>
-            ` : ''}
+
+            ${
+              own
+                ? `
+                  <button onclick="almoraEditProfile()">
+                    Editar perfil
+                  </button>
+
+                  <button
+                    id="almora-privacy-button"
+                    class="g"
+                    onclick="almoraOpenPrivacy()">
+                    Privacidade
+                  </button>
+
+                  <button class="g" onclick="out()">
+                    Sair da conta
+                  </button>
+                `
+                : ''
+            }
 
             <button class="g"
               onclick="almoraShareProfile('${data.id}')">
               Compartilhar perfil
+            </button>
 
-    // Visitantes não podem visualizar perfis privados.
-    if (privacy && privacy.profile_public === false && !own) {
-      currentProfile = null;
-      app.innerHTML = `
-        <section class="almora-profile">
-          <div class="empty">
-            <h2>🔒 Este perfil é privado</h2>
-            <p>O proprietário deste perfil escolheu limitar sua visualização.</p>
           </div>
         </section>
       `;
-      return;
-    }
 
-    const { data, error } = await almoraDB
-      .from('profiles')
-      .select('id,username,display_name,avatar_url,bio,created_at')
-      .eq('id', id)
-      .maybeSingle();
+    } catch (error) {
+      if (request !== profileRequest) return;
 
-    if (request !== profileRequest) return;
-    if (error) throw error;
-
-    if (!data) {
       currentProfile = null;
-      app.innerHTML = '<div class="empty">Perfil não encontrado.</div>';
-      return;
+
+      app.innerHTML =
+        '<div class="empty">Não foi possível carregar o perfil: ' +
+        esc(error.message) + '</div>';
     }
-
-    currentProfile = data;
-    const name = data.display_name || 'Leitor(a)';
-    const username = data.username || 'leitor';
-    const avatar = data.avatar_url || '';
-
-    app.innerHTML = `
-      <section class="almora-profile">
-        <div class="almora-profile-head">
-          ${avatar
-            ? `<img class="almora-avatar"
-                src="${esc(avatar)}"
-                alt="Foto de perfil"
-                onerror="this.style.display='none'">`
-            : `<div class="almora-avatar"
-                style="display:grid;place-items:center">
-                <span style="font-size:36px">♧</span>
-              </div>`}
-          <div class="almora-profile-info">
-            <h1>${esc(name)}</h1>
-            <div class="almora-username">
-              @${esc(username)}
-            </div>
-            <div style="color:var(--mu);font-size:12px">
-              Leitor(a) da ALMORA
-            </div>
-          </div>
-        </div>
-
-        <div class="almora-bio">
-          ${esc(data.bio || 'Este leitor ainda não escreveu uma biografia.')}
-        </div>
-
-        <div class="almora-profile-actions">
-          ${own ? `
-            <button onclick="almoraEditProfile()">
-              Editar perfil
-            </button>
-            <button class="g" onclick="almoraOpenPrivacy()">
-              Privacidade
-            </button>
-            <button class="g" onclick="out()">
-              Sair da conta
-            </button>
-          ` : ''}
-          <button class="g"
-            onclick="almoraShareProfile('${data.id}')">
-            Compartilhar perfil
-          </button>
-        </div>
-      </section>
-    `;
-  } catch (error) {
-    if (request !== profileRequest) return;
-    app.innerHTML =
-      '<div class="empty">Não foi possível carregar o perfil: ' +
-      esc(error.message) + '</div>';
   }
-}
-              
+
+  // Abre a edição do perfil.
   window.almoraEditProfile = function() {
     if (!currentProfile || !user ||
         currentProfile.id !== user.id) return;
 
     $('#app').innerHTML = `
       <section class="almora-profile">
+
         <h2>Editar perfil</h2>
 
-        <form onsubmit="event.preventDefault();almoraSaveProfile()">
+        <form onsubmit="
+          event.preventDefault();
+          almoraSaveProfile();
+        ">
+
           <label>Nome de exibição</label>
           <input id="profile_name"
             maxlength="60"
@@ -1310,18 +1306,29 @@ a:active {
           <textarea id="profile_bio"
             rows="5"
             maxlength="300"
-            placeholder="Conte um pouco sobre você...">${esc(currentProfile.bio || '')}</textarea>
+            placeholder="Conte um pouco sobre você...">${esc(
+              currentProfile.bio || ''
+            )}</textarea>
 
           <div class="almora-profile-actions">
-            <button type="submit">Salvar alterações</button>
-            <button type="button" class="g"
-              onclick="ren()">Cancelar</button>
+
+            <button type="submit">
+              Salvar alterações
+            </button>
+
+            <button type="button"
+              class="g"
+              onclick="ren()">
+              Cancelar
+            </button>
+
           </div>
         </form>
       </section>
     `;
   };
 
+  // Salva as alterações do perfil.
   window.almoraSaveProfile = async function() {
     if (!user || !currentProfile ||
         currentProfile.id !== user.id) return;
@@ -1330,7 +1337,9 @@ a:active {
     const avatar = $('#profile_avatar').value.trim();
     const bio = $('#profile_bio').value.trim();
 
-    if (!name) return toast('Informe seu nome de exibição.');
+    if (!name) {
+      return toast('Informe seu nome de exibição.');
+    }
 
     try {
       const { error } = await almoraDB
@@ -1346,39 +1355,55 @@ a:active {
 
       toast('Perfil atualizado com sucesso!');
       await loadProfile(user.id);
+
     } catch (error) {
       toast('Erro ao atualizar perfil: ' + error.message);
     }
   };
 
-  window.almoraShareProfile = function(id) {
-    const url = location.origin + location.pathname + '#perfil/' + id;
+  // Compartilha o perfil.
+  window.almoraShareProfile = async function(id) {
+    const url =
+      location.origin +
+      location.pathname +
+      '#perfil/' + id;
 
-    navigator.clipboard?.writeText(url)
-      .then(() => toast('Link do perfil copiado!'))
-      .catch(() => toast(url));
+    try {
+      await navigator.clipboard.writeText(url);
+      toast('Link do perfil copiado!');
+    } catch (error) {
+      toast(url);
+    }
   };
 
+  // Conecta a rota #perfil ao sistema de navegação.
+  const originalRender = window.ren;
 
-const originalRender = window.ren;
+  window.ren = function(...args) {
+    originalRender.apply(this, args);
 
-window.ren = function(...args) {
-  originalRender.apply(this, args);
+    const [route, id] = location.hash
+      .slice(1)
+      .split('/');
 
-  const [route, id] = location.hash.slice(1).split('/');
+    if (route !== 'perfil') return;
 
-  if (route !== 'perfil') return;
+    const target = id || user?.id;
 
-  const target = id || user?.id;
+    if (!target) {
+      currentProfile = null;
 
-  if (!target) {
-    $('#app').innerHTML =
-      '<div class="empty">Entre na sua conta para acessar seu perfil. <a href="#conta">Entrar</a></div>';
-    return;
-  }
+      $('#app').innerHTML = `
+        <div class="empty">
+          Entre na sua conta para acessar seu perfil.
+          <a href="#conta">Entrar</a>
+        </div>
+      `;
+      return;
+    }
 
-  loadProfile(target);
-};
+    loadProfile(target);
+  };
 
 })();
 </script>
