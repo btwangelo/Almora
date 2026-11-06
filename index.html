@@ -2869,31 +2869,40 @@ body:has(#nav a[href="#home"].on) #app .empty {
     }
   };
 
-  window.almoraSavePrivacy = async function() {
-    if (!user) return toast('Entre na sua conta primeiro.');
+  
+window.almoraSavePrivacy = async function() {
+  if (!user) return toast('Entre na sua conta primeiro.');
 
-    const settings = {
-      profile_public: document.getElementById('privacy_profile').checked,
-      library_public: document.getElementById('privacy_library').checked,
-      history_public: document.getElementById('privacy_history').checked,
-      stats_public: document.getElementById('privacy_stats').checked,
-      updated_at: new Date().toISOString()
-    };
-
-    try {
-      const { error } = await almoraDB
-        .from('profile_privacy')
-        .update(settings)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      toast('Preferências de privacidade salvas!');
-      location.hash = '#perfil';
-    } catch (error) {
-      toast('Erro ao salvar: ' + error.message);
-    }
+  const settings = {
+    user_id: user.id,
+    profile_public: document.getElementById('privacy_profile').checked,
+    library_public: document.getElementById('privacy_library').checked,
+    history_public: document.getElementById('privacy_history').checked,
+    stats_public: document.getElementById('privacy_stats').checked,
+    updated_at: new Date().toISOString()
   };
+
+  try {
+    const { data, error } = await almoraDB
+      .from('profile_privacy')
+      .upsert(settings, { onConflict: 'user_id' })
+      .select('user_id, profile_public, library_public, history_public, stats_public')
+      .single();
+
+    if (error) throw error;
+    if (!data || data.user_id !== user.id) {
+      throw new Error('O banco não confirmou a gravação.');
+    }
+
+    toast('Preferências salvas e confirmadas!');
+    location.hash = '#perfil';
+
+  } catch (error) {
+    console.error('Erro ao salvar privacidade:', error);
+    toast('Erro ao salvar: ' + error.message);
+  }
+};
+              
 
   if (location.hash.startsWith('#perfil')) {
     setTimeout(() => window.ren(), 1000);
