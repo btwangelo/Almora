@@ -104,7 +104,8 @@ h2{font-size:18px;margin:22px 0 10px;border-left:4px solid var(--ac);padding-lef
 #toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ac2);color:#fff;padding:10px 16px;border-radius:12px;display:none;z-index:9;max-width:90%}
 footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const ALMORA_URL = 'https://mcdinntggkanmsqubozn.supabase.co';
 const ALMORA_KEY = 'sb_publishable_dbymLTRkJyrohmyCjS6aPA_25sOAS61';
@@ -539,9 +540,9 @@ ${S.works.map(w=>`<option value="${w.id}">${esc(w.title)}</option>`).join('')}
 <label>Título (opcional)</label>
 <input id="c_t">
 
-<label>Páginas (várias imagens)</label>
-<input id="c_f" type="file" accept="image/*" multiple onchange="pages(this)">
-
+<label>Páginas (imagens, CBZ ou ZIP)</label>
+<input id="c_f" type="file" accept="image/*,.cbz,.zip,application/zip,application/x-cbz" multiple onchange="pages(this)">
+<small style="color:var(--mu)">Envie imagens individuais ou um arquivo CBZ/ZIP com as páginas. A ALMORA organiza as páginas automaticamente.</small>
 <div id="dr"></div>
 
 <div class="act">
@@ -628,9 +629,54 @@ function almoraFilterChapterWorks(){
     select.value=selected;
   }
 }
-async function pages(el){draft=(await Promise.all([...el.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true})).map(f=>comp(f,900)))).filter(Boolean);drawD()}
-function drawD(){$('#dr').innerHTML=draft.map((s,i)=>`<div class="th"><img src="${s}"><span>Pág. ${i+1}</span><button class="g" onclick="mv(${i},-1)">↑</button><button class="g" onclick="mv(${i},1)">↓</button><button class="d" onclick="draft.splice(${i},1);drawD()">✕</button></div>`).join('')}
-function mv(i,d){const j=i+d;if(j<0||j>=draft.length)return;[draft[i],draft[j]]=[draft[j],draft[i]];drawD()}
+async function pages(el){
+  const files=[...el.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+  if(!files.length)return;
+  draft=[];
+  drawD();
+  try{
+    const expanded=[];
+    for(const file of files){
+      const ext=file.name.split('.').pop().toLowerCase();
+
+      if(ext==='cbz'||ext==='zip'){
+        if(typeof JSZip==='undefined')throw new Error('O leitor ZIP não carregou. Atualize a página e tente novamente.');
+        const archive=await JSZip.loadAsync(file);
+        const entries=Object.values(archive.files)
+          .filter(entry=>!entry.dir&&!entry.name.split('/').some(part=>part==='__MACOSX'||part.startsWith('._'))&&/\.(jpe?g|png|webp|gif|avif)$/i.test(entry.name))
+          .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+
+        if(!entries.length)throw new Error('O arquivo '+file.name+' não contém imagens compatíveis.');
+
+        for(const entry of entries){
+          const blob=await entry.async('blob');
+          const name=entry.name.split('/').pop();
+          expanded.push(new File([blob],name,{type:blob.type||'application/octet-stream'}));
+        }
+      }else if(file.type.startsWith('image/')){
+        expanded.push(file);
+      }else{
+        throw new Error('Formato não suportado: '+file.name);
+      }
+    }
+
+    if(expanded.length>300)throw new Error('O limite é de 300 páginas por capítulo.');
+    const totalBytes=expanded.reduce((sum,file)=>sum+file.size,0);
+    if(totalBytes>120*1024*1024)throw new Error('O capítulo ultrapassa o limite de 120 MB descompactados.');
+
+    draft=(await Promise.all(expanded.map(file=>comp(file,900)))).filter(Boolean);
+    if(!draft.length)throw new Error('Não foi possível encontrar imagens válidas nesses arquivos.');
+
+    drawD();
+    toast(draft.length+' páginas prontas para publicar.');
+  }catch(e){
+    draft=[];
+    drawD();
+    toast('Erro ao ler capítulo: '+e.message);
+  }finally{
+    el.value='';
+   }
+  }
   async function almoraUploadToR2(file) {
   const { data: { session }, error } = await almoraDB.auth.getSession();
 
