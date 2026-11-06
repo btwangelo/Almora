@@ -1359,7 +1359,12 @@ a:active {
       .catch(() => toast(url));
   };
 
-function abrirRotaPerfil() {
+
+const originalRender = window.ren;
+
+window.ren = function(...args) {
+  originalRender.apply(this, args);
+
   const [route, id] = location.hash.slice(1).split('/');
 
   if (route !== 'perfil') return;
@@ -1373,14 +1378,9 @@ function abrirRotaPerfil() {
   }
 
   loadProfile(target);
-}
+};
 
-window.addEventListener('hashchange', abrirRotaPerfil);
-
-if (location.hash.slice(1).split('/')[0] === 'perfil') {
-  setTimeout(abrirRotaPerfil, 500);
-        } 
-  
+})();
 </script>
 
 <style>
