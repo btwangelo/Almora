@@ -502,7 +502,7 @@ async function addC(){
       .insert({
         work_id:id,
         chapter_number:Number(n),
-        title:title||null,
+        title:title||('Capítulo '+n),
         status:'published'
       })
       .select()
