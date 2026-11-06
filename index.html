@@ -3418,6 +3418,164 @@ window.almoraSavePrivacy = async function() {
 })();
     
   </script>
-  
+  <style>
+.almora-pinned-label {
+  background: #f5e8c5;
+  color: #795b18;
+  padding: 7px 12px;
+  border-radius: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: bold;
+}
+.almora-pin-button {
+  cursor: pointer;
+}
+</style>
+
+<script>
+(() => {
+  let checkedUserId = null;
+  let cachedCanPin = false;
+  let running = false;
+  let pending = false;
+
+  async function permission() {
+    const current = typeof user !== 'undefined' ? user : null;
+
+    if (!current?.id) {
+      checkedUserId = null;
+      cachedCanPin = false;
+      return false;
+    }
+
+    if (checkedUserId === current.id) return cachedCanPin;
+
+    const map = await window.almoraLoadStaffBadges([current.id]);
+
+    checkedUserId = current.id;
+    cachedCanPin = (map[current.id] || []).some(x =>
+      ['owner', 'admin', 'moderator'].includes(x.key)
+    );
+
+    return cachedCanPin;
+  }
+
+  async function scan() {
+    if (running) {
+      pending = true;
+      return;
+    }
+
+    running = true;
+
+    try {
+      const app = document.getElementById('app');
+      if (!app) return;
+
+      const articles = [...app.querySelectorAll('article[data-comment-id]')];
+
+      articles.forEach(article => {
+        const pinned = article.dataset.isPinned === 'true';
+        const existing = article.querySelector('.almora-pinned-label');
+
+        if (pinned && !existing) {
+          const label = document.createElement('div');
+          label.className = 'almora-pinned-label';
+          label.textContent = '📌 Comentário fixado';
+          article.prepend(label);
+        } else if (!pinned && existing) {
+          existing.remove();
+        }
+      });
+
+      const allowed = await permission();
+
+      if (!allowed) {
+        app.querySelectorAll('.almora-pin-button').forEach(b => b.remove());
+        return;
+      }
+
+      articles.forEach(article => {
+        const actions = article.querySelector(
+          '.almora-comment-actions, .almora-chapter-comment-actions'
+        );
+
+        if (!actions || actions.querySelector('.almora-pin-button')) return;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'g almora-pin-button';
+        btn.textContent =
+          article.dataset.isPinned === 'true' ? '📌 Desafixar' : '📌 Fixar';
+
+        btn.addEventListener('click', () =>
+          window.almoraToggleCommentPin(btn)
+        );
+
+        actions.appendChild(btn);
+      });
+
+    } catch (e) {
+      console.error('ALMORA — Fixar comentários:', e);
+    } finally {
+      running = false;
+      if (pending) {
+        pending = false;
+        scan();
+      }
+    }
+  }
+
+  window.almoraToggleCommentPin = async function(button) {
+    const article = button.closest('article[data-comment-id]');
+    if (!article) return;
+
+    const isPinned = article.dataset.isPinned === 'true';
+
+    button.disabled = true;
+
+    try {
+      const { error } = await almoraDB.rpc('almora_pin_comment', {
+        p_comment_id: article.dataset.commentId,
+        p_is_pinned: !isPinned
+      });
+
+      if (error) throw error;
+
+      toast(isPinned ? 'Comentário desafixado.' : 'Comentário fixado!');
+      location.reload();
+
+    } catch (e) {
+      toast(e.message || 'Não foi possível alterar o comentário.');
+      button.disabled = false;
+    }
+  };
+
+  function start() {
+    const app = document.getElementById('app');
+    if (!app) return;
+
+    new MutationObserver(() => scan()).observe(app, {
+      childList: true,
+      subtree: true
+    });
+
+    scan();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+
+  almoraDB.auth.onAuthStateChange(() => {
+    checkedUserId = null;
+    cachedCanPin = false;
+    scan();
+  });
+})();
+</script>
 </body>
 </html>
