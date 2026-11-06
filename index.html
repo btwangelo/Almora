@@ -423,21 +423,17 @@ async function out(){
 async function pin(){
   if(!user)return toast('Entre na sua conta primeiro.');
 
-  const {data,error}=await almoraDB
-    .from('profiles')
-    .select('role')
-    .eq('id',user.id)
-    .single();
+  const {data,error}=await almoraDB.rpc('is_admin');
 
-  if(error)return toast('Erro ao verificar cargo: '+error.message);
+  if(error)return toast('Erro ao verificar acesso: '+error.message);
 
-  if(!['admin','superadmin'].includes(data?.role))
+  if(data!==true)
     return toast('Acesso restrito à administração.');
 
   unlocked=true;
   toast('Acesso administrativo autorizado!');
   ren();
-                                      }                    
+}                    
 function studio(){if(!unlocked)return `<div class="box" style="max-width:380px;margin:30px auto"><h2 style="margin-top:0">ALMORA STUDIO</h2><p style="color:var(--mu)">Acesse com sua conta administrativa.</p><div class="act"><button onclick="pin()">Verificar acesso administrativo</button></div></div>`;
 return `<h2>ALMORA STUDIO</h2><div class="act"><button class="g" onclick="unlocked=false;ren()">Sair</button><button class="g" onclick="bk()">Exportar backup (sem imagens)</button></div>
 <div class="box"><b>Nova obra</b><label>Título</label><input id="n_t"><label>Título alternativo</label><input id="n_a"><label>Categoria</label><select id="n_c"><option>BL</option><option>GL</option></select>
