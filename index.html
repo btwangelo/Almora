@@ -3280,6 +3280,122 @@ window.almoraSavePrivacy = async function() {
   };
 })();
 </script>
+  <script>
+(() => {
+  const cache = {};
+  const pending = new Set();
+
+  async function applyBadges() {
+    const app = document.getElementById('app');
+    if (!app || !window.almoraLoadStaffBadges) return;
+
+    const targets = [];
+
+    // Nome no perfil
+    const profileTitle = app.querySelector(
+      '.almora-profile-info h1'
+    );
+
+    if (
+      profileTitle &&
+      !profileTitle.querySelector('.almora-staff-badges')
+    ) {
+      const id = location.hash.slice(1).split('/')[1] || user?.id;
+
+      if (id) {
+        targets.push({
+          id,
+          element: profileTitle
+        });
+      }
+    }
+
+    // Nomes nos comentários
+    app.querySelectorAll(
+      '.almora-comment-author, .almora-chapter-comment-author'
+    ).forEach(author => {
+      if (author.querySelector('.almora-staff-badges')) return;
+
+      const match = author.getAttribute('href')?.match(
+        /^#perfil\/([0-9a-f-]{36})$/i
+      );
+
+      if (!match) return;
+
+      const name = author.querySelector('span:not(.almora-comment-avatar-fallback)');
+      if (!name) return;
+
+      targets.push({
+        id: match[1],
+        element: name
+      });
+    });
+
+    const missing = [
+      ...new Set(
+        targets
+          .map(item => item.id)
+          .filter(id => !cache[id] && !pending.has(id))
+      )
+    ];
+
+    if (missing.length) {
+      missing.forEach(id => pending.add(id));
+
+      try {
+        const result = await window.almoraLoadStaffBadges(missing);
+
+        missing.forEach(id => {
+          cache[id] = result[id] || [];
+        });
+      } catch (error) {
+        console.error('ALMORA — Erro ao carregar selos:', error);
+      } finally {
+        missing.forEach(id => pending.delete(id));
+      }
+    }
+
+    targets.forEach(item => {
+      if (item.element.querySelector('.almora-staff-badges')) return;
+
+      const badges = cache[item.id] || [];
+
+      if (badges.length) {
+        item.element.insertAdjacentHTML(
+          'afterend',
+          window.almoraRenderStaffBadges(badges)
+        );
+      }
+    });
+  }
+
+  const observer = new MutationObserver(() => {
+    applyBadges();
+  });
+
+  function start() {
+    const app = document.getElementById('app');
+    if (!app) return;
+
+    observer.observe(app, {
+      childList: true,
+      subtree: true
+    });
+
+    applyBadges();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else {
+    start();
+  }
+
+  window.addEventListener('hashchange', () => {
+    setTimeout(applyBadges, 300);
+  });
+})();
+  </script>
   
 </body>
 </html>
