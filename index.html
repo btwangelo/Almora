@@ -2721,6 +2721,185 @@ body:has(#nav a[href="#home"].on) #app .empty {
   }
 }
   </style>
+
+<style>
+.almora-privacy {
+  max-width: 720px;
+  margin: 24px auto;
+}
+.almora-privacy-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  margin: 12px 0;
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 13px;
+}
+.almora-privacy-item p {
+  margin: 4px 0 0;
+  color: var(--mu);
+  font-size: 13px;
+}
+.almora-privacy-item input {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  accent-color: var(--ac);
+}
+</style>
+
+<script>
+(() => {
+  const oldRender = window.ren;
+  if (typeof oldRender !== 'function') return;
+
+  let profileTimer;
+
+  window.ren = function(...args) {
+    oldRender.apply(this, args);
+
+    clearTimeout(profileTimer);
+    profileTimer = setTimeout(() => {
+      const [route] = location.hash.slice(1).split('/');
+      if (route !== 'perfil') return;
+
+      const actions = document.querySelector(
+        '.almora-profile-actions'
+      );
+
+      if (!actions || document.getElementById('almora-privacy-button')) return;
+      if (!user) return;
+
+      const button = document.createElement('button');
+      button.id = 'almora-privacy-button';
+      button.className = 'g';
+      button.textContent = 'Privacidade';
+      button.onclick = window.almoraOpenPrivacy;
+      actions.insertBefore(button, actions.firstChild);
+    }, 950);
+  };
+
+  window.almoraOpenPrivacy = async function() {
+    if (!user) return toast('Entre na sua conta primeiro.');
+
+    const app = document.getElementById('app');
+    app.innerHTML = '<div class="empty">Carregando configurações...</div>';
+
+    try {
+      const { data, error } = await almoraDB
+        .from('profile_privacy')
+        .select('profile_public,library_public,history_public,stats_public')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      const settings = data || {
+        profile_public: true,
+        library_public: false,
+        history_public: false,
+        stats_public: false
+      };
+
+      app.innerHTML = `
+        <section class="almora-privacy">
+          <h1>Privacidade</h1>
+          <p style="color:var(--mu)">
+            Escolha quais informações outras pessoas poderão
+            visualizar no seu perfil.
+          </p>
+
+          <div class="almora-privacy-item">
+            <div>
+              <b>Perfil público</b>
+              <p>Permite que outras pessoas encontrem e visualizem seu perfil.</p>
+            </div>
+            <input type="checkbox" id="privacy_profile"
+              ${settings.profile_public ? 'checked' : ''}>
+          </div>
+
+          <div class="almora-privacy-item">
+            <div>
+              <b>Biblioteca pública</b>
+              <p>Permite mostrar as obras salvas na sua biblioteca.</p>
+            </div>
+            <input type="checkbox" id="privacy_library"
+              ${settings.library_public ? 'checked' : ''}>
+          </div>
+
+          <div class="almora-privacy-item">
+            <div>
+              <b>Histórico de leitura público</b>
+              <p>Permite mostrar seu histórico de leitura.</p>
+            </div>
+            <input type="checkbox" id="privacy_history"
+              ${settings.history_public ? 'checked' : ''}>
+          </div>
+
+          <div class="almora-privacy-item">
+            <div>
+              <b>Estatísticas públicas</b>
+              <p>Autoriza a exibição de estatísticas no perfil quando esse recurso estiver disponível.</p>
+            </div>
+            <input type="checkbox" id="privacy_stats"
+              ${settings.stats_public ? 'checked' : ''}>
+          </div>
+
+          <div class="almora-profile-actions">
+            <button onclick="almoraSavePrivacy()">
+              Salvar preferências
+            </button>
+            <button class="g" onclick="location.hash='#perfil'">
+              Voltar ao perfil
+            </button>
+          </div>
+        </section>
+      `;
+    } catch (error) {
+      app.innerHTML = `
+        <div class="empty">
+          Não foi possível carregar as configurações:
+          ${esc(error.message)}
+          <p><button class="g" onclick="location.hash='#perfil'">Voltar</button></p>
+        </div>
+      `;
+    }
+  };
+
+  window.almoraSavePrivacy = async function() {
+    if (!user) return toast('Entre na sua conta primeiro.');
+
+    const settings = {
+      profile_public: document.getElementById('privacy_profile').checked,
+      library_public: document.getElementById('privacy_library').checked,
+      history_public: document.getElementById('privacy_history').checked,
+      stats_public: document.getElementById('privacy_stats').checked,
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      const { error } = await almoraDB
+        .from('profile_privacy')
+        .update(settings)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast('Preferências de privacidade salvas!');
+      location.hash = '#perfil';
+    } catch (error) {
+      toast('Erro ao salvar: ' + error.message);
+    }
+  };
+
+  if (location.hash.startsWith('#perfil')) {
+    setTimeout(() => window.ren(), 1000);
+  }
+})();
+</script>
   
 </body>
 </html>
