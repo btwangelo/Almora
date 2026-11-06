@@ -901,5 +901,72 @@ ren();initAuth();
   }
 })();
 </script>
+
+<style>
+/* ALMORA — microinterações */
+
+button, .btn, [role="button"] {
+  transition:
+    transform .18s ease,
+    opacity .18s ease,
+    box-shadow .2s ease,
+    background-color .2s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active, .btn:active, [role="button"]:active {
+  transform: scale(.96);
+}
+
+.card, .work-card, .item {
+  transition:
+    transform .25s ease,
+    box-shadow .25s ease,
+    border-color .25s ease;
+}
+
+.card:active, .work-card:active, .item:active {
+  transform: scale(.985);
+}
+
+input, textarea, select {
+  transition:
+    border-color .2s ease,
+    box-shadow .2s ease,
+    background-color .2s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px #a66bdb30;
+}
+
+a {
+  transition: opacity .2s ease;
+}
+
+a:active {
+  opacity: .7;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover, .work-card:hover, .item:hover {
+    transform: translateY(-3px);
+  }
+
+  button:hover, .btn:hover {
+    filter: brightness(1.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button, .btn, [role="button"],
+  .card, .work-card, .item,
+  input, textarea, select, a {
+    transition: none !important;
+  }
+}
+</style>
+  
 </body>
 </html>
