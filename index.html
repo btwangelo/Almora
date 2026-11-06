@@ -2280,6 +2280,73 @@ a:active {
   };
 })();
 </script>
+
+<script>
+(() => {
+  let adminStatus = false;
+
+  const originalNav = window.nav;
+  const originalStudio = window.studio;
+
+  // Mostra Studio somente para administradores
+  window.nav = function(route) {
+    originalNav(route);
+
+    const links = document.querySelectorAll('#nav a');
+    links.forEach(link => {
+      if (link.getAttribute('href') === '#studio') {
+        link.remove();
+      }
+    });
+
+    if (adminStatus) {
+      const link = document.createElement('a');
+      link.href = '#studio';
+      link.textContent = 'Studio';
+      link.className = route === 'studio' ? 'on' : '';
+      document.querySelector('#nav').appendChild(link);
+    }
+  };
+
+  // Bloqueia acesso direto à rota Studio
+  window.studio = function(...args) {
+    if (!adminStatus) {
+      return `
+        <div class="box" style="max-width:380px;margin:30px auto">
+          <h2>Acesso restrito</h2>
+          <p>Esta área é exclusiva da administração da ALMORA.</p>
+          <a href="#home"><button>Voltar ao início</button></a>
+        </div>
+      `;
+    }
+
+    return originalStudio.apply(this, args);
+  };
+
+  // Consulta a autorização diretamente no Supabase
+  async function checkAdmin() {
+    adminStatus = false;
+
+    if (typeof user === 'undefined' || !user) {
+      window.ren();
+      return;
+    }
+
+    const { data, error } = await almoraDB.rpc('is_admin');
+
+    adminStatus = !error && data === true;
+
+    window.ren();
+  }
+
+  // Verifica ao iniciar e quando a autenticação mudar
+  almoraDB.auth.onAuthStateChange(() => {
+    setTimeout(checkAdmin, 0);
+  });
+
+  checkAdmin();
+})();
+</script>
   
 </body>
 </html>
