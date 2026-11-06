@@ -1913,9 +1913,19 @@ window.almoraSaveProfile = async function() {
           <article class="almora-chapter-comment">
             <div class="almora-chapter-comment-head">
               <a class="almora-chapter-comment-author"
-                 href="#perfil/${c.user_id}">
-                ${esc(name)}
-              </a>
+   href="#perfil/${c.user_id}">
+  ${p.avatar_url ? `
+    <img class="almora-comment-avatar"
+         src="${esc(p.avatar_url)}"
+         alt=""
+         onerror="this.style.display='none';this.nextElementSibling.style.display='grid'">
+  ` : ''}
+  <span class="almora-comment-avatar-fallback"
+        style="display:${p.avatar_url ? 'none' : 'grid'}">
+    👤
+  </span>
+  <span>${esc(name)}</span>
+</a>
               <span class="almora-chapter-comment-date">
                 ${esc(date)}
               </span>
