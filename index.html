@@ -2347,6 +2347,232 @@ a:active {
   checkAdmin();
 })();
 </script>
+
+<style>
+/* ALMORA — avaliações */
+.almora-rating {
+  background:var(--sf);
+  border:1px solid var(--bd);
+  border-radius:16px;
+  padding:18px;
+  margin:20px 0;
+}
+.almora-rating-stars {
+  display:flex;
+  gap:7px;
+  margin:12px 0;
+}
+.almora-rating-stars button {
+  background:transparent;
+  color:var(--bd);
+  border:0;
+  padding:2px;
+  font-size:34px;
+  cursor:pointer;
+}
+.almora-rating-stars button.active {
+  color:#f5b73d;
+}
+.almora-rating-info {
+  color:var(--mu);
+  font-size:13px;
+}
+.almora-rating-average {
+  font-size:30px;
+  font-weight:700;
+}
+</style>
+
+<script>
+(() => {
+  let currentRatingWork = null;
+  let currentRatingRequest = 0;
+
+  async function loadWorkRating(workId) {
+    const request = ++currentRatingRequest;
+    currentRatingWork = workId;
+
+    const hero = document.querySelector('#app .hero');
+    if (!hero) return;
+
+    document.querySelector('#almora-rating')?.remove();
+
+    hero.insertAdjacentHTML('afterend', `
+      <section class="almora-rating" id="almora-rating">
+        <b>Avaliações da comunidade</b>
+        <div class="almora-rating-info">Carregando avaliações...</div>
+      </section>
+    `);
+
+    try {
+      const {data: ratings, error} = await almoraDB
+        .from('ratings')
+        .select('score')
+        .eq('work_id', workId);
+
+      if (error) throw error;
+      if (request !== currentRatingRequest) return;
+
+      const scores = ratings || [];
+      const total = scores.length;
+      const average = total
+        ? scores.reduce((sum, item) => sum + Number(item.score), 0) / total
+        : 0;
+
+      let myScore = 0;
+
+      if (user) {
+        const {data, error: ownError} = await almoraDB
+          .from('ratings')
+          .select('score')
+          .eq('work_id', workId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (ownError) throw ownError;
+        myScore = Number(data?.score || 0);
+      }
+
+      if (request !== currentRatingRequest) return;
+
+      renderRating(workId, average, total, myScore);
+
+    } catch (error) {
+      const section = document.querySelector('#almora-rating');
+      if (section) {
+        section.innerHTML = `
+          <b>Avaliações da comunidade</b>
+          <p class="almora-rating-info">
+            Não foi possível carregar as avaliações:
+            ${esc(error.message)}
+          </p>
+        `;
+      }
+    }
+  }
+
+  function renderRating(workId, average, total, myScore) {
+    const section = document.querySelector('#almora-rating');
+    if (!section) return;
+
+    section.innerHTML = `
+      <b>Avaliações da comunidade</b>
+
+      <div class="almora-rating-average">
+        ${average.toFixed(1)} ★
+      </div>
+
+      <div class="almora-rating-info">
+        ${total} ${total === 1 ? 'avaliação' : 'avaliações'}
+      </div>
+
+      <div class="almora-rating-info" style="margin-top:14px">
+        ${user
+          ? (myScore
+              ? 'Sua avaliação atual: ' + myScore + '/5'
+              : 'Qual nota você daria para esta obra?')
+          : 'Entre na sua conta para avaliar esta obra.'}
+      </div>
+
+      <div class="almora-rating-stars">
+        ${[1,2,3,4,5].map(n => `
+          <button
+            type="button"
+            class="${n <= myScore ? 'active' : ''}"
+            aria-label="${n} estrelas"
+            ${user ? `onclick="almoraRateWork('${workId}',${n})"` : ''}
+          >★</button>
+        `).join('')}
+      </div>
+
+      <div class="almora-rating-info">
+        ${myScore
+          ? 'Você pode alterar sua avaliação quando quiser.'
+          : 'Sua avaliação ajuda outros leitores a descobrir histórias.'}
+      </div>
+    `;
+  }
+
+  window.almoraRateWork = async function(workId, score) {
+    if (!user) {
+      toast('Entre na sua conta para avaliar.');
+      location.hash = '#conta';
+      return;
+    }
+
+    if (score < 1 || score > 5) return;
+
+    const section = document.querySelector('#almora-rating');
+    if (section) {
+      section.querySelectorAll('button').forEach(b => b.disabled = true);
+    }
+
+    try {
+      const {data: existing, error: searchError} = await almoraDB
+        .from('ratings')
+        .select('score')
+        .eq('work_id', workId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (searchError) throw searchError;
+
+      let result;
+
+      if (existing) {
+        result = await almoraDB
+          .from('ratings')
+          .update({score:score})
+          .eq('work_id', workId)
+          .eq('user_id', user.id);
+      } else {
+        result = await almoraDB
+          .from('ratings')
+          .insert({
+            work_id:workId,
+            user_id:user.id,
+            score:score
+          });
+      }
+
+      if (result.error) throw result.error;
+
+      toast('Avaliação salva com sucesso!');
+      await loadWorkRating(workId);
+
+    } catch (error) {
+      toast('Erro ao salvar avaliação: ' + error.message);
+      await loadWorkRating(workId);
+    }
+  };
+
+  const originalRen = window.ren;
+
+  window.ren = function(...args) {
+    originalRen.apply(this, args);
+
+    const [route, workId] = location.hash
+      .slice(1)
+      .split('/');
+
+    if (route === 'obra' && workId) {
+      setTimeout(() => {
+        if (location.hash === '#obra/' + workId) {
+          loadWorkRating(workId);
+        }
+      }, 250);
+    } else {
+      currentRatingRequest++;
+      currentRatingWork = null;
+    }
+  };
+
+  if (location.hash.startsWith('#obra/')) {
+    const id = location.hash.slice(6).split('/')[0];
+    setTimeout(() => loadWorkRating(id), 500);
+  }
+})();
+</script>
   
 </body>
 </html>
