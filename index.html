@@ -675,5 +675,110 @@ ren();initAuth();
   };
 })();
 </script>
+<style>
+@keyframes almoraPageIn {
+  from {
+    opacity: 0;
+    transform: translateY(13px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes almoraCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+#app.almora-leaving {
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity .16s ease, transform .16s ease;
+}
+
+#app.almora-entering > * {
+  animation: almoraPageIn .4s ease both;
+}
+
+#app.almora-entering .card {
+  animation: almoraCardIn .45s ease both;
+}
+
+#app.almora-entering .card:nth-child(2) {
+  animation-delay: .04s;
+}
+
+#app.almora-entering .card:nth-child(3) {
+  animation-delay: .08s;
+}
+
+#app.almora-entering .card:nth-child(4) {
+  animation-delay: .12s;
+}
+
+#app.almora-entering .card:nth-child(5) {
+  animation-delay: .16s;
+}
+
+#app.almora-entering .rd img {
+  animation: almoraPageIn .45s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #app, #app * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+</style>
+
+<script>
+(() => {
+  const app = document.querySelector('#app');
+  const originalRender = window.ren;
+
+  if (!app || typeof originalRender !== 'function') return;
+
+  let renderTimer;
+
+  window.ren = function(...args) {
+    if (window.matchMedia(
+      '(prefers-reduced-motion: reduce)'
+    ).matches) {
+      return originalRender.apply(this, args);
+    }
+
+    clearTimeout(renderTimer);
+    app.classList.remove('almora-entering');
+    app.classList.add('almora-leaving');
+
+    renderTimer = setTimeout(() => {
+      originalRender.apply(this, args);
+
+      app.classList.remove('almora-leaving');
+      void app.offsetWidth;
+      app.classList.add('almora-entering');
+
+      setTimeout(() => {
+        app.classList.remove('almora-entering');
+      }, 700);
+    }, 160);
+  };
+
+  app.classList.add('almora-entering');
+
+  setTimeout(() => {
+    app.classList.remove('almora-entering');
+  }, 700);
+})();
+</script>
 </body>
 </html>
