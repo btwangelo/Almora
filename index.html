@@ -685,7 +685,7 @@ function mv(i,d){const j=i+d;if(j<0||j>=draft.length)return;[draft[i],draft[j]]=
       const name=f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
       const path=user.id+'/'+Date.now()+'-'+name;
       cover = await almoraUploadToR2(f);
-
+  }
     const payload={
       title:t,
       alternative_title:$('#n_a').value.trim(),
