@@ -1197,24 +1197,6 @@ a:active {
               onclick="almoraShareProfile('${data.id}')">
               Compartilhar perfil
 
-async function loadProfile(id) {
-  const request = ++profileRequest;
-  const app = $('#app');
-  app.innerHTML = '<div class="empty">Carregando perfil...</div>';
-
-  try {
-    const own = user && user.id === id;
-
-    // Primeiro, verifica a preferência de privacidade.
-    const { data: privacy, error: privacyError } = await almoraDB
-      .from('profile_privacy')
-      .select('profile_public')
-      .eq('user_id', id)
-      .maybeSingle();
-
-    if (request !== profileRequest) return;
-    if (privacyError) throw privacyError;
-
     // Visitantes não podem visualizar perfis privados.
     if (privacy && privacy.profile_public === false && !own) {
       currentProfile = null;
@@ -1301,7 +1283,7 @@ async function loadProfile(id) {
       '<div class="empty">Não foi possível carregar o perfil: ' +
       esc(error.message) + '</div>';
   }
-              }
+}
               
   window.almoraEditProfile = function() {
     if (!currentProfile || !user ||
