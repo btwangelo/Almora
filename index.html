@@ -293,11 +293,7 @@ async function loadCatalog(){
       };
     });
 
-    const remoteIds=new Set(remoteWorks.map(w=>w.id));
-    const localOnly=oldWorks.filter(w=>!remoteIds.has(w.id));
-
-    S.works=[...remoteWorks,...localOnly];
-
+    S.works=remoteWorks;
   }catch(e){
     console.error('Erro ao carregar catálogo:',e);
     toast('Erro ao carregar catálogo: '+e.message);
@@ -797,7 +793,95 @@ async function addC(){
   }
     }
     
-const arch=id=>{const w=W(id);w.archived=!w.archived;save();ren()},delW=id=>{if(confirm('Excluir obra?')){S.works=S.works.filter(w=>w.id!==id);save();ren()}},delC=(id,n)=>{if(confirm('Excluir capítulo?')){const w=W(id);w.chapters=w.chapters.filter(c=>String(c.n)!==n);save();ren()}};
+const arch=id=>{
+  const w=W(id);
+  if(!w)return;
+  w.archived=!w.archived;
+  save();
+  ren();
+};
+
+async function delW(id){
+  if(!confirm('Excluir esta obra e todos os seus capítulos e páginas?'))return;
+
+  try{
+    const {data:chapters,error:chapError}=await almoraDB
+      .from('chapters')
+      .select('id')
+      .eq('work_id',id);
+
+    if(chapError)throw chapError;
+
+    const ids=(chapters||[]).map(c=>c.id);
+
+    if(ids.length){
+      const {error:pagesError}=await almoraDB
+        .from('pages')
+        .delete()
+        .in('chapter_id',ids);
+
+      if(pagesError)throw pagesError;
+
+      const {error:chaptersError}=await almoraDB
+        .from('chapters')
+        .delete()
+        .in('id',ids);
+
+      if(chaptersError)throw chaptersError;
+    }
+
+    const {error:workError}=await almoraDB
+      .from('works')
+      .delete()
+      .eq('id',id);
+
+    if(workError)throw workError;
+
+    S.works=S.works.filter(w=>String(w.id)!==String(id));
+    save();
+    toast('Obra excluída com sucesso!');
+    ren();
+
+  }catch(e){
+    console.error('Erro ao excluir obra:',e);
+    toast('Erro ao excluir obra: '+e.message);
+  }
+}
+
+async function delC(id,n){
+  if(!confirm('Excluir este capítulo e todas as suas páginas?'))return;
+
+  try{
+    const w=W(id);
+    if(!w)throw new Error('Obra não encontrada.');
+
+    const chapter=w.chapters.find(c=>String(c.n)===String(n));
+    if(!chapter)throw new Error('Capítulo não encontrado.');
+
+    const {error:pagesError}=await almoraDB
+      .from('pages')
+      .delete()
+      .eq('chapter_id',chapter.id);
+
+    if(pagesError)throw pagesError;
+
+    const {error:chapterError}=await almoraDB
+      .from('chapters')
+      .delete()
+      .eq('id',chapter.id);
+
+    if(chapterError)throw chapterError;
+
+    w.chapters=w.chapters.filter(c=>String(c.n)!==String(n));
+    save();
+    toast('Capítulo excluído com sucesso!');
+    ren();
+
+  }catch(e){
+    console.error('Erro ao excluir capítulo:',e);
+    toast('Erro ao excluir capítulo: '+e.message);
+    }
+  }
 function bk(){const d=JSON.stringify({...S,works:S.works.map(w=>({...w,cover:'',chapters:w.chapters.map(c=>({...c,pages:c.pages.length}))}))},null,1);navigator.clipboard?.writeText(d);toast('Backup copiado')}
 function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
 A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():home();
