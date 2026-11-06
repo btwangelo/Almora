@@ -1377,28 +1377,28 @@ async function loadProfile(id) {
       .catch(() => toast(url));
   };
 
-  const oldRender = window.ren;
+function abrirRotaPerfil() {
+  const [route, id] = location.hash.slice(1).split('/');
 
-  window.ren = function(...args) {
-    oldRender.apply(this, args);
+  if (route !== 'perfil') return;
 
-    const [route, id] = location.hash.slice(1).split('/');
+  const target = id || user?.id;
 
-    if (route === 'perfil') {
-      setTimeout(() => {
-        const target = id || user?.id;
+  if (!target) {
+    $('#app').innerHTML =
+      '<div class="empty">Entre na sua conta para acessar seu perfil. <a href="#conta">Entrar</a></div>';
+    return;
+  }
 
-        if (!target) {
-          $('#app').innerHTML =
-            '<div class="empty">Entre na sua conta para acessar seu perfil. <a href="#conta">Entrar</a></div>';
-          return;
-        }
+  loadProfile(target);
+}
 
-        loadProfile(target);
-      }, 230);
-    }
-  };
-})();
+window.addEventListener('hashchange', abrirRotaPerfil);
+
+if (location.hash.slice(1).split('/')[0] === 'perfil') {
+  setTimeout(abrirRotaPerfil, 500);
+  }  
+  
 </script>
 
 <style>
