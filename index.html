@@ -3281,9 +3281,15 @@ window.almoraSavePrivacy = async function() {
 })();
 </script>
   <script>
+
 (() => {
   const cache = {};
   const pending = new Set();
+
+  function hasBadgeAfter(element) {
+    return element?.nextElementSibling
+      ?.classList.contains('almora-staff-badges') || false;
+  }
 
   async function applyBadges() {
     const app = document.getElementById('app');
@@ -3296,10 +3302,7 @@ window.almoraSavePrivacy = async function() {
       '.almora-profile-info h1'
     );
 
-    if (
-      profileTitle &&
-      !profileTitle.querySelector('.almora-staff-badges')
-    ) {
+    if (profileTitle && !hasBadgeAfter(profileTitle)) {
       const id = location.hash.slice(1).split('/')[1] || user?.id;
 
       if (id) {
@@ -3322,8 +3325,11 @@ window.almoraSavePrivacy = async function() {
 
       if (!match) return;
 
-      const name = author.querySelector('span:not(.almora-comment-avatar-fallback)');
-      if (!name) return;
+      const name = author.querySelector(
+        'span:not(.almora-comment-avatar-fallback)'
+      );
+
+      if (!name || hasBadgeAfter(name)) return;
 
       targets.push({
         id: match[1],
@@ -3349,14 +3355,17 @@ window.almoraSavePrivacy = async function() {
           cache[id] = result[id] || [];
         });
       } catch (error) {
-        console.error('ALMORA — Erro ao carregar selos:', error);
+        console.error(
+          'ALMORA — Erro ao carregar selos:',
+          error
+        );
       } finally {
         missing.forEach(id => pending.delete(id));
       }
     }
 
     targets.forEach(item => {
-      if (item.element.querySelector('.almora-staff-badges')) return;
+      if (hasBadgeAfter(item.element)) return;
 
       const badges = cache[item.id] || [];
 
@@ -3395,6 +3404,7 @@ window.almoraSavePrivacy = async function() {
     setTimeout(applyBadges, 300);
   });
 })();
+    
   </script>
   
 </body>
