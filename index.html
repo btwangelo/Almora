@@ -2573,6 +2573,154 @@ a:active {
   }
 })();
 </script>
+
+<style>
+/* ALMORA — refinamento visual da página inicial */
+
+/* Só aplica o visual novo quando a rota Início está ativa */
+body:has(#nav a[href="#home"].on) #app {
+  max-width: 1180px;
+  padding: 24px clamp(14px, 3vw, 30px) 50px;
+}
+
+/* Títulos das seções */
+body:has(#nav a[href="#home"].on) #app > h2 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 38px 0 17px;
+  padding: 0;
+  border: 0;
+  font-size: clamp(17px, 2vw, 21px);
+  font-weight: 700;
+  letter-spacing: -.4px;
+}
+
+body:has(#nav a[href="#home"].on) #app > h2::before {
+  content: "";
+  width: 4px;
+  height: 25px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--ac), var(--ac2));
+}
+
+body:has(#nav a[href="#home"].on) #app > h2::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(90deg, var(--bd), transparent);
+}
+
+/* Organização das fileiras */
+body:has(#nav a[href="#home"].on) #app .row {
+  gap: 16px;
+  padding: 3px 2px 16px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+}
+
+body:has(#nav a[href="#home"].on) #app .row .card {
+  width: 155px;
+  min-width: 155px;
+  scroll-snap-align: start;
+}
+
+/* Grades de obras */
+body:has(#nav a[href="#home"].on) #app .grid {
+  grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+  gap: 20px 16px;
+}
+
+/* Cartões */
+body:has(#nav a[href="#home"].on) #app .card {
+  min-width: 0;
+  overflow: hidden;
+  border-radius: 13px;
+}
+
+body:has(#nav a[href="#home"].on) #app .cv {
+  border: 1px solid #ffffff12;
+  border-radius: 13px;
+  box-shadow: 0 5px 16px #0002;
+  transition: transform .25s ease, box-shadow .25s ease;
+}
+
+body:has(#nav a[href="#home"].on) #app .cv::before {
+  content: "";
+  position: absolute;
+  inset: 35% 0 0;
+  background: linear-gradient(transparent, #0007);
+  pointer-events: none;
+}
+
+body:has(#nav a[href="#home"].on) #app .cv i {
+  z-index: 1;
+  backdrop-filter: blur(8px);
+  border: 1px solid #ffffff20;
+}
+
+body:has(#nav a[href="#home"].on) #app .t {
+  margin: 9px 2px 3px;
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Atualizações */
+body:has(#nav a[href="#home"].on) #app .ch {
+  border: 1px solid var(--bd);
+  border-radius: 8px;
+  padding: 7px 9px;
+  gap: 5px;
+}
+
+/* Estado vazio */
+body:has(#nav a[href="#home"].on) #app .empty {
+  padding: 28px 18px;
+  border-radius: 15px;
+  line-height: 1.7;
+}
+
+/* Interação em computadores */
+@media (hover: hover) and (pointer: fine) {
+  body:has(#nav a[href="#home"].on) #app .card:hover .cv {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 25px #0004;
+  }
+}
+
+/* Ajustes para celulares */
+@media (max-width: 600px) {
+  body:has(#nav a[href="#home"].on) #app {
+    padding: 14px 13px 35px;
+  }
+
+  body:has(#nav a[href="#home"].on) #app > h2 {
+    margin-top: 29px;
+    margin-bottom: 13px;
+    font-size: 17px;
+  }
+
+  body:has(#nav a[href="#home"].on) #app .row {
+    gap: 12px;
+  }
+
+  body:has(#nav a[href="#home"].on) #app .row .card {
+    width: 132px;
+    min-width: 132px;
+  }
+
+  body:has(#nav a[href="#home"].on) #app .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 17px 12px;
+  }
+}
+  </style>
   
 </body>
 </html>
