@@ -153,7 +153,7 @@ const almoraDB = window.supabase.createClient(
 <button class="g" id="th" title="Tema">◐</button>
 </header>
 <main id="app"></main>
-<footer>ALMORA — Where every story finds a home.</footer>
+<footer>ALMORA — Where every story finds a home.<div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:10px"><a href="#sobre" style="color:var(--ac);text-decoration:underline">Sobre</a><a href="#regras" style="color:var(--ac);text-decoration:underline">Regras da comunidade</a><a href="#contato" style="color:var(--ac);text-decoration:underline">Contato</a></div></footer>
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -4862,5 +4862,36 @@ window.almoraSavePrivacy = async function() {
 })();
 </script>
 
+<script id="almora-institutional-pages">
+(() => {
+  const pages = {
+    sobre: '<section class="box" style="max-width:760px;margin:24px auto"><h1>Sobre a ALMORA</h1><p>A ALMORA é um espaço de descoberta e leitura de histórias GL e BL. A proposta é reunir obras, facilitar novas descobertas e oferecer uma experiência de leitura organizada e acolhedora.</p><h2>O que você encontra por aqui</h2><ul><li>Catálogo de obras GL e BL com filtros por gênero, status, classificação e tags.</li><li>Páginas de obras com sinopse, autoria, capítulos e avaliações.</li><li>Leitor com acompanhamento de progresso e marcadores de páginas.</li><li>Biblioteca pessoal, lista de desejos, perfis e conquistas.</li><li>Comentários e ferramentas de denúncia e moderação.</li></ul><p style="color:var(--mu)">A ALMORA está em desenvolvimento contínuo. Recursos podem ser aprimorados, alterados ou ficar temporariamente indisponíveis.</p></section>',
+    regras: '<section class="box" style="max-width:760px;margin:24px auto"><h1>Regras da comunidade</h1><p>Queremos que a ALMORA seja um espaço seguro para leitores e criadores. Ao participar, siga estas regras:</p><ol><li><b>Respeito:</b> não pratique assédio, ameaças, perseguição ou ataques pessoais.</li><li><b>Sem discriminação:</b> não publique racismo, LGBTfobia, misoginia, capacitismo ou discurso de ódio.</li><li><b>Privacidade:</b> não exponha dados pessoais seus ou de outras pessoas sem consentimento.</li><li><b>Sem spam:</b> evite publicidade repetitiva, golpes, links maliciosos e conteúdo fora de contexto.</li><li><b>Spoilers:</b> sinalize informações importantes sobre acontecimentos de capítulos e finais.</li><li><b>Direitos autorais:</b> publique apenas conteúdo próprio ou material que você tenha autorização para disponibilizar.</li><li><b>Classificação indicativa:</b> informe corretamente a faixa etária e respeite as restrições aplicáveis.</li><li><b>Denúncias:</b> use a ferramenta de denúncia com responsabilidade; denúncias abusivas também podem ser moderadas.</li></ol><p>A equipe poderá ocultar conteúdo que viole estas regras e analisar denúncias conforme a gravidade e o contexto.</p></section>',
+    contato: '<section class="box" style="max-width:760px;margin:24px auto"><h1>Contato</h1><p>Para relatar problemas técnicos, enviar sugestões ou comunicar uma questão relacionada à comunidade, utilize o canal público do projeto no GitHub.</p><p><a href="https://github.com/btwangelo/Almora/issues/new" target="_blank" rel="noopener noreferrer" style="color:var(--ac);text-decoration:underline">Abrir uma solicitação para a equipe da ALMORA</a></p><p style="color:var(--mu)">Não publique senhas, códigos de autenticação, dados pessoais ou informações privadas em solicitações públicas.</p></section>'
+  };
+
+  const originalRender = window.ren;
+  if (typeof originalRender !== 'function') return;
+
+  window.ren = function(...args) {
+    const route = location.hash.slice(1).split('/')[0];
+    if (!Object.prototype.hasOwnProperty.call(pages, route)) {
+      return originalRender.apply(this, args);
+    }
+    window.nav(route);
+    document.getElementById('app').innerHTML = pages[route];
+    window.almoraUpdatePageMeta(route);
+    const titles = {sobre:'Sobre a ALMORA',regras:'Regras da comunidade',contato:'Contato'};
+    document.title = titles[route] + ' — ALMORA';
+    const descriptions = {
+      sobre:'Conheça a ALMORA, espaço de descoberta e leitura de histórias GL e BL.',
+      regras:'Conheça as regras de convivência e participação da comunidade ALMORA.',
+      contato:'Entre em contato com a equipe da ALMORA pelo canal oficial do projeto.'
+    };
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute('content', descriptions[route]);
+  };
+})();
+</script>
 </body>
 </html>
