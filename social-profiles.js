@@ -258,6 +258,10 @@
   };
 
   function decorateProfile(){
+    // Aguarda o perfil terminar de montar: app.innerHTML += recria o DOM
+    // e poderia desconectar o elemento enquanto a aparência é carregada.
+    const app=document.getElementById('app');
+    if(app?.dataset.almoraProfileLoading==='1')return;
     // Só a visualização pública recebe decoração. A tela de edição também
     // usa a classe .almora-profile, mas não deve receber controles sociais.
     const profile=document.querySelector('.almora-profile-view');
@@ -269,6 +273,9 @@
       loadAppearance(profileId,profile).catch(error=>{delete profile.dataset.appearanceLoaded;console.warn('Aparência do perfil indisponível:',error);});
     }
   }
+
+  // Chamado explicitamente quando loadProfile conclui toda a montagem do perfil.
+  window.almoraApplyProfileAppearance=decorateProfile;
 
   const style=document.createElement('style');
   style.textContent='.almora-moodboard-profile{position:relative;overflow:hidden;padding:16px;border-radius:18px;background:var(--profile-soft,#f7e8ee);color:var(--profile-ink,#563344);border:1px solid color-mix(in srgb,var(--profile-accent,#c66f91) 35%,transparent)}'+
