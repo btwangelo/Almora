@@ -12,8 +12,10 @@
   function install(){
     if(!app||!isStudio()){app?.classList.remove('almora-studio-dashboard-active');return;}
     const section=document.getElementById('almora-studio-works');
-    if(!section)return;
+    if(!section){app.classList.remove('almora-studio-dashboard-active');return;}
     app.classList.add('almora-studio-dashboard-active');
+    const toolbar=[...app.querySelectorAll(':scope > .act')].find(node=>node.textContent.includes('Exportar backup')&&node.textContent.includes('Sair'));
+    if(toolbar)toolbar.dataset.studioToolbar='true';
     let nav=document.getElementById('almora-studio-dashboard-nav');
     if(!nav){
       nav=document.createElement('nav');nav.id='almora-studio-dashboard-nav';nav.className='almora-studio-dashboard-nav';nav.setAttribute('aria-label','Seções do Studio');
@@ -75,6 +77,7 @@
     const section=document.getElementById('almora-studio-works');
     const moderation=document.getElementById('almora-moderation');
     const analytics=document.getElementById('almora-studio-statistics');
+    const toolbar=app.querySelector('[data-studio-toolbar]');
     const nav=document.getElementById('almora-studio-dashboard-nav');
     if(!section||!nav)return;
     const allBoxes=boxes(section);const forms=allBoxes.filter(box=>box.dataset.studioTranslate!=='true');
@@ -99,12 +102,13 @@
     listNodes.forEach(node=>{node.hidden=activePage!=='works'||node.dataset.studioTranslate==='true';});
     if(search){search.hidden=activePage!=='works';if(activePage==='works')filterWorks(search.value);}
     if(translate)translate.hidden=activePage!=='settings';
+    if(toolbar)toolbar.hidden=activePage!=='settings';
     updateButtons();
   }
 
   const style=document.createElement('style');
   style.textContent='#app.almora-studio-dashboard-active .almora-studio-tabs{display:none!important}'+
-    '.almora-studio-dashboard-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0 22px}'+
+    '.almora-studio-dashboard-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0 22px;overflow:visible;padding:0;white-space:normal;width:100%;min-width:0}'+
     '.almora-studio-dashboard-nav button{min-height:46px;padding:10px 8px;white-space:normal}'+
     '.almora-studio-dashboard-nav button.on{background:var(--ac2);color:#fff}'+
     '.almora-studio-work-search{display:block;width:100%;margin:8px 0 14px}'+
