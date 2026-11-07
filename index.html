@@ -1910,9 +1910,12 @@ ren();initAuth();
   if (!app || typeof originalRender !== 'function') return;
 
   let enterTimer;
+  let lastAnimatedHash = null;
 
   window.ren = function(...args) {
     const route = (location.hash.slice(1) || 'home').split('/')[0];
+    const currentHash = location.hash || '#home';
+    const isNewPage = currentHash !== lastAnimatedHash;
     const chapterFile = app.querySelector('#c_f');
 
     const hasPendingChapter =
@@ -1923,8 +1926,17 @@ ren();initAuth();
 
     if (route === 'studio' && hasPendingChapter) {
       app.classList.remove('almora-leaving', 'almora-entering');
+      lastAnimatedHash = currentHash;
       return;
     }
+
+    // Chamadas internas de atualização não devem reiniciar a animação.
+    if (!isNewPage) {
+      app.classList.remove('almora-entering');
+      return originalRender.apply(this, args);
+    }
+
+    lastAnimatedHash = currentHash;
 
     if (window.matchMedia(
       '(prefers-reduced-motion: reduce)'
@@ -1933,7 +1945,7 @@ ren();initAuth();
       return originalRender.apply(this, args);
     }
 
-    // Renderiza imediatamente: não há animação nem atraso de saída.
+    // Anima apenas quando o endereço da página realmente muda.
     originalRender.apply(this, args);
 
     app.classList.remove('almora-leaving', 'almora-entering');
@@ -2297,6 +2309,7 @@ a:active {
   async function loadProfile(id) {
     const request = ++profileRequest;
     const app = $('#app');
+    app.dataset.almoraProfileLoading = '1';
 
     app.innerHTML =
       '<div class="empty">Carregando perfil...</div>';
@@ -2331,6 +2344,7 @@ a:active {
             </div>
           </section>
         `;
+        delete app.dataset.almoraProfileLoading;
         return;
       }
 
@@ -2350,6 +2364,7 @@ a:active {
         currentProfile = null;
         app.innerHTML =
           '<div class="empty">Perfil não encontrado.</div>';
+        delete app.dataset.almoraProfileLoading;
         return;
       }
 
@@ -2451,10 +2466,16 @@ a:active {
 
       if (request !== profileRequest) return;
       app.innerHTML += await almoraRenderAchievements(id, own);
+      if (request !== profileRequest) return;
+      delete app.dataset.almoraProfileLoading;
+      if (typeof window.almoraInitProfileSocial === 'function') {
+        window.almoraInitProfileSocial();
+      }
     } catch (error) {
       if (request !== profileRequest) return;
 
       currentProfile = null;
+      delete app.dataset.almoraProfileLoading;
 
       app.innerHTML =
         '<div class="empty">Não foi possível carregar o perfil: ' +
@@ -3810,7 +3831,8 @@ window.almoraSaveProfile = async function() {
   if (typeof user === 'undefined' || !user) {
     adminStatus = false;
 
-    if (previousAdminStatus !== adminStatus) {
+    if (previousAdminStatus !== adminStatus &&
+        (location.hash.slice(1).split('/')[0] === 'studio')) {
       window.ren();
     }
 
@@ -3821,7 +3843,8 @@ window.almoraSaveProfile = async function() {
 
   adminStatus = !error && data === true;
 
-  if (previousAdminStatus !== adminStatus) {
+  if (previousAdminStatus !== adminStatus &&
+      (location.hash.slice(1).split('/')[0] === 'studio')) {
     window.ren();
   }
   }
@@ -4403,9 +4426,7 @@ window.almoraSavePrivacy = async function() {
 };
               
 
-  if (location.hash.startsWith('#perfil')) {
-    setTimeout(() => window.ren(), 1000);
-  }
+  // O carregamento do perfil já é iniciado pelo roteador; não forçar novo render.
 })();
 </script>
 
