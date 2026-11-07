@@ -1,7 +1,7 @@
 /* ALMORA — comunidade, conexões e personalização de perfis */
 (() => {
   'use strict';
-  const db = window.almoraDB;
+  const db = window.almoraDB || (typeof almoraDB !== 'undefined' ? almoraDB : null);
   const currentUser = () => (typeof user !== 'undefined' ? user : null);
   const escHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const palettes = {
@@ -22,10 +22,12 @@
     return data||[];
   }
 
+  window.almoraRenderDirectory = renderDirectory;
+
   function personCard(p,followed=false) {
     const label=p.display_name||p.username||'Leitor(a)';
     const canFollow=currentUser()&&currentUser().id!==p.id;
-    return '<article class="almora-person-card"><a class="almora-person-main" href="#perfil/'+encodeURIComponent(p.id)+'">'+
+    return '<article class="almora-person-card" data-search="'+escHtml((label+' '+(p.username||'')).toLowerCase())+'"><a class="almora-person-main" href="#perfil/'+encodeURIComponent(p.id)+'">'+
       (p.avatar_url?'<img src="'+escHtml(p.avatar_url)+'" alt="" loading="lazy">':'<span class="almora-person-avatar">♡</span>')+
       '<span><b>'+escHtml(label)+'</b><small>@'+escHtml(p.username||'leitor')+'</small><small>'+escHtml((p.bio||'Leitor(a) da ALMORA').slice(0,100))+'</small></span></a>'+
       (canFollow?'<button class="g" type="button" data-follow-id="'+escHtml(p.id)+'">'+(followed?'Seguindo':'Seguir')+'</button>':'')+'</article>';
@@ -104,7 +106,15 @@
       if(result.error)throw result.error;
       const map=new Map((result.data||[]).map(p=>[p.id,p]));
       mount.innerHTML='<div class="almora-connections-heading">'+(kind==='followers'?'Pessoas que seguem este perfil':'Pessoas seguidas por este perfil')+'</div>'+
-        ids.map(id=>map.get(id)).filter(Boolean).map(p=>personCard(p)).join('');
+        '<input type="search" class="almora-connections-search" aria-label="Pesquisar conexões" placeholder="'+(kind==='followers'?'Pesquisar seguidores por nome ou @usuário...':'Pesquisar pessoas seguidas por nome ou @usuário...')+'">'+
+        '<div class="almora-connections-results">'+ids.map(id=>map.get(id)).filter(Boolean).map(p=>personCard(p)).join('')+'</div>';
+      const search=mount.querySelector('.almora-connections-search');
+      search?.addEventListener('input',()=>{
+        const term=search.value.trim().toLocaleLowerCase('pt-BR');
+        mount.querySelectorAll('.almora-connections-results .almora-person-card').forEach(card=>{
+          card.hidden=!!term&&!String(card.dataset.search||'').includes(term);
+        });
+      });
       bindFollowButtons(mount);
     }catch(error){
       mount.innerHTML='<div class="empty">Não foi possível carregar a lista. '+escHtml(error.message)+'</div>';
@@ -206,9 +216,10 @@
     if(!tools){
       tools=document.createElement('section');
       tools.id='almora-connection-tools';tools.className='almora-connection-tools';
-      tools.innerHTML='<h2>Conexões</h2><div class="almora-connection-buttons"><button class="g" type="button" data-connection="followers">Ver seguidores</button><button class="g" type="button" data-connection="following">Ver seguindo</button></div><div id="almora-connections-list" aria-live="polite"></div>';
+      tools.innerHTML='<h2>Conexões</h2><div class="almora-connection-buttons"><button class="g" type="button" data-connection="followers">Ver seguidores</button><button class="g" type="button" data-connection="following">Ver seguindo</button><button class="g" type="button" data-connection="search-followers">Pesquisar seguidores</button></div><div id="almora-connections-list" aria-live="polite"></div>';
       tools.querySelector('[data-connection="followers"]').addEventListener('click',()=>window.almoraShowConnections(profileId,'followers'));
       tools.querySelector('[data-connection="following"]').addEventListener('click',()=>window.almoraShowConnections(profileId,'following'));
+      tools.querySelector('[data-connection="search-followers"]').addEventListener('click',()=>window.almoraShowConnections(profileId,'followers'));
       (summary||actions).insertAdjacentElement('afterend',tools);
     }else if(summary&&tools.previousElementSibling!==summary){
       summary.insertAdjacentElement('afterend',tools);
@@ -236,7 +247,8 @@
     '.almora-social-counts span b{font-size:20px;color:var(--tx)}'+
     '#almora-profile-social #almora-follow-button{min-height:42px;padding:9px 18px}'+
     '.almora-connection-tools{margin-top:22px;padding-top:18px;border-top:1px solid var(--bd)}.almora-connection-tools h2{margin:0 0 12px}'+
-    '.almora-connection-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.almora-connection-buttons button{width:100%;min-height:48px;padding:10px 14px;border:1px solid var(--bd);border-radius:12px;white-space:normal}'+
+    '.almora-connection-buttons{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}.almora-connection-buttons button{width:100%;min-height:48px;padding:10px 14px;border:1px solid var(--bd);border-radius:12px;white-space:normal}'+
+    '.almora-connections-search{width:100%;margin:10px 0}.almora-connections-results{display:grid;gap:10px}.almora-connections-results [hidden]{display:none!important}'+
     '#almora-connections-list{display:grid;gap:10px;margin-top:16px}#almora-connections-list .almora-person-card{margin:0}.almora-connections-heading{font-weight:600;color:var(--mu);margin:4px 0}'+
     '.almora-editor{background:var(--sf);border:1px solid var(--bd);border-radius:18px;padding:16px}.almora-editor input[type=file]{margin:6px 0}'+
     '.almora-palette-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}.almora-palette-picker label{margin:0!important}.almora-palette-picker input{position:absolute;opacity:0;pointer-events:none}'+
