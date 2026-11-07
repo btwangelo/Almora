@@ -157,7 +157,16 @@ const card=(w,extra='',rank)=>`<a class="card" href="#obra/${w.id}"><div class="
 const sec=(t,ws,fn)=>`<h2>${t}</h2>`+(ws.length?fn(ws):`<div class="empty">Nenhuma obra ainda.</div>`);
 const rowOf=ws=>`<div class="row">${ws.map((w,i)=>card(w,'',i+1)).join('')}</div>`;
 const gridOf=ws=>`<div class="grid">${ws.map(w=>card(w)).join('')}</div>`;
-const upd=ws=>`<div class="grid">${ws.map(w=>card(w,[...w.chapters].sort((a,b)=>b.date-a.date).slice(0,2).map(c=>`<div class="ch"><b>Capítulo ${esc(c.n)}${Date.now()-c.date<864e5*3?' <span class="new">New</span>':''}</b><span>${ago(c.date)}</span></div>`).join(''))).join('')}</div>`;
+function almoraChapterDisplay(c){
+  const type=c.type||'chapter';
+  if(type==='chapter')return 'Capítulo '+(c.label||c.n);
+  if(type==='extra')return c.label||'Extra';
+  if(type==='special')return c.label||'Especial';
+  if(type==='prologue')return c.label||'Prólogo';
+  if(type==='epilogue')return c.label||'Epílogo';
+  return 'Capítulo '+c.n;
+}
+const upd=ws=>`<div class="grid">${ws.map(w=>card(w,[...w.chapters].sort((a,b)=>b.date-a.date).slice(0,2).map(c=>`<div class="ch"><b>${esc(almoraChapterDisplay(c))}${Date.now()-c.date<864e5*3?' <span class="new">New</span>':''}</b><span>${ago(c.date)}</span></div>`).join(''))).join('')}</div>`;
 const pub=()=>S.works.filter(w=>!w.archived);
 function nav(r){
   const links=[
@@ -188,7 +197,7 @@ let l=f.filter(w=>!st||w.status===st);const rt=w=>(S.rate[w.id]||0);
 l.sort(or==='a'?(a,b)=>a.title.localeCompare(b.title):or==='r'?(a,b)=>(b.reads||0)-(a.reads||0):or==='n'?(a,b)=>b.created-a.created:or==='s'?(a,b)=>rt(b)-rt(a):(a,b)=>last(b)-last(a));
 return l.length?gridOf(l):`<div class="empty">Nada encontrado.</div>`})()}
 function obra(id){const w=W(id);if(!w)return`<div class="empty">Obra não encontrada.</div>`;                 
-const lp=S.prog[id],cs=[...w.chapters].sort((a,b)=>a.n-b.n),r=S.rate[id]||0,ls=S.lib[id]||'';
+const lp=S.prog[id],cs=[...w.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n)),r=S.rate[id]||0,ls=S.lib[id]||'';
 return `<div class="hero"><div class="cv" ${cover(w)}></div><div><h1 style="margin:0">${esc(w.title)}</h1><div style="color:var(--mu)">${esc(w.alt)}</div>
 <div style="margin:8px 0"><span class="pill">${w.cat}</span><span class="pill">${esc(w.status)}</span><span class="pill">${esc(w.age)}</span>${(w.genres||'').split(',').filter(x=>x.trim()).map(g=>`<span class="pill">${esc(g.trim())}</span>`).join('')}</div>
 <div>Autor: ${esc(w.author||'—')} · Ilustrador: ${esc(w.illus||'—')}</div><div>${cs.length} capítulos · 👁 ${w.reads||0} leituras</div>
@@ -199,7 +208,7 @@ ${user?wishlistButton(id):''}
 <select onchange="lib('${id}',this.value)"><option value="">+ Biblioteca</option>${['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'].map(x=>`<option ${ls===x?'selected':''}>${x}</option>`).join('')}</select>
 <button class="g" onclick="share('${id}')">Compartilhar</button></div></div></div>
 <h2>Sinopse</h2><p>${esc(w.synopsis||'Sem sinopse.')}</p>
-<h2>Capítulos</h2>${cs.length?[...cs].sort((a,b)=>a.n-b.n).map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>Capítulo ${esc(c.n)}${c.title&&c.title.trim()!=='Capítulo '+c.n?' — '+esc(c.title):''}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join(''):'<div class="empty">Sem capítulos publicados.</div>'}`}
+<h2>Capítulos</h2>${cs.length?[...cs].sort((a,b)=>(a.order??a.n)-(b.order??b.n)).map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>${esc(almoraChapterDisplay(c))}${c.title&&c.title.trim()!==almoraChapterDisplay(c)?' — '+esc(c.title):''}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join(''):'<div class="empty">Sem capítulos publicados.</div>'}`}
 function rate(id,n){S.rate[id]=n;save();ren()}
 async function fav(id){
   const next=!S.fav[id];
@@ -460,7 +469,7 @@ async function syncWishlistButton(id){
   }
 let obs;
 function reader(id,n){const w=W(id),c=w&&w.chapters.find(c=>String(c.n)===n);if(!c)return`<div class="empty">Capítulo não encontrado.</div>`;
-const cs=[...w.chapters].sort((a,b)=>a.n-b.n),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
+const cs=[...w.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n)),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
 if(p.n!==c.n){w.reads=(w.reads||0)+1}p.n=c.n;if(!p.read.includes(c.n))p.read.push(c.n);save();
 const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}'"`:'disabled'}>◀</button><button class="g" ${cs[i+1]?`onclick="location.hash='#ler/${id}/${cs[i+1].n}'"`:'disabled'}>▶</button>`;
 setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
@@ -469,7 +478,7 @@ setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=
   almoraSaveReadingProgress(id,c.n,S.prog[id].pg);
   }
   }),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
-return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>Cap. ${esc(c.n)}</span><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
+return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
 <div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
 /* CONTA / AUTH (Firebase Authentication) */
 /* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
@@ -495,7 +504,7 @@ async function loadCatalog(){
       {data:pages,error:pagesError}
     ] = await Promise.all([
       almoraDB.from('works').select('*').order('created_at',{ascending:false}),
-      almoraDB.from('chapters').select('*').order('chapter_number'),
+      almoraDB.from('chapters').select('*').order('reading_order',{ascending:true}).order('chapter_number',{ascending:true}),
       almoraDB.from('pages').select('*').order('page_number')
     ]);
 
@@ -524,6 +533,9 @@ async function loadCatalog(){
         id:c.id,
         n:Number(c.chapter_number),
         title:c.title||'',
+        type:c.chapter_type||'chapter',
+        label:c.chapter_label||'',
+        order:Number(c.reading_order??c.chapter_number),
         date:new Date(c.created_at).getTime(),
         pages:chapterPages
       });
@@ -812,6 +824,14 @@ ${S.works.map(w=>`<option value="${w.id}">${esc(w.title)}</option>`).join('')}
 </div>
 </div>
 
+<div class="box" style="margin-top:18px">
+  <b>Envio de vários capítulos</b>
+  <p style="color:var(--mu)">Selecione vários arquivos CBZ ou ZIP da mesma obra. Cada arquivo será cadastrado como um capítulo separado. Você poderá revisar os dados antes de publicar.</p>
+  <label>Arquivos dos capítulos</label>
+  <input id="c_batch_files" type="file" accept=".cbz,.zip,application/zip,application/x-cbz" multiple onchange="almoraPrepareBatch(this)">
+  <div id="almora-batch-review"></div>
+</div>
+
 <h2>Obras cadastradas</h2>
 
 ${S.works.map(w=>`
@@ -825,7 +845,7 @@ ${S.works.map(w=>`
 
 ${w.chapters.map(c=>`
 <div class="ch">
-Cap. ${esc(c.n)} (${c.pages.length} pág.)
+${esc(almoraChapterDisplay(c))} (${c.pages.length} pág.)
 <button class="d" onclick="delC('${w.id}','${c.n}')">✕</button>
 </div>
 `).join('')}
@@ -1071,7 +1091,8 @@ async function addC(){
   if(!user)return toast('Entre na conta administrativa');
   if(!w||n==='')return toast('Escolha obra e número');
   if(!draft.length)return toast('Adicione páginas');
-  if(w.chapters.some(c=>String(c.n)===n))
+  if(!Number.isFinite(Number(n)))return toast('Informe um número válido.');
+  if(w.chapters.some(c=>Number(c.n)===Number(n)))
     return toast('Número já existe');
 
   const btn=document.querySelector('#app button[onclick="addC()"]');
@@ -1095,7 +1116,10 @@ async function addC(){
         work_id:id,
         chapter_number:Number(n),
         title:title||('Capítulo '+n),
-        status:'published'
+        status:'published',
+        chapter_type:'chapter',
+        chapter_label:String(n),
+        reading_order:Math.max(0,...w.chapters.map(c=>Number(c.order??c.n)||0))+1
       })
       .select()
       .single();
@@ -1117,7 +1141,10 @@ async function addC(){
     w.chapters.push({
       id:chapter.id,
       n:Number(n),
-      title,
+      title:title||('Capítulo '+n),
+      type:'chapter',
+      label:String(n),
+      order:Math.max(0,...w.chapters.map(c=>Number(c.order??c.n)||0))+1,
       date:Date.now(),
       pages:uploaded.map(p=>p.image_url)
     });
@@ -1257,11 +1284,286 @@ async function loadWishlistPage(){
   function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
 A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():home();
 if(r==='desejos') loadWishlistPage();
+if(r==='studio'&&window.almoraBatchRender) almoraBatchRender();
 if(r==='obra'&&user) syncWishlistButton(a);
 document.title=r==='obra'&&W(a)?W(a).title+' — ALMORA':'ALMORA — Where every story finds a home'}
 addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
 $('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
 $('#th').onclick=()=>{const d=document.documentElement,c=getComputedStyle(d).getPropertyValue('--bg').trim()==='#121214';d.dataset.theme=c?'light':'dark'};
+
+// ===== ALMORA: ENVIO DE VARIOS CAPITULOS =====
+window.almoraBatch = window.almoraBatch || [];
+
+function almoraParseChapterFilename(filename) {
+  const name = filename.replace(/\.(cbz|zip)$/i, '').replace(/_/g, ' ').trim();
+  let m;
+
+  m = name.match(/^extra\s*(\d+(?:[.,]\d+)?)?\s*(?:[-–—:]\s*(.*))?$/i);
+  if (m) return {type:'extra', label:'Extra'+(m[1]?' '+m[1].replace(',','.'):''), number:'', title:(m[2]||'').trim()};
+
+  m = name.match(/^especial\s*(?:[-–—:]\s*|\s+)?(.*)$/i);
+  if (m) return {type:'special', label:'Especial', number:'', title:(m[1]||'').trim()};
+
+  m = name.match(/^(pr[oó]logo)\s*(?:[-–—:]\s*)?(.*)$/i);
+  if (m) return {type:'prologue', label:'Prólogo', number:'', title:(m[2]||'').trim()};
+
+  m = name.match(/^(ep[ií]logo)\s*(?:[-–—:]\s*)?(.*)$/i);
+  if (m) return {type:'epilogue', label:'Epílogo', number:'', title:(m[2]||'').trim()};
+
+  m = name.match(/^(?:cap[ií]tulo|cap\.?)\s*(\d+(?:[.,]\d+)?)\s*(?:[-–—:]\s*(.*))?$/i);
+  if (!m) m = name.match(/^(\d+(?:[.,]\d+)?)\s*[-–—:]\s*(.*)$/);
+  if (!m) m = name.match(/^(\d+(?:[.,]\d+)?)$/);
+
+  if (m) {
+    const number=m[1].replace(',','.');
+    return {type:'chapter',label:number,number,title:(m[2]||'').trim()};
+  }
+  return {type:'chapter',label:'',number:'',title:''};
+}
+
+function almoraNextInternalNumber(work) {
+  const used=(work?.chapters||[]).map(c=>Number(c.n)).filter(Number.isFinite);
+  let candidate=-1;
+  while(used.includes(candidate)) candidate--;
+  return candidate;
+}
+
+function almoraBatchUpdate(index,key,value) {
+  const item=almoraBatch[index];
+  if(!item || item.status==='Enviando' || item.status==='Publicado') return;
+  item[key]=value;
+
+  if(key==='type') {
+    if(value==='chapter') {
+      item.number=/^\d+(?:[.,]\d+)?$/.test(item.label)?item.label.replace(',','.'):'';
+    } else {
+      item.number='';
+      if(/^\d+(?:[.,]\d+)?$/.test(item.label)) {
+        item.label=({extra:'Extra',special:'Especial',prologue:'Prólogo',epilogue:'Epílogo'})[value]||'';
+      } else if(!item.label) {
+        item.label=({extra:'Extra',special:'Especial',prologue:'Prólogo',epilogue:'Epílogo'})[value]||'';
+      }
+    }
+  }
+  if(key==='number' && item.type==='chapter') item.label=String(value);
+  almoraBatchRender();
+}
+
+function almoraBatchRemove(index) {
+  if(almoraBatch[index]?.status==='Enviando') return;
+  almoraBatch.splice(index,1);
+  almoraBatchRender();
+}
+
+function almoraClearPublishedBatch() {
+  almoraBatch=almoraBatch.filter(x=>x.status!=='Publicado');
+  almoraBatchRender();
+}
+
+function almoraBatchRender() {
+  const box=document.getElementById('almora-batch-review');
+  if(!box) return;
+  if(!almoraBatch.length) { box.innerHTML=''; return; }
+
+  const total=almoraBatch.length;
+  const done=almoraBatch.filter(x=>x.status==='Publicado').length;
+  const percent=Math.round(almoraBatch.reduce((sum,x)=>sum+(x.status==='Publicado'?100:x.status==='Enviando'?x.progress:0),0)/Math.max(1,total));
+
+  box.innerHTML=`
+    <div style="margin-top:16px">
+      <b>Revisão dos arquivos (${total})</b>
+      <div style="margin:8px 0;color:var(--mu);font-size:13px">${done} de ${total} publicados · Progresso geral: ${percent}%</div>
+      <progress value="${percent}" max="100" style="width:100%"></progress>
+      ${almoraBatch.map((item,i)=>`
+        <div class="box" style="margin-top:10px">
+          <b>${esc(item.file.name)}</b>
+          <small style="display:block;color:var(--mu)">${item.pages.length} páginas identificadas</small>
+          <label>Título do capítulo</label>
+          <input value="${esc(item.title)}" ${item.status==='Enviando'||item.status==='Publicado'?'disabled':''}
+            onchange="almoraBatchUpdate(${i},'title',this.value)">
+          <label>Tipo</label>
+          <select ${item.status==='Enviando'||item.status==='Publicado'?'disabled':''}
+            onchange="almoraBatchUpdate(${i},'type',this.value)">
+            <option value="chapter" ${item.type==='chapter'?'selected':''}>Capítulo</option>
+            <option value="extra" ${item.type==='extra'?'selected':''}>Extra</option>
+            <option value="special" ${item.type==='special'?'selected':''}>Especial</option>
+            <option value="prologue" ${item.type==='prologue'?'selected':''}>Prólogo</option>
+            <option value="epilogue" ${item.type==='epilogue'?'selected':''}>Epílogo</option>
+          </select>
+          <label>Identificação exibida ao leitor</label>
+          <input value="${esc(item.label)}" placeholder="Ex.: 12, Extra 2, Especial..."
+            ${item.status==='Enviando'||item.status==='Publicado'?'disabled':''}
+            onchange="almoraBatchUpdate(${i},'label',this.value)">
+          ${item.type==='chapter'?`
+            <label>Número do capítulo</label>
+            <input type="number" step="0.1" value="${esc(item.number)}"
+              ${item.status==='Enviando'||item.status==='Publicado'?'disabled':''}
+              onchange="almoraBatchUpdate(${i},'number',this.value)">
+          `:''}
+          <label>Ordem de leitura</label>
+          <input type="number" step="0.1" value="${esc(item.order)}"
+            ${item.status==='Enviando'||item.status==='Publicado'?'disabled':''}
+            onchange="almoraBatchUpdate(${i},'order',this.value)">
+          <div style="margin-top:10px">
+            <small>${esc(item.status)}</small>
+            ${item.status==='Enviando'?`<progress value="${item.progress}" max="100" style="width:100%"></progress><small>${item.progress}%</small>`:''}
+            ${item.error?`<small style="display:block;color:#e66">${esc(item.error)}</small>`:''}
+          </div>
+          ${item.status!=='Publicado'?`<button class="d" style="margin-top:8px" ${item.status==='Enviando'?'disabled':''} onclick="almoraBatchRemove(${i})">Remover arquivo</button>`:''}
+        </div>
+      `).join('')}
+      <button onclick="almoraPublishBatch()" ${almoraBatch.some(x=>x.status==='Enviando')||!almoraBatch.some(x=>x.status!=='Publicado'&&x.archive)?'disabled':''}>
+        Publicar capítulos selecionados
+      </button>
+      <button class="g" style="margin-left:6px" onclick="almoraClearPublishedBatch()" ${done===0?'disabled':''}>Limpar publicados</button>
+    </div>
+  `;
+}
+
+async function almoraPrepareBatch(input) {
+  const files=[...input.files];
+  if(!files.length) return;
+
+  const workId=document.getElementById('c_w')?.value;
+  const work=W(workId);
+  if(!work) { toast('Escolha uma obra antes de selecionar os arquivos.'); input.value=''; return; }
+
+  if(almoraBatch.some(x=>x.workId!==workId)) {
+    toast('Publique ou remova a revisão anterior antes de escolher arquivos de outra obra.');
+    input.value='';
+    return;
+  }
+  if(typeof JSZip==='undefined') { toast('Leitor ZIP não carregado. Atualize a página.'); input.value=''; return; }
+
+  let maxOrder=Math.max(0,...work.chapters.map(c=>Number(c.order??c.n)||0),...almoraBatch.map(c=>Number(c.order)||0));
+
+  for(const file of files) {
+    try {
+      if(!/\.(cbz|zip)$/i.test(file.name)) throw new Error('Use arquivos CBZ ou ZIP.');
+      const parsed=almoraParseChapterFilename(file.name);
+      const archive=await JSZip.loadAsync(file);
+      const entries=Object.values(archive.files)
+        .filter(e=>!e.dir&&!e.name.split('/').some(p=>p==='__MACOSX'||p.startsWith('._'))&&/\.(jpe?g|png|webp|gif|avif)$/i.test(e.name))
+        .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
+
+      if(!entries.length) throw new Error('Nenhuma imagem encontrada.');
+      if(entries.length>300) throw new Error('Limite de 300 páginas por capítulo.');
+      const totalBytes=entries.reduce((sum,e)=>sum+(Number(e._data?.uncompressedSize)||0),0);
+      if(totalBytes>120*1024*1024) throw new Error('Arquivo ultrapassa 120 MB descompactados.');
+
+      almoraBatch.push({
+        file,archive,pages:entries,workId,
+        type:parsed.type,label:parsed.label,number:parsed.number,
+        title:parsed.title,order:++maxOrder,
+        status:'Aguardando revisão',progress:0,error:''
+      });
+    } catch(error) {
+      almoraBatch.push({
+        file,archive:null,pages:[],workId,type:'chapter',label:'',number:'',
+        title:'',order:++maxOrder,status:'Arquivo inválido',progress:0,error:error.message
+      });
+    }
+    almoraBatchRender();
+  }
+  input.value='';
+}
+
+async function almoraPublishBatch() {
+  if(!user) return toast('Entre na conta administrativa.');
+  if(!unlocked) return toast('Acesso restrito à administração.');
+
+  const pending=almoraBatch.filter(x=>x.status!=='Publicado'&&x.archive&&x.status!=='Enviando');
+  if(!pending.length) return toast('Não há capítulos válidos aguardando publicação.');
+
+  const workIds=[...new Set(pending.map(x=>x.workId))];
+  if(workIds.length!==1) return toast('Separe os envios por obra.');
+  const workId=workIds[0];
+  const work=W(workId);
+  if(!work) return toast('Obra não encontrada.');
+
+  const pendingChapterNumbers=[];
+  const pendingLabels=[];
+  const pendingOrders=[];
+  for(const item of pending) {
+    if(!String(item.label||'').trim()) return toast('Preencha a identificação de todos os capítulos.');
+    if(String(item.order).trim()===''||!Number.isFinite(Number(item.order))) return toast('Confira a ordem de leitura.');
+    const orderValue=Number(item.order);
+    if(work.chapters.some(c=>Number(c.order??c.n)===orderValue)||pendingOrders.includes(orderValue))
+      return toast('Há ordens de leitura repetidas. Ajuste a posição de cada arquivo.');
+    pendingOrders.push(orderValue);
+    if(item.type==='chapter') {
+      if(String(item.number).trim()===''||!Number.isFinite(Number(item.number))) return toast('Informe o número de cada capítulo normal.');
+      const number=String(Number(item.number));
+      if(work.chapters.some(c=>(c.type||'chapter')==='chapter'&&String(Number(c.n))===number)||pendingChapterNumbers.includes(number))
+        return toast('Há números de capítulos duplicados. Confira a revisão.');
+      pendingChapterNumbers.push(number);
+    } else {
+      const normalized=String(item.label).trim().toLocaleLowerCase('pt-BR');
+      const titleKey=String(item.title||'').trim().toLocaleLowerCase('pt-BR');
+      const labelKey=item.type+'|'+normalized+'|'+titleKey;
+      if(work.chapters.some(c=>(c.type||'chapter')===item.type&&String(c.label||'').trim().toLocaleLowerCase('pt-BR')===normalized&&String(c.title||'').trim().toLocaleLowerCase('pt-BR')===titleKey)||pendingLabels.includes(labelKey))
+        return toast('Há identificações repetidas para o mesmo tipo de conteúdo.');
+      pendingLabels.push(labelKey);
+    }
+  }
+
+  for(const item of pending) {
+    item.status='Enviando'; item.progress=0; item.error=''; almoraBatchRender();
+    try {
+      const uploaded=[];
+      let totalUncompressed=0;
+      for(let i=0;i<item.pages.length;i++) {
+        const entry=item.pages[i];
+        const original=await entry.async('blob');
+        totalUncompressed+=original.size;
+        if(totalUncompressed>120*1024*1024) throw new Error('Capítulo ultrapassa 120 MB descompactados.');
+        const pageFile=new File([original],entry.name.split('/').pop(),{type:original.type||'image/jpeg'});
+        const compressed=await comp(pageFile,900);
+        if(!compressed) throw new Error('Falha ao processar uma página.');
+        const blob=await fetch(compressed).then(r=>r.blob());
+        const url=await almoraUploadToR2(blob);
+        uploaded.push({page_number:i+1,image_url:url});
+        item.progress=Math.round(((i+1)/item.pages.length)*90);
+        almoraBatchRender();
+      }
+
+      const chapterNumber=item.type==='chapter'?Number(item.number):almoraNextInternalNumber(work);
+      const {data:chapter,error:chapterError}=await almoraDB.from('chapters').insert({
+        work_id:workId,chapter_number:chapterNumber,
+        title:item.title.trim()||item.label.trim(),
+        status:'published',chapter_type:item.type,
+        chapter_label:item.label.trim(),reading_order:Number(item.order)
+      }).select().single();
+      if(chapterError) throw chapterError;
+
+      const pageRows=uploaded.map(p=>({chapter_id:chapter.id,page_number:p.page_number,image_url:p.image_url}));
+      const {error:pagesError}=await almoraDB.from('pages').insert(pageRows);
+      if(pagesError) {
+        await almoraDB.from('chapters').delete().eq('id',chapter.id);
+        throw pagesError;
+      }
+
+      item.status='Publicado'; item.progress=100;
+      work.chapters.push({
+        id:chapter.id,n:chapterNumber,title:item.title||item.label,
+        type:item.type,label:item.label,order:Number(item.order),
+        date:Date.now(),pages:uploaded.map(p=>p.image_url)
+      });
+    } catch(error) {
+      item.status='Falhou'; item.error=error.message||'Erro desconhecido';
+    }
+    almoraBatchRender();
+  }
+
+  await loadCatalog();
+  ren();
+  const successes=almoraBatch.filter(x=>x.status==='Publicado').length;
+  const failures=almoraBatch.filter(x=>x.status==='Falhou'||x.status==='Arquivo inválido').length;
+  toast(`${successes} capítulo(s) publicado(s). ${failures} falha(s).`);
+}
+// ===== FIM DO ENVIO EM LOTE =====
+
+
 ren();initAuth();
 </script>
 <style>
