@@ -15,7 +15,7 @@
   let directoryRequest = 0;
 
   async function fetchProfiles(query) {
-    const safeQuery=String(query||'').replace(/[%,()]/g,' ').replace(/\\s+/g,' ').trim();
+    const safeQuery=String(query||'').replace(/[%,()]/g,' ').replace(/\s+/g,' ').trim();
     let request = db.from('profiles').select('id,username,display_name,avatar_url,bio,created_at').order('created_at',{ascending:false}).limit(40);
     if (safeQuery) request = request.or('username.ilike.%'+safeQuery+'%,display_name.ilike.%'+safeQuery+'%');
     const {data,error} = await request;
