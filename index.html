@@ -4890,6 +4890,10 @@ window.almoraSavePrivacy = async function() {
     };
     const meta = document.querySelector('meta[name="description"]');
     if (meta) meta.setAttribute('content', descriptions[route]);
+    almoraSetMeta('meta[property="og:title"]', 'content', document.title);
+    almoraSetMeta('meta[property="og:description"]', 'content', descriptions[route]);
+    almoraSetMeta('meta[name="twitter:title"]', 'content', document.title);
+    almoraSetMeta('meta[name="twitter:description"]', 'content', descriptions[route]);
   };
 })();
 </script>
