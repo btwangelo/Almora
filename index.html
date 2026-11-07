@@ -153,11 +153,11 @@ const almoraDB = window.supabase.createClient(
 <button class="g" id="th" title="Tema">◐</button>
 </header>
 <main id="app"></main>
-<footer>ALMORA — Where every story finds a home.</footer>
+<footer>ALMORA — Where every story finds a home.<div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:10px"><a href="#sobre" style="color:var(--ac);text-decoration:underline">Sobre</a><a href="#regras" style="color:var(--ac);text-decoration:underline">Regras da comunidade</a><a href="#contato" style="color:var(--ac);text-decoration:underline">Contato</a><a href="#privacidade" style="color:var(--ac);text-decoration:underline">Privacidade</a><a href="#termos" style="color:var(--ac);text-decoration:underline">Termos</a></div></footer>
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let S={works:[],prog:{},lib:{},fav:{},rate:{},pin:null},unlocked=false,draft=[];
+let S={works:[],prog:{},lib:{},fav:{},rate:{},bookmarks:{},pin:null},unlocked=false,draft=[];
 try{Object.assign(S,JSON.parse(localStorage.getItem('almora')||'{}'))}catch(e){}
 
 const save=()=>{
@@ -166,7 +166,8 @@ const save=()=>{
       prog:S.prog||{},
       lib:S.lib||{},
       fav:S.fav||{},
-      rate:S.rate||{}
+      rate:S.rate||{},
+      bookmarks:S.bookmarks||{}
     };
     localStorage.setItem('almora',JSON.stringify(personalData));
     return true;
@@ -207,7 +208,7 @@ function nav(r){
     ['studio','Studio']
   ];
 
-  if(user) links.push(['desejos','Lista de desejos'],['perfil','Perfil']);
+  if(user) links.push(['desejos','Lista de desejos'],['perfil','Perfil'],['notificacoes','Notificações']);
 
   $('#nav').innerHTML=links
     .map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}">${t}</a>`)
@@ -256,7 +257,7 @@ function obra(id){const w=W(id);if(!w)return`<div class="empty">Obra não encont
 const lp=S.prog[id],cs=[...w.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n)),r=S.rate[id]||0,ls=S.lib[id]||'';
 return `<div class="hero"><div class="cv" ${cover(w)}></div><div><h1 style="margin:0">${esc(w.title)}</h1><div style="color:var(--mu)">${esc(w.alt)}</div>
 <div style="margin:8px 0"><span class="pill">${w.cat}</span><span class="pill">${esc(w.status)}</span><span class="pill">${esc(w.age)}</span>${(w.genres||'').split(',').filter(x=>x.trim()).map(g=>`<span class="pill">${esc(g.trim())}</span>`).join('')}${(w.tropes||[]).map(tag=>`<span class="pill almora-tag">#${esc(tag)}</span>`).join('')}</div>
-<div>Autor: ${esc(w.author||'—')} · Ilustrador: ${esc(w.illus||'—')}</div><div>${cs.length} capítulos · 👁 ${w.reads||0} leituras</div>
+<div>Autor: ${esc(w.author||'—')} · Ilustrador: ${esc(w.illus||'—')}</div><div>${cs.length} capítulos · 👁 ${w.reads||0} leituras</div><div id="almora-work-like-count" style="color:var(--mu);font-size:13px;margin-top:4px"></div>
 <div class="stars" id="stars">${[1,2,3,4,5].map(i=>`<span class="${i<=r?'on':''}" onclick="rate('${id}',${i})">★</span>`).join('')}</div>
 <div class="act">${cs.length?`<button onclick="location.hash='#ler/${id}/${lp?lp.n:cs[0].n}'">${lp?'Continuar lendo (cap. '+esc(lp.n)+')':'Começar a ler'}</button>`:''}
 <button class="g" onclick="fav('${id}')">${S.fav[id]?'♥ Favorita':'♡ Favoritar'}</button>
@@ -490,7 +491,20 @@ async function fav(id){
 function lib(id,v){if(v)S.lib[id]=v;else delete S.lib[id];save();toast('Biblioteca atualizada')}
 function share(id){const u=location.href.split('#')[0]+'#obra/'+id;navigator.clipboard?.writeText(u).then(()=>toast('Link copiado'),()=>toast(u))}
 function biblio(){const L=['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'];
-const fv=pub().filter(w=>S.fav[w.id]);return sec('Favoritas',fv,gridOf)+L.map(l=>sec(l,pub().filter(w=>S.lib[w.id]===l),gridOf)).join('')}
+const fv=pub().filter(w=>S.fav[w.id]);
+const marks=Object.values(S.bookmarks||{}).filter(m=>W(m.work_id));
+const marked=marks.length?`<h2>Páginas marcadas</h2>${marks.sort((a,b)=>(b.created_at||0)-(a.created_at||0)).map(m=>{const w=W(m.work_id),c=w.chapters.find(x=>String(x.n)===String(m.chapter));return `<a class="ch" href="#ler/${w.id}/${m.chapter}"><b>${esc(w.title)} · ${esc(c?almoraChapterDisplay(c):'Capítulo '+m.chapter)}</b><span>Página ${(Number(m.page)||0)+1}</span></a>`}).join('')}`:'<h2>Páginas marcadas</h2><div class="empty">Você ainda não marcou nenhuma página.</div>';
+return sec('Favoritas',fv,gridOf)+L.map(l=>sec(l,pub().filter(w=>S.lib[w.id]===l),gridOf)).join('')+marked}
+function almoraToggleBookmark(id,chapter,page,button){
+  S.bookmarks=S.bookmarks||{};
+  const key=[id,chapter,page].join(':');
+  const exists=!!S.bookmarks[key];
+  if(exists)delete S.bookmarks[key];
+  else S.bookmarks[key]={work_id:id,chapter:String(chapter),page:Number(page)||0,created_at:Date.now()};
+  save();
+  if(button)button.textContent=exists?'☆ Marcar página':'★ Página marcada';
+  toast(exists?'Marcador removido.':'Página marcada!');
+}
 function wishlistButton(id){
   return `<button class="g" id="wishlist-${id}" onclick="wishlistToggle('${id}')">♡ Lista de desejos</button>`;
 }
@@ -559,11 +573,16 @@ if(p.n!==c.n){w.reads=(w.reads||0)+1}p.n=c.n;if(!p.read.includes(c.n))p.read.pus
 const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}'"`:'disabled'}>◀</button><button class="g" ${cs[i+1]?`onclick="location.hash='#ler/${id}/${cs[i+1].n}'"`:'disabled'}>▶</button>`;
 setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
   S.prog[id].pg=+e.target.dataset.i;
+  const currentBookmarkKey=[id,c.n,S.prog[id].pg].join(':');
+  const bookmarkButton=document.getElementById('almora-page-bookmark');
+  if(bookmarkButton)bookmarkButton.textContent=S.bookmarks&&S.bookmarks[currentBookmarkKey]?'★ Página marcada':'☆ Marcar página';
   save();
   almoraSaveReadingProgress(id,c.n,S.prog[id].pg);
   }
   }),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
-return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
+const bookmarkKey=[id,c.n,p.pg||0].join(':');
+const isBookmarked=!!(S.bookmarks&&S.bookmarks[bookmarkKey]);
+return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><button class="g" type="button" id="almora-page-bookmark" onclick="almoraToggleBookmark('${id}','${c.n}',S.prog['${id}'].pg||0,this)">${isBookmarked?'★ Página marcada':'☆ Marcar página'}</button><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
 <div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
 /* CONTA / AUTH (Firebase Authentication) */
 /* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
@@ -1367,12 +1386,58 @@ async function loadWishlistPage(){
     app.innerHTML='<div class="empty">Não foi possível carregar sua lista: '+esc(error.message)+'</div>';
   }
 }
-  function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
+  function almoraSetMeta(selector,attribute,value){
+  let el=document.querySelector(selector);
+  if(!el){el=document.createElement('meta');document.head.appendChild(el);}
+  el.setAttribute(attribute,value);
+}
+function almoraUpdatePageMeta(route,id,chapter){
+  const work=(route==='obra'||route==='ler')?W(id):null;
+  let title='ALMORA — Where every story finds a home';
+  let description='Descubra e leia histórias GL e BL na ALMORA. Explore obras, acompanhe capítulos e organize sua biblioteca.';
+  if(work){
+    title=work.title+' — ALMORA';
+    description=String(work.synopsis||('Leia '+work.title+' na ALMORA.')).replace(/\s+/g,' ').trim().slice(0,160);
+    if(route==='ler'){
+      const current=work.chapters.find(c=>String(c.n)===String(chapter));
+      if(current)title=work.title+' — '+almoraChapterDisplay(current)+' — ALMORA';
+    }
+  }
+  document.title=title;
+  almoraSetMeta('meta[name="description"]','content',description);
+  almoraSetMeta('meta[property="og:title"]','content',title);
+  almoraSetMeta('meta[property="og:description"]','content',description);
+  almoraSetMeta('meta[name="twitter:title"]','content',title);
+  almoraSetMeta('meta[name="twitter:description"]','content',description);
+  let structured=document.getElementById('almora-page-schema');
+  if(!structured){structured=document.createElement('script');structured.id='almora-page-schema';structured.type='application/ld+json';document.head.appendChild(structured);}
+  if(work&&route==='obra'){
+    const schema={
+      '@context':'https://schema.org',
+      '@type':'CreativeWork',
+      name:work.title,
+      description:description,
+      inLanguage:'pt-BR',
+      url:location.href,
+      author:work.author?{'@type':'Person',name:work.author}:undefined,
+      genre:(work.genres||'').split(',').map(g=>g.trim()).filter(Boolean),
+      keywords:(work.tropes||[]).join(', '),
+      image:work.cover||undefined,
+      isAccessibleForFree:true,
+      publisher:{'@type':'Organization',name:'ALMORA'}
+    };
+    structured.textContent=JSON.stringify(schema,(key,value)=>value===undefined?undefined:value).replace(/</g,'\\u003c');
+  }else{
+    structured.textContent='';
+  }
+}
+function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
 A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():home();
 if(r==='desejos') loadWishlistPage();
 if(r==='studio'&&window.almoraBatchRender) almoraBatchRender();
 if(r==='obra'&&user) syncWishlistButton(a);
-document.title=r==='obra'&&W(a)?W(a).title+' — ALMORA':'ALMORA — Where every story finds a home'}
+if(r==='obra'&&window.almoraLoadWorkFavoriteCount) almoraLoadWorkFavoriteCount(a);
+almoraUpdatePageMeta(r,a,b)}
 addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
 $('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
 $('#th').onclick=()=>{const d=document.documentElement,c=getComputedStyle(d).getPropertyValue('--bg').trim()==='#121214';d.dataset.theme=c?'light':'dark'};
@@ -4724,5 +4789,321 @@ window.almoraSavePrivacy = async function() {
   });
 })();
 </script>
+
+<script id="almora-studio-statistics-enhancement">
+(() => {
+  const originalStudio = window.studio;
+  if (typeof originalStudio !== 'function') return;
+
+  window.studio = function(...args) {
+    let html = originalStudio.apply(this, args);
+    if (!html.includes('id="almora-studio-works"')) return html;
+    html = html.replace(
+      '</div>\n\n<section id="almora-studio-works">',
+      '<button id="almora-tab-stats" class="g" type="button" onclick="almoraStudioTab(&#39;stats&#39;)">Estatísticas</button></div>\n\n<section id="almora-studio-works">'
+    );
+    return html + '\n<section class="almora-mod" id="almora-studio-statistics" style="display:none"><h2>Estatísticas da ALMORA</h2><p style="color:var(--mu)">Visão geral dos dados cadastrados na plataforma.</p><div id="almora-stats-content"><div class="empty">Carregando estatísticas...</div></div><button class="g" type="button" style="width:100%;margin-top:12px" onclick="almoraLoadStudioStats()">Atualizar estatísticas</button></section>';
+  };
+
+  const previousTab = window.almoraStudioTab;
+  window.almoraStudioTab = function(tab) {
+    if (tab !== 'stats') {
+      const statsPanel = document.getElementById('almora-studio-statistics');
+      if (statsPanel) statsPanel.style.display = 'none';
+      return previousTab(tab);
+    }
+    const works = document.getElementById('almora-studio-works');
+    const moderation = document.getElementById('almora-moderation');
+    const stats = document.getElementById('almora-studio-statistics');
+    const buttons = {
+      works: document.getElementById('almora-tab-works'),
+      mod: document.getElementById('almora-tab-mod'),
+      stats: document.getElementById('almora-tab-stats')
+    };
+    if (!works || !moderation || !stats || !buttons.stats) return;
+    works.style.display = 'none';
+    moderation.style.display = 'none';
+    stats.style.display = 'block';
+    Object.entries(buttons).forEach(([key, button]) => {
+      if (!button) return;
+      button.classList.toggle('on', key === 'stats');
+      button.classList.toggle('g', key !== 'stats');
+    });
+    window.almoraLoadStudioStats();
+  };
+
+  window.almoraLoadStudioStats = async function() {
+    const mount = document.getElementById('almora-stats-content');
+    if (!mount) return;
+    mount.innerHTML = '<div class="empty">Carregando estatísticas...</div>';
+    try {
+      const { data: allowed, error: permissionError } = await almoraDB.rpc('is_admin');
+      if (permissionError) throw permissionError;
+      if (allowed !== true) throw new Error('Acesso restrito à administração.');
+      const metrics = [
+        ['Obras cadastradas', 'works'],
+        ['Capítulos cadastrados', 'chapters'],
+        ['Páginas cadastradas', 'pages'],
+        ['Contas de leitores', 'profiles'],
+        ['Comentários', 'comments'],
+        ['Denúncias recebidas', 'reports']
+      ];
+      const results = await Promise.all(metrics.map(async ([label, table]) => {
+        const { count, error } = await almoraDB.from(table).select('*', { count: 'exact', head: true });
+        return { label, count, error };
+      }));
+      mount.innerHTML = '<div class="grid">' + results.map(item =>
+        '<article class="box" style="margin:0"><div style="color:var(--mu);font-size:13px">' +
+        esc(item.label) + '</div><strong style="display:block;font-size:28px;margin-top:5px">' +
+        (item.error ? '—' : Number(item.count || 0).toLocaleString('pt-BR')) +
+        '</strong>' + (item.error ? '<small style="color:var(--mu)">Contagem indisponível</small>' : '') +
+        '</article>'
+      ).join('') + '</div>';
+    } catch (error) {
+      mount.innerHTML = '<div class="empty">Não foi possível carregar as estatísticas: ' + esc(error.message) + '</div>';
+    }
+  };
+})();
+</script>
+
+<script id="almora-institutional-pages">
+(() => {
+  const pages = {
+    sobre: '<section class="box" style="max-width:760px;margin:24px auto"><h1>Sobre a ALMORA</h1><p>A ALMORA é um espaço de descoberta e leitura de histórias GL e BL. A proposta é reunir obras, facilitar novas descobertas e oferecer uma experiência de leitura organizada e acolhedora.</p><h2>O que você encontra por aqui</h2><ul><li>Catálogo de obras GL e BL com filtros por gênero, status, classificação e tags.</li><li>Páginas de obras com sinopse, autoria, capítulos e avaliações.</li><li>Leitor com acompanhamento de progresso e marcadores de páginas.</li><li>Biblioteca pessoal, lista de desejos, perfis e conquistas.</li><li>Comentários e ferramentas de denúncia e moderação.</li></ul><p style="color:var(--mu)">A ALMORA está em desenvolvimento contínuo. Recursos podem ser aprimorados, alterados ou ficar temporariamente indisponíveis.</p></section>',
+    regras: '<section class="box" style="max-width:760px;margin:24px auto"><h1>Regras da comunidade</h1><p>Queremos que a ALMORA seja um espaço seguro para leitores e criadores. Ao participar, siga estas regras:</p><ol><li><b>Respeito:</b> não pratique assédio, ameaças, perseguição ou ataques pessoais.</li><li><b>Sem discriminação:</b> não publique racismo, LGBTfobia, misoginia, capacitismo ou discurso de ódio.</li><li><b>Privacidade:</b> não exponha dados pessoais seus ou de outras pessoas sem consentimento.</li><li><b>Sem spam:</b> evite publicidade repetitiva, golpes, links maliciosos e conteúdo fora de contexto.</li><li><b>Spoilers:</b> sinalize informações importantes sobre acontecimentos de capítulos e finais.</li><li><b>Direitos autorais:</b> publique apenas conteúdo próprio ou material que você tenha autorização para disponibilizar.</li><li><b>Classificação indicativa:</b> informe corretamente a faixa etária e respeite as restrições aplicáveis.</li><li><b>Denúncias:</b> use a ferramenta de denúncia com responsabilidade; denúncias abusivas também podem ser moderadas.</li></ol><p>A equipe poderá ocultar conteúdo que viole estas regras e analisar denúncias conforme a gravidade e o contexto.</p></section>',
+    contato: '<section class="box" style="max-width:760px;margin:24px auto"><h1>Contato</h1><p>Para relatar problemas técnicos, enviar sugestões ou comunicar uma questão relacionada à comunidade, utilize o canal público do projeto no GitHub.</p><p><a href="https://github.com/btwangelo/Almora/issues/new" target="_blank" rel="noopener noreferrer" style="color:var(--ac);text-decoration:underline">Abrir uma solicitação para a equipe da ALMORA</a></p><p style="color:var(--mu)">Não publique senhas, códigos de autenticação, dados pessoais ou informações privadas em solicitações públicas.</p></section>',
+
+    privacidade: '<section class="box" style="max-width:760px;margin:24px auto"><h1>Política de privacidade</h1><p>Esta página resume, em linguagem simples, como a ALMORA trata informações necessárias ao funcionamento da plataforma. A ALMORA está em desenvolvimento; esta política deve ser revisada antes de uso comercial ou expansão do serviço.</p><h2>Informações tratadas</h2><p>Ao criar uma conta ou usar recursos autenticados, podem ser tratados identificadores da conta, nome de usuário, nome de exibição, foto, biografia, data de nascimento se fornecida, obras favoritas, biblioteca, progresso de leitura, marcadores sincronizados, comentários, avaliações, denúncias e notificações.</p><h2>Finalidades</h2><p>Essas informações são usadas para autenticar contas, manter recursos pessoais, exibir perfis conforme as configurações de privacidade, organizar leituras, moderar a comunidade e manter a segurança do serviço.</p><h2>Armazenamento e fornecedores</h2><p>A infraestrutura de banco de dados, autenticação e armazenamento utiliza serviços do Supabase. Alguns dados de preferências e marcadores podem permanecer no armazenamento local do navegador. Serviços externos usados para hospedar o site, entregar imagens ou carregar bibliotecas também podem receber dados técnicos necessários à conexão.</p><h2>Visibilidade e controle</h2><p>Informações de perfil, biblioteca, histórico e lista de desejos podem ter controles de visibilidade próprios quando disponíveis. Não publique senhas, códigos de autenticação ou dados pessoais em comentários ou canais públicos. Você pode editar seu perfil e ajustar as opções de privacidade disponíveis na conta.</p><h2>Retenção e contato</h2><p>Os dados permanecem enquanto necessários ao funcionamento da conta e do serviço, salvo obrigações legais ou de segurança. Para solicitar acesso, correção ou exclusão, entre em contato pelo canal oficial do projeto. A exclusão de dados pode depender da remoção da conta e de cópias técnicas mantidas pelo fornecedor.</p><p><b>Importante:</b> esta página é uma declaração informativa inicial, não uma garantia de conformidade jurídica nem uma descrição de todos os registros técnicos dos fornecedores.</p></section>',
+    termos: '<section class="box" style="max-width:760px;margin:24px auto"><h1>Termos de uso</h1><p>Ao acessar a ALMORA, você concorda em usar a plataforma de forma legal, respeitosa e compatível com estas condições. A plataforma está em desenvolvimento e alguns recursos podem mudar ou ficar indisponíveis.</p><h2>Contas</h2><p>Você é responsável pela segurança de suas credenciais e pelas atividades realizadas em sua conta. Forneça informações corretas e não tente acessar contas ou áreas administrativas de terceiros.</p><h2>Conteúdo publicado</h2><p>Publique apenas obras, imagens, traduções e materiais que sejam seus ou que você tenha autorização para disponibilizar. Você mantém os direitos que possui sobre seu conteúdo, mas concede à ALMORA a permissão técnica necessária para armazená-lo e exibi-lo dentro do serviço. Não envie material ilegal, conteúdo que viole direitos de terceiros ou conteúdo incompatível com a classificação indicativa.</p><h2>Convivência e moderação</h2><p>Assédio, discriminação, ameaças, spam, golpes, exposição de dados pessoais e violações de direitos autorais não são permitidos. A equipe poderá analisar denúncias, ocultar material e restringir contas quando necessário, considerando a gravidade e o contexto.</p><h2>Disponibilidade e responsabilidade</h2><p>A ALMORA é fornecida em desenvolvimento contínuo, sem garantia de disponibilidade ininterrupta ou ausência de falhas. Mantenha cópias próprias de conteúdos importantes. Nada nestes termos limita direitos que a legislação aplicável não permita limitar.</p><h2>Alterações e contato</h2><p>Estes termos podem ser atualizados quando o serviço mudar. O uso continuado após a publicação de alterações representa ciência da versão atualizada, respeitados os direitos legais dos usuários. Dúvidas e solicitações podem ser enviadas pelo canal de contato da ALMORA.</p></section>'
+  };
+
+  const originalRender = window.ren;
+  if (typeof originalRender !== 'function') return;
+
+  window.ren = function(...args) {
+    const route = location.hash.slice(1).split('/')[0];
+    if (!Object.prototype.hasOwnProperty.call(pages, route)) {
+      return originalRender.apply(this, args);
+    }
+    window.nav(route);
+    document.getElementById('app').innerHTML = pages[route];
+    window.almoraUpdatePageMeta(route);
+    const titles = {sobre:'Sobre a ALMORA',regras:'Regras da comunidade',contato:'Contato',privacidade:'Política de privacidade',termos:'Termos de uso'};
+    document.title = titles[route] + ' — ALMORA';
+    const descriptions = {
+      sobre:'Conheça a ALMORA, espaço de descoberta e leitura de histórias GL e BL.',
+      regras:'Conheça as regras de convivência e participação da comunidade ALMORA.',
+      contato:'Entre em contato com a equipe da ALMORA pelo canal oficial do projeto.',
+      privacidade:'Saiba quais informações a ALMORA trata e como gerenciar as opções de privacidade disponíveis.',
+      termos:'Condições de uso, publicação de conteúdo e convivência na comunidade ALMORA.'
+    };
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) meta.setAttribute('content', descriptions[route]);
+    almoraSetMeta('meta[property="og:title"]', 'content', document.title);
+    almoraSetMeta('meta[property="og:description"]', 'content', descriptions[route]);
+    almoraSetMeta('meta[name="twitter:title"]', 'content', document.title);
+    almoraSetMeta('meta[name="twitter:description"]', 'content', descriptions[route]);
+  };
+})();
+</script>
+
+<script id="almora-social-and-notifications">
+(() => {
+  const getUser = () => (typeof user !== 'undefined' ? user : null);
+  const safe = value => typeof esc === 'function' ? esc(value) : String(value ?? '');
+
+  async function loadWorkFavoriteCount(workId) {
+    const mount = document.getElementById('almora-work-like-count');
+    if (!mount) return;
+    try {
+      const { count, error } = await almoraDB.from('work_favorite_counts')
+        .select('work_id', { count: 'exact', head: true })
+        .eq('work_id', workId);
+      if (error) throw error;
+      const { data } = await almoraDB.from('work_favorite_counts')
+        .select('favorites_count').eq('work_id', workId).maybeSingle();
+      mount.textContent = '♡ ' + Number(data?.favorites_count || 0).toLocaleString('pt-BR') + ' curtidas';
+    } catch (error) {
+      mount.textContent = '';
+      console.warn('Contagem de curtidas indisponível:', error);
+    }
+  }
+  window.almoraLoadWorkFavoriteCount = loadWorkFavoriteCount;
+
+  async function loadSocialProfile(profileId) {
+    const mount = document.getElementById('almora-profile-social');
+    if (!mount) return;
+    const me = getUser();
+    try {
+      const [followers, following, relation] = await Promise.all([
+        almoraDB.from('follows').select('follower_id', {count:'exact',head:true}).eq('following_id',profileId),
+        almoraDB.from('follows').select('following_id', {count:'exact',head:true}).eq('follower_id',profileId),
+        me && me.id !== profileId
+          ? almoraDB.from('follows').select('follower_id').eq('follower_id',me.id).eq('following_id',profileId).maybeSingle()
+          : Promise.resolve({data:null,error:null})
+      ]);
+      if (followers.error) throw followers.error;
+      if (following.error) throw following.error;
+      if (relation.error) throw relation.error;
+      const isFollowing = !!relation.data;
+      mount.innerHTML = '<div class="almora-social-counts"><span><b>' +
+        Number(followers.count || 0).toLocaleString('pt-BR') +
+        '</b> seguidores</span><span><b>' +
+        Number(following.count || 0).toLocaleString('pt-BR') +
+        '</b> seguindo</span></div>' +
+        (me && me.id !== profileId
+          ? '<button class="g" type="button" id="almora-follow-button" onclick="almoraToggleFollow(\''+profileId+'\')">' +
+            (isFollowing ? 'Deixar de seguir' : 'Seguir') + '</button>'
+          : '');
+    } catch (error) {
+      mount.innerHTML = '<small style="color:var(--mu)">Informações sociais indisponíveis.</small>';
+      console.warn('Erro ao carregar relações sociais:', error);
+    }
+  }
+  window.almoraToggleFollow = async function(profileId) {
+    const me = getUser();
+    if (!me) return toast('Entre na sua conta para seguir leitores.');
+    if (me.id === profileId) return;
+    const button = document.getElementById('almora-follow-button');
+    if (button) button.disabled = true;
+    try {
+      const {data:existing,error:readError} = await almoraDB.from('follows')
+        .select('follower_id').eq('follower_id',me.id).eq('following_id',profileId).maybeSingle();
+      if (readError) throw readError;
+      const result = existing
+        ? await almoraDB.from('follows').delete().eq('follower_id',me.id).eq('following_id',profileId)
+        : await almoraDB.from('follows').insert({follower_id:me.id,following_id:profileId});
+      if (result.error) throw result.error;
+      await loadSocialProfile(profileId);
+    } catch (error) {
+      toast('Não foi possível atualizar quem você segue: ' + error.message);
+      if (button) button.disabled = false;
+    }
+  };
+
+  async function loadNotifications() {
+    const app = document.getElementById('app');
+    const me = getUser();
+    if (!me) {
+      app.innerHTML = '<div class="empty">Entre na sua conta para ver notificações. <a href="#conta">Entrar</a></div>';
+      return;
+    }
+    app.innerHTML = '<div class="empty">Carregando notificações...</div>';
+    try {
+      const {data:items,error} = await almoraDB.from('chapter_notifications')
+        .select('id,work_id,chapter_id,created_at,read_at')
+        .eq('user_id',me.id).order('created_at',{ascending:false}).limit(50);
+      if(error)throw error;
+      if(!items?.length) {
+        app.innerHTML = '<h1>Notificações</h1><div class="empty">Você ainda não tem notificações.</div>';
+        return;
+      }
+      const workIds=[...new Set(items.map(x=>x.work_id))];
+      const chapterIds=[...new Set(items.map(x=>x.chapter_id))];
+      const [works,chapters]=await Promise.all([
+        almoraDB.from('works').select('id,title').in('id',workIds),
+        almoraDB.from('chapters').select('id,chapter_number,title,chapter_label,chapter_type').in('id',chapterIds)
+      ]);
+      if(works.error)throw works.error;
+      if(chapters.error)throw chapters.error;
+      const wm=Object.fromEntries((works.data||[]).map(x=>[x.id,x]));
+      const cm=Object.fromEntries((chapters.data||[]).map(x=>[x.id,x]));
+      app.innerHTML='<h1>Notificações</h1>'+items.map(item=>{
+        const w=wm[item.work_id]||{},c=cm[item.chapter_id]||{};
+        const label=c.chapter_label || (c.chapter_type==='extra'?'Extra':c.chapter_type==='special'?'Especial':'Capítulo '+c.chapter_number);
+        return '<article class="box" style="margin:10px 0;opacity:'+(item.read_at?'0.72':'1')+'"><b>'+safe(w.title||'Nova publicação')+'</b><p>'+safe(label)+' foi publicado.</p><small style="color:var(--mu)">'+new Date(item.created_at).toLocaleString('pt-BR')+'</small><div class="act"><a href="#obra/'+item.work_id+'"><button class="g" type="button">Abrir obra</button></a>'+(item.read_at?'':'<button class="g" type="button" onclick="almoraMarkNotificationRead(\''+item.id+'\')">Marcar como lida</button>')+'</div></article>';
+      }).join('');
+    } catch(error) {
+      app.innerHTML='<div class="empty">Não foi possível carregar notificações: '+safe(error.message)+'</div>';
+    }
+  }
+  window.almoraMarkNotificationRead=async function(id){
+    const me=getUser(); if(!me)return;
+    const {error}=await almoraDB.from('chapter_notifications').update({read_at:new Date().toISOString()}).eq('id',id).eq('user_id',me.id);
+    if(error)return toast('Não foi possível atualizar a notificação.');
+    loadNotifications();
+  };
+
+  const originalRen=window.ren;
+  if(typeof originalRen==='function'){
+    window.ren=function(...args){
+      const route=location.hash.slice(1).split('/')[0];
+      if(route==='notificacoes'){nav(route);loadNotifications();return;}
+      return originalRen.apply(this,args);
+    };
+  }
+
+  function scanProfile() {
+    const route=location.hash.slice(1).split('/');
+    if(route[0]!=='perfil')return;
+    const profileId=route[1] || getUser()?.id;
+    const profile=document.querySelector('.almora-profile');
+    if(!profile || !profileId || document.getElementById('almora-profile-social'))return;
+    const actions=profile.querySelector('.almora-profile-actions');
+    if(!actions)return;
+    const mount=document.createElement('div');
+    mount.id='almora-profile-social';
+    mount.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px';
+    actions.insertAdjacentElement('afterend',mount);
+    loadSocialProfile(profileId);
+  }
+  const app=document.getElementById('app');
+  if(app)new MutationObserver(scanProfile).observe(app,{childList:true,subtree:true});
+  document.addEventListener('DOMContentLoaded',scanProfile);
+})();
+</script>
+
+
+<script id="almora-bookmark-sync">
+(() => {
+  const currentUser=()=>typeof user!=='undefined'?user:null;
+  window.almoraPersistBookmark=async function(workId,chapter,page,remove){
+    const me=currentUser(); if(!me)return;
+    try{
+      const query=almoraDB.from('page_bookmarks').delete()
+        .eq('user_id',me.id).eq('work_id',workId)
+        .eq('chapter_number',String(chapter)).eq('page_number',Number(page)||0);
+      if(remove){
+        const {error}=await query;if(error)throw error;
+      }else{
+        const {error}=await almoraDB.from('page_bookmarks').upsert({
+          user_id:me.id,work_id:workId,chapter_number:String(chapter),
+          page_number:Number(page)||0
+        },{onConflict:'user_id,work_id,chapter_number,page_number'});
+        if(error)throw error;
+      }
+    }catch(error){console.warn('Não foi possível sincronizar o marcador:',error);toast('Marcador salvo neste aparelho, mas não sincronizado.');}
+  };
+  async function syncRemoteBookmarks(){
+    const me=currentUser();if(!me)return;
+    try{
+      const {data,error}=await almoraDB.from('page_bookmarks')
+        .select('work_id,chapter_number,page_number,created_at')
+        .eq('user_id',me.id).order('created_at',{ascending:false});
+      if(error)throw error;
+      S.bookmarks=S.bookmarks||{};
+      (data||[]).forEach(item=>{
+        const key=[item.work_id,item.chapter_number,item.page_number].join(':');
+        S.bookmarks[key]={work_id:item.work_id,chapter:String(item.chapter_number),page:Number(item.page_number),created_at:new Date(item.created_at).getTime()};
+      });
+      save();
+      if(location.hash==='#biblioteca')ren();
+    }catch(error){console.warn('Sincronização de marcadores indisponível:',error);}
+  }
+  const originalToggle=window.almoraToggleBookmark;
+  if(typeof originalToggle==='function'){
+    window.almoraToggleBookmark=function(id,chapter,page,button){
+      const key=[id,chapter,page].join(':');
+      const removing=!!(S.bookmarks&&S.bookmarks[key]);
+      originalToggle(id,chapter,page,button);
+      window.almoraPersistBookmark(id,chapter,page,removing);
+    };
+  }
+  almoraDB.auth.onAuthStateChange((event,session)=>{
+    if(session?.user)syncRemoteBookmarks();
+  });
+})();
+</script>
+
 </body>
 </html>
