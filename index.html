@@ -2505,6 +2505,7 @@ a:active {
           maxlength="60"
           required
           value="${esc(currentProfile.display_name || '')}"
+          oninput="almoraUpdateProfilePreview()"
         >
 
         <label>Biografia</label>
@@ -2513,7 +2514,21 @@ a:active {
           rows="5"
           maxlength="300"
           placeholder="Conte um pouco sobre você..."
+          oninput="almoraUpdateProfilePreview()"
         >${esc(currentProfile.bio || '')}</textarea>
+
+        <div id="profile_live_preview" style="margin:20px 0;padding:18px;border:1px solid var(--bd);border-radius:16px;background:var(--sf)">
+          <small style="display:block;color:var(--mu);margin-bottom:12px">Prévia em tempo real</small>
+          <div style="display:flex;align-items:center;gap:14px">
+            <img id="profile_live_avatar" src="${esc(currentProfile.avatar_url || '')}" alt="Foto do perfil" style="width:64px;height:64px;border-radius:50%;object-fit:cover;display:${currentProfile.avatar_url ? 'block' : 'none'}">
+            <span id="profile_live_avatar_fallback" style="width:64px;height:64px;border-radius:50%;background:var(--bg);display:${currentProfile.avatar_url ? 'none' : 'grid'};place-items:center;font-size:26px">♡</span>
+            <div style="min-width:0">
+              <strong id="profile_live_name">${esc(currentProfile.display_name || 'Seu nome')}</strong>
+              <small style="display:block;color:var(--mu)">@${esc(currentProfile.username || 'usuario')}</small>
+            </div>
+          </div>
+          <p id="profile_live_bio" style="white-space:pre-wrap;margin:14px 0 0">${esc(currentProfile.bio || 'Sua biografia aparecerá aqui...')}</p>
+        </div>
 
         <div class="almora-profile-actions">
           <button type="submit">Salvar alterações</button>
@@ -2546,8 +2561,30 @@ window.almoraPreviewAvatar = function(input) {
   }
 
   const preview = $('#profile_avatar_preview');
-  preview.src = URL.createObjectURL(file);
-  preview.style.display = 'block';
+  const livePreview = $('#profile_live_avatar');
+  const fallback = $('#profile_live_avatar_fallback');
+  if (preview) {
+    if (preview.dataset.objectUrl) URL.revokeObjectURL(preview.dataset.objectUrl);
+    preview.dataset.objectUrl = URL.createObjectURL(file);
+    preview.src = preview.dataset.objectUrl;
+    preview.style.display = 'block';
+  }
+  if (livePreview) {
+    if (livePreview.dataset.objectUrl) URL.revokeObjectURL(livePreview.dataset.objectUrl);
+    livePreview.dataset.objectUrl = URL.createObjectURL(file);
+    livePreview.src = livePreview.dataset.objectUrl;
+    livePreview.style.display = 'block';
+  }
+  if (fallback) fallback.style.display = 'none';
+};
+
+window.almoraUpdateProfilePreview = function() {
+  const name = $('#profile_name');
+  const bio = $('#profile_bio');
+  const previewName = $('#profile_live_name');
+  const previewBio = $('#profile_live_bio');
+  if (previewName && name) previewName.textContent = name.value.trim() || 'Seu nome';
+  if (previewBio && bio) previewBio.textContent = bio.value.trim() || 'Sua biografia aparecerá aqui...';
 };
 
 window.almoraSaveProfile = async function() {
