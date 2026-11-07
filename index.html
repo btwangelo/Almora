@@ -4360,7 +4360,7 @@ window.almoraSavePrivacy = async function() {
     }
 
     toast('Preferências salvas e confirmadas!');
-    location.hash = '#perfil';
+    window.ren();
 
   } catch (error) {
     console.error('Erro ao salvar privacidade:', error);
