@@ -4967,7 +4967,7 @@ window.almoraSavePrivacy = async function() {
         Number(following.count || 0).toLocaleString('pt-BR') +
         '</b><span>seguindo</span></button></div>' +
         (me && me.id !== profileId
-          ? '<button class="g" type="button" id="almora-follow-button" onclick="almoraToggleFollow(\\''+profileId+'\\')">' +
+          ? '<button class="g" type="button" id="almora-follow-button" onclick="almoraToggleFollow(\''+profileId+'\')">' +
             (isFollowing ? 'Deixar de seguir' : 'Seguir') + '</button>'
           : '');
       mount.querySelectorAll('[data-connections-kind]').forEach(button => {
