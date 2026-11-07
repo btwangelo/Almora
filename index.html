@@ -1908,7 +1908,6 @@ ren();initAuth();
 
   if (!app || typeof originalRender !== 'function') return;
 
-  let renderTimer;
   let enterTimer;
 
   window.ren = function(...args) {
@@ -1919,7 +1918,6 @@ ren();initAuth();
       (chapterFile && chapterFile.files.length > 0) ||
       (typeof draft !== 'undefined' && draft.length > 0);
 
-    clearTimeout(renderTimer);
     clearTimeout(enterTimer);
 
     if (route === 'studio' && hasPendingChapter) {
@@ -1948,7 +1946,7 @@ ren();initAuth();
 
   app.classList.add('almora-entering');
 
-  setTimeout(() => {
+  enterTimer = setTimeout(() => {
     app.classList.remove('almora-entering');
   }, 700);
 })();
