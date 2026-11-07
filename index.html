@@ -208,7 +208,7 @@ function nav(r){
     ['studio','Studio']
   ];
 
-  if(user) links.push(['desejos','Lista de desejos'],['perfil','Perfil']);
+  if(user) links.push(['desejos','Lista de desejos'],['perfil','Perfil'],['notificacoes','Notificações']);
 
   $('#nav').innerHTML=links
     .map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}">${t}</a>`)
@@ -4900,5 +4900,152 @@ window.almoraSavePrivacy = async function() {
   };
 })();
 </script>
+
+<script id="almora-social-and-notifications">
+(() => {
+  const getUser = () => (typeof user !== 'undefined' ? user : null);
+  const safe = value => typeof esc === 'function' ? esc(value) : String(value ?? '');
+
+  async function loadWorkFavoriteCount(workId) {
+    const mount = document.getElementById('almora-work-like-count');
+    if (!mount) return;
+    try {
+      const { count, error } = await almoraDB.from('work_favorite_counts')
+        .select('work_id', { count: 'exact', head: true })
+        .eq('work_id', workId);
+      if (error) throw error;
+      const { data } = await almoraDB.from('work_favorite_counts')
+        .select('favorites_count').eq('work_id', workId).maybeSingle();
+      mount.textContent = '♡ ' + Number(data?.favorites_count || 0).toLocaleString('pt-BR') + ' curtidas';
+    } catch (error) {
+      mount.textContent = '';
+      console.warn('Contagem de curtidas indisponível:', error);
+    }
+  }
+  window.almoraLoadWorkFavoriteCount = loadWorkFavoriteCount;
+
+  async function loadSocialProfile(profileId) {
+    const mount = document.getElementById('almora-profile-social');
+    if (!mount) return;
+    const me = getUser();
+    try {
+      const [followers, following, relation] = await Promise.all([
+        almoraDB.from('follows').select('follower_id', {count:'exact',head:true}).eq('following_id',profileId),
+        almoraDB.from('follows').select('following_id', {count:'exact',head:true}).eq('follower_id',profileId),
+        me && me.id !== profileId
+          ? almoraDB.from('follows').select('follower_id').eq('follower_id',me.id).eq('following_id',profileId).maybeSingle()
+          : Promise.resolve({data:null,error:null})
+      ]);
+      if (followers.error) throw followers.error;
+      if (following.error) throw following.error;
+      if (relation.error) throw relation.error;
+      const isFollowing = !!relation.data;
+      mount.innerHTML = '<div class="almora-social-counts"><span><b>' +
+        Number(followers.count || 0).toLocaleString('pt-BR') +
+        '</b> seguidores</span><span><b>' +
+        Number(following.count || 0).toLocaleString('pt-BR') +
+        '</b> seguindo</span></div>' +
+        (me && me.id !== profileId
+          ? '<button class="g" type="button" id="almora-follow-button" onclick="almoraToggleFollow(\''+profileId+'\')">' +
+            (isFollowing ? 'Deixar de seguir' : 'Seguir') + '</button>'
+          : '');
+    } catch (error) {
+      mount.innerHTML = '<small style="color:var(--mu)">Informações sociais indisponíveis.</small>';
+      console.warn('Erro ao carregar relações sociais:', error);
+    }
+  }
+  window.almoraToggleFollow = async function(profileId) {
+    const me = getUser();
+    if (!me) return toast('Entre na sua conta para seguir leitores.');
+    if (me.id === profileId) return;
+    const button = document.getElementById('almora-follow-button');
+    if (button) button.disabled = true;
+    try {
+      const {data:existing,error:readError} = await almoraDB.from('follows')
+        .select('follower_id').eq('follower_id',me.id).eq('following_id',profileId).maybeSingle();
+      if (readError) throw readError;
+      const result = existing
+        ? await almoraDB.from('follows').delete().eq('follower_id',me.id).eq('following_id',profileId)
+        : await almoraDB.from('follows').insert({follower_id:me.id,following_id:profileId});
+      if (result.error) throw result.error;
+      await loadSocialProfile(profileId);
+    } catch (error) {
+      toast('Não foi possível atualizar quem você segue: ' + error.message);
+      if (button) button.disabled = false;
+    }
+  };
+
+  async function loadNotifications() {
+    const app = document.getElementById('app');
+    const me = getUser();
+    if (!me) {
+      app.innerHTML = '<div class="empty">Entre na sua conta para ver notificações. <a href="#conta">Entrar</a></div>';
+      return;
+    }
+    app.innerHTML = '<div class="empty">Carregando notificações...</div>';
+    try {
+      const {data:items,error} = await almoraDB.from('chapter_notifications')
+        .select('id,work_id,chapter_id,created_at,read_at')
+        .eq('user_id',me.id).order('created_at',{ascending:false}).limit(50);
+      if(error)throw error;
+      if(!items?.length) {
+        app.innerHTML = '<h1>Notificações</h1><div class="empty">Você ainda não tem notificações.</div>';
+        return;
+      }
+      const workIds=[...new Set(items.map(x=>x.work_id))];
+      const chapterIds=[...new Set(items.map(x=>x.chapter_id))];
+      const [works,chapters]=await Promise.all([
+        almoraDB.from('works').select('id,title').in('id',workIds),
+        almoraDB.from('chapters').select('id,chapter_number,title,chapter_label,chapter_type').in('id',chapterIds)
+      ]);
+      if(works.error)throw works.error;
+      if(chapters.error)throw chapters.error;
+      const wm=Object.fromEntries((works.data||[]).map(x=>[x.id,x]));
+      const cm=Object.fromEntries((chapters.data||[]).map(x=>[x.id,x]));
+      app.innerHTML='<h1>Notificações</h1>'+items.map(item=>{
+        const w=wm[item.work_id]||{},c=cm[item.chapter_id]||{};
+        const label=c.chapter_label || (c.chapter_type==='extra'?'Extra':c.chapter_type==='special'?'Especial':'Capítulo '+c.chapter_number);
+        return '<article class="box" style="margin:10px 0;opacity:'+(item.read_at?'0.72':'1')+'"><b>'+safe(w.title||'Nova publicação')+'</b><p>'+safe(label)+' foi publicado.</p><small style="color:var(--mu)">'+new Date(item.created_at).toLocaleString('pt-BR')+'</small><div class="act"><a href="#obra/'+item.work_id+'"><button class="g" type="button">Abrir obra</button></a>'+(item.read_at?'':'<button class="g" type="button" onclick="almoraMarkNotificationRead(\''+item.id+'\')">Marcar como lida</button>')+'</div></article>';
+      }).join('');
+    } catch(error) {
+      app.innerHTML='<div class="empty">Não foi possível carregar notificações: '+safe(error.message)+'</div>';
+    }
+  }
+  window.almoraMarkNotificationRead=async function(id){
+    const me=getUser(); if(!me)return;
+    const {error}=await almoraDB.from('chapter_notifications').update({read_at:new Date().toISOString()}).eq('id',id).eq('user_id',me.id);
+    if(error)return toast('Não foi possível atualizar a notificação.');
+    loadNotifications();
+  };
+
+  const originalRen=window.ren;
+  if(typeof originalRen==='function'){
+    window.ren=function(...args){
+      const route=location.hash.slice(1).split('/')[0];
+      if(route==='notificacoes'){nav(route);loadNotifications();return;}
+      return originalRen.apply(this,args);
+    };
+  }
+
+  function scanProfile() {
+    const route=location.hash.slice(1).split('/');
+    if(route[0]!=='perfil')return;
+    const profileId=route[1] || getUser()?.id;
+    const profile=document.querySelector('.almora-profile');
+    if(!profile || !profileId || document.getElementById('almora-profile-social'))return;
+    const actions=profile.querySelector('.almora-profile-actions');
+    if(!actions)return;
+    const mount=document.createElement('div');
+    mount.id='almora-profile-social';
+    mount.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px';
+    actions.insertAdjacentElement('afterend',mount);
+    loadSocialProfile(profileId);
+  }
+  const app=document.getElementById('app');
+  if(app)new MutationObserver(scanProfile).observe(app,{childList:true,subtree:true});
+  document.addEventListener('DOMContentLoaded',scanProfile);
+})();
+</script>
+
 </body>
 </html>
