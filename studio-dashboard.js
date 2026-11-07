@@ -112,6 +112,7 @@
     const listNodes=[];
     if(workHeading){let n=workHeading.nextElementSibling;while(n&&n.tagName!=='H2'){listNodes.push(n);n=n.nextElementSibling;}}
     section.hidden=activePage==='analytics'||activePage==='settings'||activePage==='moderation';
+    section.style.display=activePage==='moderation'?'none':'block';
     if(moderation)moderation.style.display=activePage==='moderation'?'block':'none';
     if(analytics)analytics.hidden=activePage!=='analytics';
     if(settings)settings.hidden=activePage!=='settings';
@@ -138,7 +139,7 @@
 
 
   const style=document.createElement('style');
-  style.textContent='.almora-studio-dashboard-nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin:12px 0 20px}.almora-studio-dashboard-nav button{min-height:44px}.almora-studio-dashboard-nav button.on{background:var(--ac2);color:#fff}.almora-studio-work-search{width:100%;margin:8px 0 14px}.almora-studio-chapter-details{margin-top:10px;border-top:1px solid var(--bd);padding-top:8px}.almora-studio-chapter-details summary{cursor:pointer;color:var(--ac);font-weight:600}.almora-studio-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.almora-studio-stat-grid .box{margin:0}.almora-studio-stat-grid strong{display:block;font-size:28px;margin-top:5px}.almora-studio-extra-page[hidden]{display:none!important}';
+  style.textContent='.almora-studio-tabs{display:none!important}.almora-studio-dashboard-nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin:12px 0 20px}.almora-studio-dashboard-nav button{min-height:44px}.almora-studio-dashboard-nav button.on{background:var(--ac2);color:#fff}.almora-studio-work-search{width:100%;margin:8px 0 14px}.almora-studio-chapter-details{margin-top:10px;border-top:1px solid var(--bd);padding-top:8px}.almora-studio-chapter-details summary{cursor:pointer;color:var(--ac);font-weight:600}.almora-studio-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.almora-studio-stat-grid .box{margin:0}.almora-studio-stat-grid strong{display:block;font-size:28px;margin-top:5px}.almora-studio-extra-page[hidden]{display:none!important}';
   document.head.appendChild(style);
 
   function observe(){
