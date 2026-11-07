@@ -94,13 +94,21 @@
 
   window.almoraOpenConnectionsPage=(profileId,kind)=>{
     if(!profileId||!['followers','following'].includes(kind))return;
-    location.hash='#conexoes/'+encodeURIComponent(profileId)+'/'+kind;
+    const target='#conexoes/'+encodeURIComponent(profileId)+'/'+kind;
+    if(location.hash===target){
+      renderConnectionsPage(profileId,kind);
+      return;
+    }
+    location.hash=target;
   };
   window.almoraRenderConnectionsPage=renderConnectionsPage;
 
+  let connectionsPageRequest=0;
   async function renderConnectionsPage(profileId,kind){
     const app=document.getElementById('app');
     if(!app)return;
+    const request=++connectionsPageRequest;
+    const expectedHash='#conexoes/'+encodeURIComponent(profileId)+'/'+kind;
     const followers=kind==='followers';
     const title=followers?'Seguidores':'Seguindo';
     app.innerHTML='<section class="almora-connections-page"><button class="g" type="button" id="almora-connections-back">← Voltar ao perfil</button><h1>'+title+'</h1><div class="empty">Carregando...</div></section>';
@@ -111,6 +119,7 @@
         .eq(followers?'following_id':'follower_id',profileId)
         .order('created_at',{ascending:false}).limit(100);
       if(error)throw error;
+      if(request!==connectionsPageRequest||location.hash!==expectedHash)return;
       const ids=(data||[]).map(row=>followers?row.follower_id:row.following_id);
       const page=app.querySelector('.almora-connections-page');
       if(!page)return;
@@ -121,6 +130,7 @@
       }
       const result=await db.from('profiles').select('id,username,display_name,avatar_url,bio').in('id',ids);
       if(result.error)throw result.error;
+      if(request!==connectionsPageRequest||location.hash!==expectedHash)return;
       const byId=new Map((result.data||[]).map(person=>[person.id,person]));
       const people=ids.map(id=>byId.get(id)||{id,username:'privado',display_name:'Perfil privado',bio:'Este perfil não está público.'});
       let followed=new Set();
@@ -130,6 +140,7 @@
         if(relation.error)throw relation.error;
         followed=new Set((relation.data||[]).map(row=>row.following_id));
       }
+      if(request!==connectionsPageRequest||location.hash!==expectedHash)return;
       page.innerHTML='<button class="g" type="button" id="almora-connections-back">← Voltar ao perfil</button><h1>'+title+'</h1>'+
         '<label class="almora-search-label" for="almora-connections-search">'+(followers?'Pesquisar seguidores':'Pesquisar pessoas que você segue')+'</label>'+
         '<input id="almora-connections-search" type="search" placeholder="'+(followers?'Buscar seguidor por nome ou @usuário...':'Buscar pessoa seguida por nome ou @usuário...')+'" autocomplete="off">'+
@@ -144,6 +155,7 @@
       });
       bindFollowButtons(page);
     }catch(error){
+      if(request!==connectionsPageRequest||location.hash!==expectedHash)return;
       const page=app.querySelector('.almora-connections-page');
       if(page)page.innerHTML='<button class="g" type="button" onclick="location.hash=\'#perfil/'+encodeURIComponent(profileId)+'\'">← Voltar ao perfil</button><h1>'+title+'</h1><div class="empty">Não foi possível carregar a lista: '+escHtml(error.message)+'</div>';
     }
