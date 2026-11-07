@@ -212,8 +212,9 @@ function nav(r){
   if(user) links.push(['desejos','Lista de desejos'],['perfil','Perfil'],['notificacoes','Notificações']);
 
   $('#nav').innerHTML=links
-    .map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}">${t}</a>`)
+    .map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}" ${h==='notificacoes'?'data-notifications-link':''}>${t}</a>`)
     .join('');
+  window.almoraRefreshNotificationBadge?.();
   }
 function home(){const p=pub(),byR=[...p].sort((a,b)=>(b.reads||0)-(a.reads||0)),byU=[...p].sort((a,b)=>last(b)-last(a));
 return (p.length?'':`<div class="empty"><b>Bem-vindo(a) à ALMORA.</b><br>O catálogo está vazio. Cadastre a primeira obra no <a href="#studio" style="color:var(--ac)"><u>ALMORA STUDIO</u></a>.</div>`)+
@@ -5067,6 +5068,30 @@ window.almoraSavePrivacy = async function() {
     }
   };
 
+  window.almoraRefreshNotificationBadge = async function(){
+    const me=getUser();
+    const link=document.querySelector('[data-notifications-link]');
+    if(!me||!link)return;
+    try{
+      const [chapters,follows]=await Promise.all([
+        almoraDB.from('chapter_notifications').select('id',{count:'exact',head:true}).eq('user_id',me.id).is('read_at',null),
+        almoraDB.from('follow_notifications').select('id',{count:'exact',head:true}).eq('user_id',me.id).is('read_at',null)
+      ]);
+      if(chapters.error)throw chapters.error;
+      if(follows.error)throw follows.error;
+      const total=Number(chapters.count||0)+Number(follows.count||0);
+      const old=link.querySelector('.almora-notification-badge');
+      if(old)old.remove();
+      if(total){
+        const badge=document.createElement('span');
+        badge.className='almora-notification-badge';
+        badge.textContent=total>99?'99+':String(total);
+        badge.style.cssText='display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:#d93654;color:#fff;font-size:11px;font-weight:700;line-height:1';
+        link.appendChild(badge);
+      }
+    }catch(error){console.warn('Contagem de notificações indisponível:',error);}
+  };
+
   async function loadNotifications() {
     const app = document.getElementById('app');
     const me = getUser();
@@ -5076,39 +5101,67 @@ window.almoraSavePrivacy = async function() {
     }
     app.innerHTML = '<div class="empty">Carregando notificações...</div>';
     try {
-      const {data:items,error} = await almoraDB.from('chapter_notifications')
-        .select('id,work_id,chapter_id,created_at,read_at')
-        .eq('user_id',me.id).order('created_at',{ascending:false}).limit(50);
-      if(error)throw error;
-      if(!items?.length) {
-        app.innerHTML = '<h1>Notificações</h1><div class="empty">Você ainda não tem notificações.</div>';
-        return;
-      }
-      const workIds=[...new Set(items.map(x=>x.work_id))];
-      const chapterIds=[...new Set(items.map(x=>x.chapter_id))];
-      const [works,chapters]=await Promise.all([
-        almoraDB.from('works').select('id,title').in('id',workIds),
-        almoraDB.from('chapters').select('id,chapter_number,title,chapter_label,chapter_type').in('id',chapterIds)
+      const [chapterResult,followResult] = await Promise.all([
+        almoraDB.from('chapter_notifications')
+          .select('id,work_id,chapter_id,created_at,read_at')
+          .eq('user_id',me.id).order('created_at',{ascending:false}).limit(50),
+        almoraDB.from('follow_notifications')
+          .select('id,follower_id,created_at,read_at')
+          .eq('user_id',me.id).order('created_at',{ascending:false}).limit(50)
+      ]);
+      if(chapterResult.error)throw chapterResult.error;
+      if(followResult.error)throw followResult.error;
+      const chapters=chapterResult.data||[];
+      const follows=followResult.data||[];
+      const workIds=[...new Set(chapters.map(x=>x.work_id))];
+      const chapterIds=[...new Set(chapters.map(x=>x.chapter_id))];
+      const followerIds=[...new Set(follows.map(x=>x.follower_id))];
+      const [works,chapterData,profiles]=await Promise.all([
+        workIds.length?almoraDB.from('works').select('id,title').in('id',workIds):Promise.resolve({data:[],error:null}),
+        chapterIds.length?almoraDB.from('chapters').select('id,chapter_number,title,chapter_label,chapter_type').in('id',chapterIds):Promise.resolve({data:[],error:null}),
+        followerIds.length?almoraDB.from('profiles').select('id,username,display_name').in('id',followerIds):Promise.resolve({data:[],error:null})
       ]);
       if(works.error)throw works.error;
-      if(chapters.error)throw chapters.error;
+      if(chapterData.error)throw chapterData.error;
+      if(profiles.error)throw profiles.error;
       const wm=Object.fromEntries((works.data||[]).map(x=>[x.id,x]));
-      const cm=Object.fromEntries((chapters.data||[]).map(x=>[x.id,x]));
-      app.innerHTML='<h1>Notificações</h1>'+items.map(item=>{
+      const cm=Object.fromEntries((chapterData.data||[]).map(x=>[x.id,x]));
+      const pm=Object.fromEntries((profiles.data||[]).map(x=>[x.id,x]));
+      const combined=[
+        ...chapters.map(item=>({...item,notificationType:'chapter'})),
+        ...follows.map(item=>({...item,notificationType:'follow'}))
+      ].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,50);
+      if(!combined.length) {
+        app.innerHTML = '<h1>Notificações</h1><div class="empty">Você ainda não tem notificações.</div>';
+        window.almoraRefreshNotificationBadge();
+        return;
+      }
+      app.innerHTML='<h1>Notificações</h1>'+combined.map(item=>{
+        if(item.notificationType==='follow'){
+          const p=pm[item.follower_id]||{};
+          const name=p.display_name||'Um leitor';
+          const handle=p.username?' (@'+safe(p.username)+')':'';
+          return '<article class="box" style="margin:10px 0;opacity:'+(item.read_at?'0.72':'1')+'"><b>'+safe(name)+safe(handle)+'</b><p>começou a seguir seu perfil.</p><small style="color:var(--mu)">'+new Date(item.created_at).toLocaleString('pt-BR')+'</small><div class="act"><a href="#perfil/'+encodeURIComponent(item.follower_id)+'"><button class="g" type="button">Ver perfil</button></a>'+(item.read_at?'':'<button class="g" type="button" onclick="almoraMarkNotificationRead(\''+item.id+'\',\'follow\')">Marcar como lida</button>')+'</div></article>';
+        }
         const w=wm[item.work_id]||{},c=cm[item.chapter_id]||{};
         const label=c.chapter_label || (c.chapter_type==='extra'?'Extra':c.chapter_type==='special'?'Especial':'Capítulo '+c.chapter_number);
-        return '<article class="box" style="margin:10px 0;opacity:'+(item.read_at?'0.72':'1')+'"><b>'+safe(w.title||'Nova publicação')+'</b><p>'+safe(label)+' foi publicado.</p><small style="color:var(--mu)">'+new Date(item.created_at).toLocaleString('pt-BR')+'</small><div class="act"><a href="#obra/'+item.work_id+'"><button class="g" type="button">Abrir obra</button></a>'+(item.read_at?'':'<button class="g" type="button" onclick="almoraMarkNotificationRead(\''+item.id+'\')">Marcar como lida</button>')+'</div></article>';
+        return '<article class="box" style="margin:10px 0;opacity:'+(item.read_at?'0.72':'1')+'"><b>'+safe(w.title||'Nova publicação')+'</b><p>'+safe(label)+' foi publicado.</p><small style="color:var(--mu)">'+new Date(item.created_at).toLocaleString('pt-BR')+'</small><div class="act"><a href="#obra/'+item.work_id+'"><button class="g" type="button">Abrir obra</button></a>'+(item.read_at?'':'<button class="g" type="button" onclick="almoraMarkNotificationRead(\''+item.id+'\',\'chapter\')">Marcar como lida</button>')+'</div></article>';
       }).join('');
+      window.almoraRefreshNotificationBadge();
     } catch(error) {
       app.innerHTML='<div class="empty">Não foi possível carregar notificações: '+safe(error.message)+'</div>';
     }
   }
-  window.almoraMarkNotificationRead=async function(id){
+  window.almoraMarkNotificationRead=async function(id,type='chapter'){
     const me=getUser(); if(!me)return;
-    const {error}=await almoraDB.from('chapter_notifications').update({read_at:new Date().toISOString()}).eq('id',id).eq('user_id',me.id);
+    const table=type==='follow'?'follow_notifications':'chapter_notifications';
+    const {error}=await almoraDB.from(table).update({read_at:new Date().toISOString()}).eq('id',id).eq('user_id',me.id);
     if(error)return toast('Não foi possível atualizar a notificação.');
+    await window.almoraRefreshNotificationBadge();
     loadNotifications();
   };
+
+  window.almoraRefreshNotificationBadge?.();
 
   const originalRen=window.ren;
   if(typeof originalRen==='function'){
