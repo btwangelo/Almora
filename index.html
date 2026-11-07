@@ -201,7 +201,198 @@ ${user?wishlistButton(id):''}
 <h2>Sinopse</h2><p>${esc(w.synopsis||'Sem sinopse.')}</p>
 <h2>Capítulos</h2>${cs.length?[...cs].sort((a,b)=>a.n-b.n).map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>Capítulo ${esc(c.n)}${c.title&&c.title.trim()!=='Capítulo '+c.n?' — '+esc(c.title):''}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join(''):'<div class="empty">Sem capítulos publicados.</div>'}`}
 function rate(id,n){S.rate[id]=n;save();ren()}
-function fav(id){S.fav[id]=!S.fav[id];save();ren()}
+async function fav(id){
+  const next=!S.fav[id];
+  if(next)S.fav[id]=true;
+  else delete S.fav[id];
+  save();
+  ren();
+
+  if(!user)return;
+
+  try{
+    const q=next
+      ?await almoraDB.from('favorites').upsert(
+        {user_id:user.id,work_id:id},
+        {onConflict:'user_id,work_id'}
+      )
+      :await almoraDB.from('favorites')
+        .delete()
+        .eq('user_id',user.id)
+        .eq('work_id',id);
+
+    if(q.error)throw q.error;
+  }catch(e){
+    if(next)delete S.fav[id];
+    else S.fav[id]=true;
+    save();
+    ren();
+    toast('Não foi possível sincronizar a favorita.');
+    console.error(e);
+  }
+  }
+  async function almoraSyncFavorites(){
+  if(!user)return;
+
+  const marker='almora_favorites_migrated_'+user.id;
+
+  try{
+    if(!localStorage.getItem(marker)){
+      const ids=Object.keys(S.fav||{}).filter(id=>S.fav[id]);
+
+      if(ids.length){
+        const rows=ids.map(work_id=>({
+          user_id:user.id,
+          work_id
+        }));
+
+        const {error}=await almoraDB
+          .from('favorites')
+          .upsert(rows,{onConflict:'user_id,work_id'});
+
+        if(error)throw error;
+      }
+
+      localStorage.setItem(marker,'1');
+    }
+
+    const {data,error}=await almoraDB
+      .from('favorites')
+      .select('work_id')
+      .eq('user_id',user.id);
+
+    if(error)throw error;
+
+    S.fav={};
+    (data||[]).forEach(item=>{
+      S.fav[item.work_id]=true;
+    });
+
+    save();
+  }catch(e){
+    console.error('Erro ao sincronizar favoritas:',e);
+    toast('Não foi possível carregar suas favoritas.');
+  }
+  }
+  async function almoraSyncReadingProgress(){
+  if(!user)return;
+
+  const marker='almora_progress_migrated_'+user.id;
+
+  try{
+    if(!localStorage.getItem(marker)){
+      const rows=[];
+      const activities=[];
+
+      Object.entries(S.prog||{}).forEach(([workId,p])=>{
+        const w=W(workId);
+        if(!w||!p||!p.n)return;
+
+        const c=w.chapters.find(x=>Number(x.n)===Number(p.n));
+        if(!c||!c.id)return;
+
+        const page=Math.max(1,Number(p.pg||0)+1);
+
+        rows.push({
+          user_id:user.id,
+          work_id:workId,
+          chapter_id:c.id,
+          page_number:page
+        });
+
+        activities.push({
+          user_id:user.id,
+          work_id:workId,
+          chapter_id:c.id,
+          pages_read:page
+        });
+      });
+
+      if(rows.length){
+        const {error}=await almoraDB
+          .from('reading_progress')
+          .upsert(rows,{onConflict:'user_id,work_id'});
+
+        if(error)throw error;
+      }
+
+      if(activities.length){
+        const {error}=await almoraDB
+          .from('reading_activity')
+          .upsert(activities,{onConflict:'user_id,chapter_id'});
+
+        if(error)throw error;
+      }
+
+      localStorage.setItem(marker,'1');
+    }
+
+    const {data,error}=await almoraDB
+      .from('reading_progress')
+      .select('work_id,chapter_id,page_number,completed')
+      .eq('user_id',user.id);
+
+    if(error)throw error;
+
+    (data||[]).forEach(item=>{
+      const w=W(item.work_id);
+      if(!w)return;
+
+      const c=w.chapters.find(x=>x.id===item.chapter_id);
+      if(!c)return;
+
+      const p=S.prog[item.work_id]||{read:[]};
+      p.n=c.n;
+      p.pg=Math.max(0,Number(item.page_number)-1);
+
+      if(!p.read.includes(c.n))p.read.push(c.n);
+
+      S.prog[item.work_id]=p;
+    });
+
+    save();
+  }catch(e){
+    console.error('Erro ao sincronizar progresso:',e);
+    toast('Não foi possível sincronizar seu progresso.');
+  }
+  }
+  async function almoraSaveReadingProgress(workId,chapterNumber,pageIndex){
+  if(!user)return;
+
+  const w=W(workId);
+  const c=w?.chapters.find(x=>Number(x.n)===Number(chapterNumber));
+  if(!c?.id)return;
+
+  try{
+    const pageNumber=Math.max(1,Number(pageIndex)+1);
+
+    const {error:progressError}=await almoraDB
+      .from('reading_progress')
+      .upsert({
+        user_id:user.id,
+        work_id:workId,
+        chapter_id:c.id,
+        page_number:pageNumber
+      },{onConflict:'user_id,work_id'});
+
+    if(progressError)throw progressError;
+
+    const {error:activityError}=await almoraDB
+      .from('reading_activity')
+      .upsert({
+        user_id:user.id,
+        work_id:workId,
+        chapter_id:c.id,
+        pages_read:pageNumber,
+        last_read_at:new Date().toISOString()
+      },{onConflict:'user_id,chapter_id'});
+
+    if(activityError)throw activityError;
+
+  }catch(e){
+    console.error('Erro ao salvar progresso:',e);
+  }
+              }
 function lib(id,v){if(v)S.lib[id]=v;else delete S.lib[id];save();toast('Biblioteca atualizada')}
 function share(id){const u=location.href.split('#')[0]+'#obra/'+id;navigator.clipboard?.writeText(u).then(()=>toast('Link copiado'),()=>toast(u))}
 function biblio(){const L=['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'];
@@ -272,7 +463,12 @@ function reader(id,n){const w=W(id),c=w&&w.chapters.find(c=>String(c.n)===n);if(
 const cs=[...w.chapters].sort((a,b)=>a.n-b.n),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
 if(p.n!==c.n){w.reads=(w.reads||0)+1}p.n=c.n;if(!p.read.includes(c.n))p.read.push(c.n);save();
 const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}'"`:'disabled'}>◀</button><button class="g" ${cs[i+1]?`onclick="location.hash='#ler/${id}/${cs[i+1].n}'"`:'disabled'}>▶</button>`;
-setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){S.prog[id].pg=+e.target.dataset.i;save()}}),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
+setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
+  S.prog[id].pg=+e.target.dataset.i;
+  save();
+  almoraSaveReadingProgress(id,c.n,S.prog[id].pg);
+  }
+  }),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
 return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>Cap. ${esc(c.n)}</span><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
 <div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
 /* CONTA / AUTH (Firebase Authentication) */
@@ -372,15 +568,20 @@ async function initAuth(){
     head();
 
     await loadCatalog();
-    ren();
+await almoraSyncFavorites();
+    await almoraSyncReadingProgress();
+ren();
 
     almoraDB.auth.onAuthStateChange((event,session)=>{
       user=session?.user||null;
       head();
 
       if(event==='SIGNED_IN' || event==='SIGNED_OUT'){
-        loadCatalog().then(()=>{
-          ren();
+        loadCatalog().then(async()=>{
+  await almoraSyncFavorites();
+          await almoraSyncReadingProgress();
+  ren();
+});
         });
       }else if((location.hash.slice(1)||'home').split('/')[0]==='conta'){
         ren();
