@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   const app=document.getElementById('app');
-  const pages=[['works','Obras'],['launch','Publicar obra'],['chapters','Capítulos'],['moderation','Moderação'],['analytics','Estatísticas'],['settings','Configurações']];
+  const pages=[['works','Obras'],['launch','Publicar obra'],['chapters','Capítulos'],['moderation','Moderação'],['analytics','Estatísticas'],['settings','Configurações'],['announcements','Anúncios']];
   let activePage='works';
   let observer=null;
   const isStudio=()=>location.hash.split('/')[0]==='#studio';
@@ -24,6 +24,11 @@
         button.addEventListener('click',()=>window.almoraStudioPage(id));nav.appendChild(button);
       });
       section.insertAdjacentElement('beforebegin',nav);
+    }
+    let announcementPanel=document.getElementById('almora-studio-announcements');
+    if(!announcementPanel){
+      announcementPanel=document.createElement('section');announcementPanel.id='almora-studio-announcements';announcementPanel.style.display='none';
+      section.insertAdjacentElement('beforebegin',announcementPanel);
     }
     const heading=workHeading(section);
     if(heading&&!document.getElementById('almora-studio-work-search')){
@@ -70,7 +75,7 @@
     });
   }
 
-  window.almoraStudioPage=page=>{if(!pages.some(item=>item[0]===page))return;activePage=page;applyPage();};
+  window.almoraStudioPage=page=>{if(!pages.some(item=>item[0]===page))return;activePage=page;if(page==='announcements'){const panel=document.getElementById('almora-studio-announcements');if(panel)panel.dataset.loaded='0';}applyPage();};
 
   function applyPage(){
     if(!isStudio()||!app)return;
@@ -79,6 +84,7 @@
     const analytics=document.getElementById('almora-studio-statistics');
     const toolbar=app.querySelector('[data-studio-toolbar]');
     const nav=document.getElementById('almora-studio-dashboard-nav');
+    const announcementPanel=document.getElementById('almora-studio-announcements');
     if(!section||!nav)return;
     const allBoxes=boxes(section);const forms=allBoxes.filter(box=>box.dataset.studioTranslate!=='true');
     const translate=allBoxes.find(box=>box.dataset.studioTranslate==='true');
@@ -91,6 +97,10 @@
 
     const showMain=['works','launch','chapters','settings'].includes(activePage);
     section.hidden=!showMain;section.style.display=showMain?'block':'none';
+    if(announcementPanel){
+      announcementPanel.hidden=activePage!=='announcements';announcementPanel.style.display=activePage==='announcements'?'block':'none';
+      if(activePage==='announcements'&&announcementPanel.dataset.loaded!=='1'&&announcementPanel.dataset.loading!=='1')window.almoraLoadStudioAnnouncements?.();
+    }
     if(moderation)moderation.style.display=activePage==='moderation'?'block':'none';
     if(analytics)analytics.style.display=activePage==='analytics'?'block':'none';
     forms.forEach((box,index)=>{
