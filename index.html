@@ -595,7 +595,7 @@ const authErr=e=>{
     'weak_password':'Senha fraca.',
     'email_exists':'Este e-mail já está cadastrado.',
     'user_already_exists':'Este e-mail já está cadastrado.',
-    'over_email_send_rate_limit':'Muitas tentativas. Tente novamente mais tarde.'
+    'over_email_send_rate_limit':'O serviço de e-mail da ALMORA atingiu o limite temporário de envios. Aguarde ou tente novamente mais tarde. A equipe precisa configurar um serviço SMTP próprio para liberar novos cadastros.'
   };
   return msgs[e.code]||msgs[e.message]||'Erro: '+(e.message||'Tente novamente.');
 };
