@@ -4795,10 +4795,10 @@ window.almoraSavePrivacy = async function() {
     let html = originalStudio.apply(this, args);
     if (!html.includes('id="almora-studio-works"')) return html;
     html = html.replace(
-      '<button id="almora-tab-mod" class="g" onclick="almoraStudioTab(\\'mod\\')">Moderação</button>',
-      '<button id="almora-tab-mod" class="g" onclick="almoraStudioTab(\\'mod\\')">Moderação</button><button id="almora-tab-stats" class="g" onclick="almoraStudioTab(\\'stats\\')">Estatísticas</button>'
+      '</div>\n\n<section id="almora-studio-works">',
+      '<button id="almora-tab-stats" class="g" type="button" onclick="almoraStudioTab(&#39;stats&#39;)">Estatísticas</button></div>\n\n<section id="almora-studio-works">'
     );
-    return html + '\\n<section class="almora-mod" id="almora-studio-statistics" style="display:none"><h2>Estatísticas da ALMORA</h2><p style="color:var(--mu)">Visão geral dos dados cadastrados na plataforma.</p><div id="almora-stats-content"><div class="empty">Carregando estatísticas...</div></div><button class="g" type="button" style="width:100%;margin-top:12px" onclick="almoraLoadStudioStats()">Atualizar estatísticas</button></section>';
+    return html + '\n<section class="almora-mod" id="almora-studio-statistics" style="display:none"><h2>Estatísticas da ALMORA</h2><p style="color:var(--mu)">Visão geral dos dados cadastrados na plataforma.</p><div id="almora-stats-content"><div class="empty">Carregando estatísticas...</div></div><button class="g" type="button" style="width:100%;margin-top:12px" onclick="almoraLoadStudioStats()">Atualizar estatísticas</button></section>';
   };
 
   const previousTab = window.almoraStudioTab;
