@@ -205,6 +205,45 @@ function lib(id,v){if(v)S.lib[id]=v;else delete S.lib[id];save();toast('Bibliote
 function share(id){const u=location.href.split('#')[0]+'#obra/'+id;navigator.clipboard?.writeText(u).then(()=>toast('Link copiado'),()=>toast(u))}
 function biblio(){const L=['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'];
 const fv=pub().filter(w=>S.fav[w.id]);return sec('Favoritas',fv,gridOf)+L.map(l=>sec(l,pub().filter(w=>S.lib[w.id]===l),gridOf)).join('')}
+  async function wishlistToggle(id){
+  if(!user){
+    toast('Entre na sua conta para usar a lista de desejos.');
+    return;
+  }
+
+  try{
+    const {data,error}=await almoraDB
+      .from('wishlists')
+      .select('id')
+      .eq('user_id',user.id)
+      .eq('work_id',id)
+      .maybeSingle();
+
+    if(error)throw error;
+
+    if(data){
+      const {error:delError}=await almoraDB
+        .from('wishlists')
+        .delete()
+        .eq('id',data.id);
+
+      if(delError)throw delError;
+      toast('Obra removida da lista de desejos.');
+    }else{
+      const {error:insertError}=await almoraDB
+        .from('wishlists')
+        .insert({user_id:user.id,work_id:id});
+
+      if(insertError)throw insertError;
+      toast('Obra adicionada à lista de desejos!');
+    }
+
+    ren();
+  }catch(error){
+    console.error('Erro na lista de desejos:',error);
+    toast('Não foi possível atualizar a lista: '+error.message);
+   }
+  }
 let obs;
 function reader(id,n){const w=W(id),c=w&&w.chapters.find(c=>String(c.n)===n);if(!c)return`<div class="empty">Capítulo não encontrado.</div>`;
 const cs=[...w.chapters].sort((a,b)=>a.n-b.n),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
