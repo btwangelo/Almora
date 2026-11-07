@@ -216,7 +216,6 @@
       document.getElementById('almora-editor-back').addEventListener('click',back);
       document.getElementById('almora-editor-cancel').addEventListener('click',back);
       document.getElementById('almora-editor-save').addEventListener('click',window.almoraSaveAppearance);
-      document.querySelectorAll('input[name="almora-palette"]').forEach(input=>input.addEventListener('change',()=>{}));
     }catch(error){
       app.innerHTML='<div class="empty">Não foi possível abrir o editor: '+escHtml(error.message)+'</div>';
     }
@@ -280,8 +279,7 @@
     '.almora-editor{background:var(--sf);border:1px solid var(--bd);border-radius:18px;padding:16px}.almora-editor input[type=file]{margin:6px 0}'+
     '.almora-palette-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}.almora-palette-picker label{margin:0!important}.almora-palette-picker input{position:absolute;opacity:0;pointer-events:none}'+
     '.almora-palette-picker span{display:flex;align-items:center;gap:7px;padding:10px;border:2px solid var(--bd);border-radius:12px;cursor:pointer}.almora-palette-picker input:checked+span{outline:2px solid var(--ac);outline-offset:2px}'+
-    '.almora-palette-picker i{width:18px;height:18px;border-radius:50%}.almora-editor-preview{margin:18px 0;padding:24px;border:2px solid var(--bd);border-radius:16px;background:#f7e8ee;color:#563344}'+
-    '.almora-editor-preview b{font-size:20px}.almora-editor-preview p{margin-bottom:0}@media(max-width:520px){.almora-person-card{align-items:flex-start}.almora-person-card>button{padding:7px 10px}.almora-moodboard-profile{padding:12px}.almora-profile-cover{margin:-12px -12px 14px}}';
+    '.almora-palette-picker i{width:18px;height:18px;border-radius:50%}@media(max-width:520px){.almora-person-card{align-items:flex-start}.almora-person-card>button{padding:7px 10px}.almora-moodboard-profile{padding:12px}.almora-profile-cover{margin:-12px -12px 14px}}';
   document.head.appendChild(style);
 
   function addCommunityLink(){
