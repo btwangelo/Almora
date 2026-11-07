@@ -170,7 +170,7 @@ function nav(r){
     ['studio','Studio']
   ];
 
-  if(user) links.push(['perfil','Perfil']);
+  if(user) links.push(['desejos','Lista de desejos'],['perfil','Perfil']);
 
   $('#nav').innerHTML=links
     .map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}">${t}</a>`)
@@ -187,7 +187,7 @@ return `<h2>${t}</h2><div class="act"><select id="st" onchange="ren()"><option v
 let l=f.filter(w=>!st||w.status===st);const rt=w=>(S.rate[w.id]||0);
 l.sort(or==='a'?(a,b)=>a.title.localeCompare(b.title):or==='r'?(a,b)=>(b.reads||0)-(a.reads||0):or==='n'?(a,b)=>b.created-a.created:or==='s'?(a,b)=>rt(b)-rt(a):(a,b)=>last(b)-last(a));
 return l.length?gridOf(l):`<div class="empty">Nada encontrado.</div>`})()}
-function obra(id){const w=W(id);if(!w)return`<div class="empty">Obra não encontrada.</div>`;
+function obra(id){const w=W(id);if(!w)return`<div class="empty">Obra não encontrada.</div>`;                 
 const lp=S.prog[id],cs=[...w.chapters].sort((a,b)=>a.n-b.n),r=S.rate[id]||0,ls=S.lib[id]||'';
 return `<div class="hero"><div class="cv" ${cover(w)}></div><div><h1 style="margin:0">${esc(w.title)}</h1><div style="color:var(--mu)">${esc(w.alt)}</div>
 <div style="margin:8px 0"><span class="pill">${w.cat}</span><span class="pill">${esc(w.status)}</span><span class="pill">${esc(w.age)}</span>${(w.genres||'').split(',').filter(x=>x.trim()).map(g=>`<span class="pill">${esc(g.trim())}</span>`).join('')}</div>
@@ -195,6 +195,7 @@ return `<div class="hero"><div class="cv" ${cover(w)}></div><div><h1 style="marg
 <div class="stars" id="stars">${[1,2,3,4,5].map(i=>`<span class="${i<=r?'on':''}" onclick="rate('${id}',${i})">★</span>`).join('')}</div>
 <div class="act">${cs.length?`<button onclick="location.hash='#ler/${id}/${lp?lp.n:cs[0].n}'">${lp?'Continuar lendo (cap. '+esc(lp.n)+')':'Começar a ler'}</button>`:''}
 <button class="g" onclick="fav('${id}')">${S.fav[id]?'♥ Favorita':'♡ Favoritar'}</button>
+${user?wishlistButton(id):''}
 <select onchange="lib('${id}',this.value)"><option value="">+ Biblioteca</option>${['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'].map(x=>`<option ${ls===x?'selected':''}>${x}</option>`).join('')}</select>
 <button class="g" onclick="share('${id}')">Compartilhar</button></div></div></div>
 <h2>Sinopse</h2><p>${esc(w.synopsis||'Sem sinopse.')}</p>
@@ -205,6 +206,28 @@ function lib(id,v){if(v)S.lib[id]=v;else delete S.lib[id];save();toast('Bibliote
 function share(id){const u=location.href.split('#')[0]+'#obra/'+id;navigator.clipboard?.writeText(u).then(()=>toast('Link copiado'),()=>toast(u))}
 function biblio(){const L=['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'];
 const fv=pub().filter(w=>S.fav[w.id]);return sec('Favoritas',fv,gridOf)+L.map(l=>sec(l,pub().filter(w=>S.lib[w.id]===l),gridOf)).join('')}
+function wishlistButton(id){
+  return `<button class="g" id="wishlist-${id}" onclick="wishlistToggle('${id}')">♡ Lista de desejos</button>`;
+}
+
+async function syncWishlistButton(id){
+  if(!user) return;
+  try{
+    const {data,error}=await almoraDB
+      .from('wishlists')
+      .select('id')
+      .eq('user_id',user.id)
+      .eq('work_id',id)
+      .maybeSingle();
+
+    if(error) throw error;
+
+    const button=document.getElementById('wishlist-'+id);
+    if(button) button.textContent=data?'♥ Na lista de desejos':'♡ Adicionar à lista';
+  }catch(error){
+    console.error('Erro ao consultar lista de desejos:',error);
+  }
+  }  
   async function wishlistToggle(id){
   if(!user){
     toast('Entre na sua conta para usar a lista de desejos.');
@@ -1000,8 +1023,41 @@ async function delC(id,n){
     }
   }
 function bk(){const d=JSON.stringify({...S,works:S.works.map(w=>({...w,cover:'',chapters:w.chapters.map(c=>({...c,pages:c.pages.length}))}))},null,1);navigator.clipboard?.writeText(d);toast('Backup copiado')}
-function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
-A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():home();
+async function loadWishlistPage(){
+  const app=document.getElementById('app');
+
+  if(!user){
+    app.innerHTML='<div class="empty">Entre na sua conta para acessar sua lista de desejos. <p><a href="#conta">Entrar ou criar conta</a></p></div>';
+    return;
+  }
+
+  app.innerHTML='<div class="empty">Carregando sua lista de desejos...</div>';
+
+  try{
+    const {data,error}=await almoraDB
+      .from('wishlists')
+      .select('work_id')
+      .eq('user_id',user.id);
+
+    if(error) throw error;
+    if(location.hash!=='#desejos') return;
+
+    const works=(data||[])
+      .map(item=>W(item.work_id))
+      .filter(Boolean);
+
+    app.innerHTML=works.length
+      ? sec('Minha lista de desejos',works,gridOf)
+      : '<h1>Lista de desejos</h1><div class="empty">Você ainda não adicionou nenhuma obra. Explore o catálogo e salve as histórias que deseja ler depois.</div>';
+
+  }catch(error){
+    app.innerHTML='<div class="empty">Não foi possível carregar sua lista: '+esc(error.message)+'</div>';
+  }
+}
+  function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
+A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():home();
+if(r==='desejos') loadWishlistPage();
+if(r==='obra'&&user) syncWishlistButton(a);
 document.title=r==='obra'&&W(a)?W(a).title+' — ALMORA':'ALMORA — Where every story finds a home'}
 addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
 $('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
@@ -1545,7 +1601,7 @@ a:active {
       const { data: privacy, error: privacyError } =
         await almoraDB
           .from('profile_privacy')
-          .select('profile_public')
+          .select('profile_public,wishlist_public')
           .eq('user_id', id)
           .maybeSingle();
 
@@ -1668,6 +1724,23 @@ a:active {
         </section>
       `;
 
+            if (own || (privacy && privacy.wishlist_public === true)) {
+        const { data: wishlistItems, error: wishlistError } = await almoraDB
+          .from('wishlists')
+          .select('work_id')
+          .eq('user_id', id);
+
+        if (request !== profileRequest) return;
+        if (wishlistError) throw wishlistError;
+
+        const wishlistWorks = (wishlistItems || [])
+          .map(item => W(item.work_id))
+          .filter(Boolean);
+
+        app.innerHTML += wishlistWorks.length
+          ? sec('Lista de desejos', wishlistWorks, gridOf)
+          : '<h2>Lista de desejos</h2><div class="empty">Nenhuma obra adicionada à lista de desejos.</div>';
+  }
     } catch (error) {
       if (request !== profileRequest) return;
 
@@ -3453,7 +3526,7 @@ body:has(#nav a[href="#home"].on) #app .empty {
     try {
       const { data, error } = await almoraDB
         .from('profile_privacy')
-        .select('profile_public,library_public,history_public,stats_public')
+        .select('profile_public,library_public,history_public,stats_public,wishlist_public')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -3464,6 +3537,7 @@ body:has(#nav a[href="#home"].on) #app .empty {
         library_public: false,
         history_public: false,
         stats_public: false
+        wishlist_public: false
       };
 
       app.innerHTML = `
@@ -3510,6 +3584,16 @@ body:has(#nav a[href="#home"].on) #app .empty {
               ${settings.stats_public ? 'checked' : ''}>
           </div>
 
+          <div>
+  <label>
+    <input type="checkbox" id="privacy_wishlist"
+      ${settings.wishlist_public ? 'checked' : ''}>
+    Tornar minha lista de desejos pública
+  </label>
+  <p style="color:var(--mu);font-size:13px">
+    Permite que outras pessoas vejam as obras da sua lista de desejos no seu perfil.
+  </p>
+</div>
           <div class="almora-profile-actions">
             <button onclick="almoraSavePrivacy()">
               Salvar preferências
@@ -3541,6 +3625,7 @@ window.almoraSavePrivacy = async function() {
     library_public: document.getElementById('privacy_library').checked,
     history_public: document.getElementById('privacy_history').checked,
     stats_public: document.getElementById('privacy_stats').checked,
+    wishlist_public: document.getElementById('privacy_wishlist').checked,
     updated_at: new Date().toISOString()
   };
 
@@ -3548,7 +3633,7 @@ window.almoraSavePrivacy = async function() {
     const { data, error } = await almoraDB
       .from('profile_privacy')
       .upsert(settings, { onConflict: 'user_id' })
-      .select('user_id, profile_public, library_public, history_public, stats_public')
+      .select('user_id, profile_public, library_public, history_public, stats_public, wishlist_public')
       .single();
 
     if (error) throw error;
