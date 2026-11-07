@@ -179,7 +179,9 @@
       const lists=document.createElement('section');
       lists.id='almora-connection-tools';
       lists.className='almora-connection-tools';
-      lists.innerHTML='<div class="almora-connection-buttons"><button class="g" type="button" onclick="almoraShowConnections(\\''+profileId+'\\',\\'followers\\')">Seguidores</button><button class="g" type="button" onclick="almoraShowConnections(\\''+profileId+'\\',\\'following\\')">Seguindo</button></div><div id="almora-connections-list"></div>';
+      lists.innerHTML='<div class="almora-connection-buttons"><button class="g" type="button" data-connection="followers">Seguidores</button><button class="g" type="button" data-connection="following">Seguindo</button></div><div id="almora-connections-list"></div>';
+      lists.querySelector('[data-connection="followers"]').addEventListener('click',()=>window.almoraShowConnections(profileId,'followers'));
+      lists.querySelector('[data-connection="following"]').addEventListener('click',()=>window.almoraShowConnections(profileId,'following'));
       actions.insertAdjacentElement('afterend',lists);
     }
     if(actions && currentUser()?.id===profileId && !profile.querySelector('#almora-customize-profile')){
