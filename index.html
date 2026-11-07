@@ -7,7 +7,7 @@
 <meta name="twitter:image" content="https://almoraverse.pages.dev/almora-logo.png">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="description" content="Descubra e leia histórias GL e BL na ALMORA. Explore obras, acompanhe capítulos, organize sua biblioteca e encontre novas leituras.">
+<meta name="description" content="Leia histórias GL e BL na ALMORA. Descubra novas obras, acompanhe capítulos e organize sua biblioteca em um espaço feito para leitores.">
 <meta name="robots" content="index, follow">
 <meta name="application-name" content="ALMORA">
 <meta name="theme-color" content="#121214">
@@ -21,7 +21,7 @@
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="ALMORA — histórias GL e BL para descobrir e ler">
 <meta name="twitter:description" content="Descubra e leia histórias GL e BL na ALMORA. Explore obras, acompanhe capítulos e organize sua biblioteca.">
-<title>ALMORA — Where every story finds a home</title>
+<title>ALMORA | Leia histórias GL e BL</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600;700&family=Inter:wght@400;600&display=swap">
 <style>
 :root{--bg:#121214;--sf:#1e1e22;--sf2:#2a2a30;--tx:#f2eefc;--mu:#9d98b0;--ac:#b13df5;--ac2:#4b2bc4;--lv:#e2d9fa;--bd:#33333b;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -155,6 +155,15 @@ const almoraDB = window.supabase.createClient(
 );
 window.almoraDB = almoraDB;
 </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "ALMORA",
+    "alternateName": "ALMORA — histórias GL e BL",
+    "url": "https://almoraverse.pages.dev/"
+  }
+  </script>
   <meta name="google-site-verification" content="Fqj443WFo1-2r5SbIG0NqO0sOdkmcgjU8v2d8OfrEYk" />
 </head>
 <body>
@@ -166,7 +175,7 @@ window.almoraDB = almoraDB;
 <button class="g" id="th" title="Tema">◐</button>
 </header>
 <main id="app"></main>
-<footer>ALMORA — Where every story finds a home.<div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:10px"><a href="#sobre" style="color:var(--ac);text-decoration:underline">Sobre</a><a href="#regras" style="color:var(--ac);text-decoration:underline">Regras da comunidade</a><a href="#contato" style="color:var(--ac);text-decoration:underline">Contato</a><a href="#privacidade" style="color:var(--ac);text-decoration:underline">Privacidade</a><a href="#termos" style="color:var(--ac);text-decoration:underline">Termos</a></div></footer>
+<footer>ALMORA | Leia histórias GL e BL.<div style="display:flex;justify-content:center;gap:14px;flex-wrap:wrap;margin-top:10px"><a href="#sobre" style="color:var(--ac);text-decoration:underline">Sobre</a><a href="#regras" style="color:var(--ac);text-decoration:underline">Regras da comunidade</a><a href="#contato" style="color:var(--ac);text-decoration:underline">Contato</a><a href="#privacidade" style="color:var(--ac);text-decoration:underline">Privacidade</a><a href="#termos" style="color:var(--ac);text-decoration:underline">Termos</a></div></footer>
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -1440,7 +1449,7 @@ async function loadWishlistPage(){
 }
 function almoraUpdatePageMeta(route,id,chapter){
   const work=(route==='obra'||route==='ler')?W(id):null;
-  let title='ALMORA — Where every story finds a home';
+  let title='ALMORA | Leia histórias GL e BL';
   let description='Descubra e leia histórias GL e BL na ALMORA. Explore obras, acompanhe capítulos e organize sua biblioteca.';
   if(work){
     title=work.title+' — ALMORA';
