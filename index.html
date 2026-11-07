@@ -1910,9 +1910,12 @@ ren();initAuth();
   if (!app || typeof originalRender !== 'function') return;
 
   let enterTimer;
+  let lastAnimatedHash = null;
 
   window.ren = function(...args) {
     const route = (location.hash.slice(1) || 'home').split('/')[0];
+    const currentHash = location.hash || '#home';
+    const isNewPage = currentHash !== lastAnimatedHash;
     const chapterFile = app.querySelector('#c_f');
 
     const hasPendingChapter =
@@ -1923,8 +1926,17 @@ ren();initAuth();
 
     if (route === 'studio' && hasPendingChapter) {
       app.classList.remove('almora-leaving', 'almora-entering');
+      lastAnimatedHash = currentHash;
       return;
     }
+
+    // Chamadas internas de atualização não devem reiniciar a animação.
+    if (!isNewPage) {
+      app.classList.remove('almora-entering');
+      return originalRender.apply(this, args);
+    }
+
+    lastAnimatedHash = currentHash;
 
     if (window.matchMedia(
       '(prefers-reduced-motion: reduce)'
@@ -1933,7 +1945,7 @@ ren();initAuth();
       return originalRender.apply(this, args);
     }
 
-    // Renderiza imediatamente: não há animação nem atraso de saída.
+    // Anima apenas quando o endereço da página realmente muda.
     originalRender.apply(this, args);
 
     app.classList.remove('almora-leaving', 'almora-entering');
@@ -2297,6 +2309,12 @@ a:active {
   async function loadProfile(id) {
     const request = ++profileRequest;
     const app = $('#app');
+    const isCurrentProfileRequest = () => {
+      const parts = location.hash.slice(1).split('/');
+      const activeId = parts[1] || user?.id;
+      return request === profileRequest && parts[0] === 'perfil' && activeId === id;
+    };
+    app.dataset.almoraProfileLoading = '1';
 
     app.innerHTML =
       '<div class="empty">Carregando perfil...</div>';
@@ -2312,7 +2330,7 @@ a:active {
           .eq('user_id', id)
           .maybeSingle();
 
-      if (request !== profileRequest) return;
+      if (!isCurrentProfileRequest()) return;
       if (privacyError) throw privacyError;
 
       if (privacy &&
@@ -2331,6 +2349,7 @@ a:active {
             </div>
           </section>
         `;
+        delete app.dataset.almoraProfileLoading;
         return;
       }
 
@@ -2343,13 +2362,14 @@ a:active {
         .eq('id', id)
         .maybeSingle();
 
-      if (request !== profileRequest) return;
+      if (!isCurrentProfileRequest()) return;
       if (error) throw error;
 
       if (!data) {
         currentProfile = null;
         app.innerHTML =
           '<div class="empty">Perfil não encontrado.</div>';
+        delete app.dataset.almoraProfileLoading;
         return;
       }
 
@@ -2437,7 +2457,7 @@ a:active {
           .select('work_id')
           .eq('user_id', id);
 
-        if (request !== profileRequest) return;
+        if (!isCurrentProfileRequest()) return;
         if (wishlistError) throw wishlistError;
 
         const wishlistWorks = (wishlistItems || [])
@@ -2449,12 +2469,18 @@ a:active {
           : '<h2>Lista de desejos</h2><div class="empty">Nenhuma obra adicionada à lista de desejos.</div>';
   }
 
-      if (request !== profileRequest) return;
+      if (!isCurrentProfileRequest()) return;
       app.innerHTML += await almoraRenderAchievements(id, own);
+      if (!isCurrentProfileRequest()) return;
+      delete app.dataset.almoraProfileLoading;
+      if (typeof window.almoraInitProfileSocial === 'function') {
+        window.almoraInitProfileSocial();
+      }
     } catch (error) {
-      if (request !== profileRequest) return;
+      if (!isCurrentProfileRequest()) return;
 
       currentProfile = null;
+      delete app.dataset.almoraProfileLoading;
 
       app.innerHTML =
         '<div class="empty">Não foi possível carregar o perfil: ' +
@@ -3810,7 +3836,8 @@ window.almoraSaveProfile = async function() {
   if (typeof user === 'undefined' || !user) {
     adminStatus = false;
 
-    if (previousAdminStatus !== adminStatus) {
+    if (previousAdminStatus !== adminStatus &&
+        (location.hash.slice(1).split('/')[0] === 'studio')) {
       window.ren();
     }
 
@@ -3821,7 +3848,8 @@ window.almoraSaveProfile = async function() {
 
   adminStatus = !error && data === true;
 
-  if (previousAdminStatus !== adminStatus) {
+  if (previousAdminStatus !== adminStatus &&
+      (location.hash.slice(1).split('/')[0] === 'studio')) {
     window.ren();
   }
   }
@@ -4403,9 +4431,7 @@ window.almoraSavePrivacy = async function() {
 };
               
 
-  if (location.hash.startsWith('#perfil')) {
-    setTimeout(() => window.ren(), 1000);
-  }
+  // O carregamento do perfil já é iniciado pelo roteador; não forçar novo render.
 })();
 </script>
 
@@ -4972,9 +4998,12 @@ window.almoraSavePrivacy = async function() {
   }
   window.almoraLoadWorkFavoriteCount = loadWorkFavoriteCount;
 
+  let socialProfileRequest = 0;
+
   async function loadSocialProfile(profileId) {
     const mount = document.getElementById('almora-profile-social');
-    if (!mount) return;
+    if (!mount || mount.dataset.profileId !== profileId) return;
+    const request = ++socialProfileRequest;
     const me = getUser();
     try {
       const [followers, following, relation] = await Promise.all([
@@ -4987,6 +5016,9 @@ window.almoraSavePrivacy = async function() {
       if (followers.error) throw followers.error;
       if (following.error) throw following.error;
       if (relation.error) throw relation.error;
+      if (request !== socialProfileRequest ||
+          !mount.isConnected ||
+          mount.dataset.profileId !== profileId) return;
       const isFollowing = !!relation.data;
       mount.innerHTML = '<div class="almora-social-counts">' +
         '<button type="button" class="almora-social-count-button" data-connections-kind="followers"><b>' +
@@ -4996,17 +5028,17 @@ window.almoraSavePrivacy = async function() {
         Number(following.count || 0).toLocaleString('pt-BR') +
         '</b><span>seguindo</span></button></div>' +
         (me && me.id !== profileId
-          ? '<button class="g" type="button" id="almora-follow-button" onclick="almoraToggleFollow(\''+profileId+'\')">' +
+          ? '<button class="g" type="button" id="almora-follow-button">' +
             (isFollowing ? 'Deixar de seguir' : 'Seguir') + '</button>'
           : '');
-      mount.querySelectorAll('[data-connections-kind]').forEach(button => {
-        button.addEventListener('click', () => {
-          if (typeof window.almoraOpenConnectionsPage === 'function') {
-            window.almoraOpenConnectionsPage(profileId, button.dataset.connectionsKind);
-          }
-        });
+      const followButton = mount.querySelector('#almora-follow-button');
+      followButton?.addEventListener('click', () => {
+        window.almoraToggleFollow(profileId);
       });
     } catch (error) {
+      if (request !== socialProfileRequest ||
+          !mount.isConnected ||
+          mount.dataset.profileId !== profileId) return;
       mount.innerHTML = '<small style="color:var(--mu)">Informações sociais indisponíveis.</small>';
       console.warn('Erro ao carregar relações sociais:', error);
     }
@@ -5085,21 +5117,35 @@ window.almoraSavePrivacy = async function() {
   }
 
   function scanProfile() {
+    const app=document.getElementById('app');
+    if(app?.dataset.almoraProfileLoading==='1')return;
     const route=location.hash.slice(1).split('/');
     if(route[0]!=='perfil')return;
     const profileId=route[1] || getUser()?.id;
     const profile=document.querySelector('.almora-profile-view');
-    if(!profile || !profileId || document.getElementById('almora-profile-social'))return;
+    if(!profile || !profileId)return;
     const actions=profile.querySelector('.almora-profile-actions');
     if(!actions)return;
-    const mount=document.createElement('div');
+    let mount=document.getElementById('almora-profile-social');
+    if(mount && mount.dataset.profileId===profileId)return;
+    if(mount)mount.remove();
+    mount=document.createElement('div');
     mount.id='almora-profile-social';
-    mount.style.cssText='display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px';
+    mount.dataset.profileId=profileId;
+    mount.style.cssText='display:grid;gap:12px;margin-top:12px';
+    mount.addEventListener('click',event=>{
+      const button=event.target.closest('[data-connections-kind]');
+      if(!button || !mount.contains(button))return;
+      event.preventDefault();
+      window.almoraOpenConnectionsPage?.(profileId,button.dataset.connectionsKind);
+    });
     actions.insertAdjacentElement('afterend',mount);
     loadSocialProfile(profileId);
   }
+  window.almoraInitProfileSocial=scanProfile;
   const app=document.getElementById('app');
   if(app)new MutationObserver(scanProfile).observe(app,{childList:true});
+  scanProfile();
   document.addEventListener('DOMContentLoaded',scanProfile);
 })();
 </script>
@@ -5156,7 +5202,7 @@ window.almoraSavePrivacy = async function() {
 })();
 </script>
 
-<script src="social-profiles.js?v=connections1"></script>
+<script src="social-profiles.js?v=profile-stability1"></script>
 <script src="studio-dashboard.js"></script>
 </body>
 </html>
