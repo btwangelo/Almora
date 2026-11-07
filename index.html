@@ -2368,7 +2368,7 @@ a:active {
       const avatar = data.avatar_url || '';
 
       app.innerHTML = `
-        <section class="almora-profile">
+        <section class="almora-profile almora-profile-view">
 
           <div class="almora-profile-head">
             ${
@@ -2526,11 +2526,16 @@ a:active {
 
         <div class="almora-profile-actions">
           <button type="submit">Salvar alterações</button>
-          <button type="button" class="g" onclick="ren()">
-            Cancelar
-          </button>
         </div>
       </form>
+      <div class="almora-profile-actions">
+        <button type="button" class="g" onclick="window.almoraOpenProfileEditor()">
+          Personalizar perfil
+        </button>
+        <button type="button" class="g" onclick="window.ren()">
+          Voltar ao perfil
+        </button>
+      </div>
     </section>
   `;
 };
@@ -4954,15 +4959,24 @@ window.almoraSavePrivacy = async function() {
       if (following.error) throw following.error;
       if (relation.error) throw relation.error;
       const isFollowing = !!relation.data;
-      mount.innerHTML = '<div class="almora-social-counts"><span><b>' +
+      mount.innerHTML = '<div class="almora-social-counts">' +
+        '<button type="button" class="almora-social-count-button" data-connections-kind="followers"><b>' +
         Number(followers.count || 0).toLocaleString('pt-BR') +
-        '</b> seguidores</span><span><b>' +
+        '</b><span>seguidores</span></button>' +
+        '<button type="button" class="almora-social-count-button" data-connections-kind="following"><b>' +
         Number(following.count || 0).toLocaleString('pt-BR') +
-        '</b> seguindo</span></div>' +
+        '</b><span>seguindo</span></button></div>' +
         (me && me.id !== profileId
-          ? '<button class="g" type="button" id="almora-follow-button" onclick="almoraToggleFollow(\''+profileId+'\')">' +
+          ? '<button class="g" type="button" id="almora-follow-button" onclick="almoraToggleFollow(\\''+profileId+'\\')">' +
             (isFollowing ? 'Deixar de seguir' : 'Seguir') + '</button>'
           : '');
+      mount.querySelectorAll('[data-connections-kind]').forEach(button => {
+        button.addEventListener('click', () => {
+          if (typeof window.almoraOpenConnectionsPage === 'function') {
+            window.almoraOpenConnectionsPage(profileId, button.dataset.connectionsKind);
+          }
+        });
+      });
     } catch (error) {
       mount.innerHTML = '<small style="color:var(--mu)">Informações sociais indisponíveis.</small>';
       console.warn('Erro ao carregar relações sociais:', error);
@@ -5045,7 +5059,7 @@ window.almoraSavePrivacy = async function() {
     const route=location.hash.slice(1).split('/');
     if(route[0]!=='perfil')return;
     const profileId=route[1] || getUser()?.id;
-    const profile=document.querySelector('.almora-profile');
+    const profile=document.querySelector('.almora-profile-view');
     if(!profile || !profileId || document.getElementById('almora-profile-social'))return;
     const actions=profile.querySelector('.almora-profile-actions');
     if(!actions)return;
