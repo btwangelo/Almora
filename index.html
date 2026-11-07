@@ -198,7 +198,7 @@ return `<div class="hero"><div class="cv" ${cover(w)}></div><div><h1 style="marg
 <select onchange="lib('${id}',this.value)"><option value="">+ Biblioteca</option>${['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'].map(x=>`<option ${ls===x?'selected':''}>${x}</option>`).join('')}</select>
 <button class="g" onclick="share('${id}')">Compartilhar</button></div></div></div>
 <h2>Sinopse</h2><p>${esc(w.synopsis||'Sem sinopse.')}</p>
-<h2>Capítulos</h2>${cs.length?[...cs].reverse().map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>Capítulo ${esc(c.n)}${c.title?' — '+esc(c.title):''}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join(''):'<div class="empty">Sem capítulos publicados.</div>'}`}
+<h2>Capítulos</h2>${cs.length?[...cs].sort((a,b)=>a.n-b.n).map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>Capítulo ${esc(c.n)}${c.title&&c.title.trim()!=='Capítulo '+c.n?' — '+esc(c.title):''}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join('')
 function rate(id,n){S.rate[id]=n;save();ren()}
 function fav(id){S.fav[id]=!S.fav[id];save();ren()}
 function lib(id,v){if(v)S.lib[id]=v;else delete S.lib[id];save();toast('Biblioteca atualizada')}
