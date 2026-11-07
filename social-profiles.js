@@ -95,7 +95,6 @@
   window.almoraOpenConnectionsPage=(profileId,kind)=>{
     if(!profileId||!['followers','following'].includes(kind))return;
     location.hash='#conexoes/'+encodeURIComponent(profileId)+'/'+kind;
-    if(typeof window.ren==='function')window.ren();
   };
   window.almoraRenderConnectionsPage=renderConnectionsPage;
 
