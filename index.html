@@ -1433,9 +1433,10 @@ function almoraUpdatePageMeta(route,id,chapter){
   }
 }
 function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
-A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():r==='comunidade'?'<section class="almora-directory"><h1>Comunidade</h1><div class="empty">Carregando leitores...</div></section>':home();
+A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():r==='comunidade'?'<section class="almora-directory"><h1>Comunidade</h1><div class="empty">Carregando leitores...</div></section>':r==='conexoes'?'<section class="almora-connections-page"><div class="empty">Carregando conexões...</div></section>':home();
 if(r==='desejos') loadWishlistPage();
 if(r==='comunidade'&&window.almoraRenderDirectory) window.almoraRenderDirectory();
+if(r==='conexoes'&&a&&['followers','following'].includes(b)&&window.almoraRenderConnectionsPage) window.almoraRenderConnectionsPage(decodeURIComponent(a),b);
 if(r==='studio'&&window.almoraBatchRender) almoraBatchRender();
 if(r==='obra'&&user) syncWishlistButton(a);
 if(r==='obra'&&window.almoraLoadWorkFavoriteCount) almoraLoadWorkFavoriteCount(a);
@@ -5155,7 +5156,7 @@ window.almoraSavePrivacy = async function() {
 })();
 </script>
 
-<script src="social-profiles.js?v=9745cace"></script>
+<script src="social-profiles.js?v=connections1"></script>
 <script src="studio-dashboard.js"></script>
 </body>
 </html>

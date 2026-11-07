@@ -96,6 +96,7 @@
     if(!profileId||!['followers','following'].includes(kind))return;
     location.hash='#conexoes/'+encodeURIComponent(profileId)+'/'+kind;
   };
+  window.almoraRenderConnectionsPage=renderConnectionsPage;
 
   async function renderConnectionsPage(profileId,kind){
     const app=document.getElementById('app');
@@ -295,10 +296,6 @@
   window.addEventListener('hashchange',()=>{
     addCommunityLink();
     if(location.hash==='#comunidade')renderDirectory();
-    const parts=location.hash.slice(1).split('/');
-    if(parts[0]==='conexoes'&&parts[1]&&['followers','following'].includes(parts[2])){
-      renderConnectionsPage(decodeURIComponent(parts[1]),parts[2]);
-    }
   });
   addCommunityLink();
   if(location.hash==='#comunidade')renderDirectory();
