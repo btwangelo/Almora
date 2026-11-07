@@ -34,6 +34,10 @@
   async function renderDirectory(query='') {
     const app = document.getElementById('app');
     if (!app) return;
+    if (!currentUser()) {
+      app.innerHTML = '<section class="almora-directory"><h1>Comunidade</h1><div class="empty">Entre na sua conta para pesquisar perfis, conhecer leitores e seguir pessoas.<br><a href="#conta" style="color:var(--ac)">Entrar ou criar conta</a></div></section>';
+      return;
+    }
     const requestId = ++directoryRequest;
     app.innerHTML = '<h1>Comunidade</h1><div class="empty">Encontrando leitores...</div>';
     try {
