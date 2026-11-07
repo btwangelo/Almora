@@ -1378,7 +1378,7 @@ function almoraUpdatePageMeta(route,id,chapter){
   let description='Descubra e leia histórias GL e BL na ALMORA. Explore obras, acompanhe capítulos e organize sua biblioteca.';
   if(work){
     title=work.title+' — ALMORA';
-    description=String(work.synopsis||('Leia '+work.title+' na ALMORA.')).replace(/\\s+/g,' ').trim().slice(0,160);
+    description=String(work.synopsis||('Leia '+work.title+' na ALMORA.')).replace(/\s+/g,' ').trim().slice(0,160);
     if(route==='ler'){
       const current=work.chapters.find(c=>String(c.n)===String(chapter));
       if(current)title=work.title+' — '+almoraChapterDisplay(current)+' — ALMORA';
