@@ -1367,12 +1367,36 @@ async function loadWishlistPage(){
     app.innerHTML='<div class="empty">Não foi possível carregar sua lista: '+esc(error.message)+'</div>';
   }
 }
-  function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
+  function almoraSetMeta(selector,attribute,value){
+  let el=document.querySelector(selector);
+  if(!el){el=document.createElement('meta');document.head.appendChild(el);}
+  el.setAttribute(attribute,value);
+}
+function almoraUpdatePageMeta(route,id,chapter){
+  const work=(route==='obra'||route==='ler')?W(id):null;
+  let title='ALMORA — Where every story finds a home';
+  let description='Descubra e leia histórias GL e BL na ALMORA. Explore obras, acompanhe capítulos e organize sua biblioteca.';
+  if(work){
+    title=work.title+' — ALMORA';
+    description=String(work.synopsis||('Leia '+work.title+' na ALMORA.')).replace(/\\s+/g,' ').trim().slice(0,160);
+    if(route==='ler'){
+      const current=work.chapters.find(c=>String(c.n)===String(chapter));
+      if(current)title=work.title+' — '+almoraChapterDisplay(current)+' — ALMORA';
+    }
+  }
+  document.title=title;
+  almoraSetMeta('meta[name="description"]','content',description);
+  almoraSetMeta('meta[property="og:title"]','content',title);
+  almoraSetMeta('meta[property="og:description"]','content',description);
+  almoraSetMeta('meta[name="twitter:title"]','content',title);
+  almoraSetMeta('meta[name="twitter:description"]','content',description);
+}
+function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
 A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():home();
 if(r==='desejos') loadWishlistPage();
 if(r==='studio'&&window.almoraBatchRender) almoraBatchRender();
 if(r==='obra'&&user) syncWishlistButton(a);
-document.title=r==='obra'&&W(a)?W(a).title+' — ALMORA':'ALMORA — Where every story finds a home'}
+almoraUpdatePageMeta(r,a,b)}
 addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
 $('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
 $('#th').onclick=()=>{const d=document.documentElement,c=getComputedStyle(d).getPropertyValue('--bg').trim()==='#121214';d.dataset.theme=c?'light':'dark'};
