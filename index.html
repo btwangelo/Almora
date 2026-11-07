@@ -573,13 +573,16 @@ if(p.n!==c.n){w.reads=(w.reads||0)+1}p.n=c.n;if(!p.read.includes(c.n))p.read.pus
 const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}'"`:'disabled'}>◀</button><button class="g" ${cs[i+1]?`onclick="location.hash='#ler/${id}/${cs[i+1].n}'"`:'disabled'}>▶</button>`;
 setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
   S.prog[id].pg=+e.target.dataset.i;
+  const currentBookmarkKey=[id,c.n,S.prog[id].pg].join(':');
+  const bookmarkButton=document.getElementById('almora-page-bookmark');
+  if(bookmarkButton)bookmarkButton.textContent=S.bookmarks&&S.bookmarks[currentBookmarkKey]?'★ Página marcada':'☆ Marcar página';
   save();
   almoraSaveReadingProgress(id,c.n,S.prog[id].pg);
   }
   }),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
 const bookmarkKey=[id,c.n,p.pg||0].join(':');
 const isBookmarked=!!(S.bookmarks&&S.bookmarks[bookmarkKey]);
-return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><button class="g" type="button" onclick="almoraToggleBookmark('${id}','${c.n}',${p.pg||0},this)">${isBookmarked?'★ Página marcada':'☆ Marcar página'}</button><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
+return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><button class="g" type="button" id="almora-page-bookmark" onclick="almoraToggleBookmark('${id}','${c.n}',S.prog['${id}'].pg||0,this)">${isBookmarked?'★ Página marcada':'☆ Marcar página'}</button><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
 <div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
 /* CONTA / AUTH (Firebase Authentication) */
 /* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
