@@ -568,9 +568,9 @@ async function initAuth(){
     head();
 
     await loadCatalog();
-await almoraSyncFavorites();
+    await almoraSyncFavorites();
     await almoraSyncReadingProgress();
-ren();
+    ren();
 
     almoraDB.auth.onAuthStateChange((event,session)=>{
       user=session?.user||null;
@@ -578,10 +578,9 @@ ren();
 
       if(event==='SIGNED_IN' || event==='SIGNED_OUT'){
         loadCatalog().then(async()=>{
-  await almoraSyncFavorites();
+          await almoraSyncFavorites();
           await almoraSyncReadingProgress();
-  ren();
-});
+          ren();
         });
       }else if((location.hash.slice(1)||'home').split('/')[0]==='conta'){
         ren();
@@ -593,7 +592,7 @@ ren();
     console.error(e);
   }
 }
-
+  
 function head(){
   const nome=user?.user_metadata?.display_name||user?.email||'Conta';
   $('#acc').innerHTML=`<button class="g" type="button">${user?esc(nome.split(/[ @]/)[0]):'Entrar'}</button>`;
