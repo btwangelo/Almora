@@ -5203,7 +5203,7 @@ window.almoraSavePrivacy = async function() {
         if(!confirm('Excluir este anúncio permanentemente?'))return;
         const deleted=await almoraDB.from('announcements').delete().eq('id',button.dataset.announcementDelete);
         if(deleted.error)return toast('Não foi possível excluir: '+deleted.error.message);
-        toast('Anúncio excluído.');mount.dataset.loaded='0';mount.dataset.loading='0';window.almoraLoadStudioAnnouncements();
+        toast('Anúncio excluído.');mount.dataset.loaded='0';mount.dataset.loading='0';await window.almoraLoadStudioAnnouncements();
       }));
       imageInput.addEventListener('change',()=>{
         const file=imageInput.files?.[0];if(!file){preview.innerHTML=currentImage?'<img src="'+safe(currentImage)+'" alt="Imagem atual" style="max-width:100%;max-height:180px;border-radius:8px">':'';return;}
@@ -5230,7 +5230,7 @@ window.almoraSavePrivacy = async function() {
           if(saved.error)throw saved.error;
           toast(editing?'Anúncio atualizado!':'Anúncio publicado para todos!');
           await window.almoraRefreshNotificationBadge();if(location.hash==='#notificacoes')loadNotifications();
-          mount.dataset.loaded='0';mount.dataset.loading='0';window.almoraLoadStudioAnnouncements();
+          mount.dataset.loaded='0';mount.dataset.loading='0';await window.almoraLoadStudioAnnouncements();
         }catch(error){toast('Não foi possível publicar: '+error.message);}
         finally{submit.disabled=false;submit.textContent=editing?'Salvar e publicar':'Publicar anúncio';}
       });
