@@ -60,7 +60,15 @@ header{
   min-width:0;
 }
 
-#acc{grid-area:acc}
+#acc{grid-area:acc;display:flex;align-items:center;gap:8px;position:relative;justify-self:end}
+#acc .almora-header-avatar{width:38px;height:38px;display:grid;place-items:center;padding:0;border-radius:50%;overflow:hidden;background:var(--sf2);border:1px solid var(--bd);color:var(--tx);font-size:17px}
+#acc .almora-header-avatar img{width:100%;height:100%;object-fit:cover}
+#acc .almora-header-gear{width:38px;height:38px;padding:0;border-radius:50%;font-size:19px;line-height:1}
+#acc .almora-account-menu{position:absolute;right:0;top:calc(100% + 9px);z-index:20;width:min(245px,calc(100vw - 28px));padding:8px;background:var(--sf);border:1px solid var(--bd);border-radius:14px;box-shadow:0 12px 32px #0005;display:grid;gap:3px}
+#acc .almora-account-menu[hidden]{display:none}
+#acc .almora-account-menu a,#acc .almora-account-menu button{display:flex;align-items:center;width:100%;padding:10px 12px;border-radius:9px;background:transparent;color:var(--tx);text-align:left;font-weight:600;border:0}
+#acc .almora-account-menu a:hover,#acc .almora-account-menu button:hover{background:var(--sf2)}
+#acc .almora-menu-email{padding:8px 12px 10px;color:var(--mu);font-size:12px;overflow-wrap:anywhere;border-bottom:1px solid var(--bd);margin-bottom:4px}
 #th{grid-area:theme}
 
 nav{
@@ -150,7 +158,7 @@ window.almoraDB = almoraDB;
 <a class="logo" href="#home" aria-label="ALMORA">Alm<svg viewBox="0 0 100 92"><path d="M8 8l32 14c14-5 26-5 40 0l12-14 4 40c-2 20-14 34-34 40-24-3-40-18-46-38z" fill="#050508" transform="translate(-2 0)"/><path d="M50 36l4 9h10l-8 6 3 10-9-6-9 6 3-10-8-6h10z" fill="#e2d9fa" transform="translate(-6 -2) scale(.9)"/><path d="M62 38c10-5 18-3 20 0-4 12-12 18-20 16z" fill="#b13df5"/></svg>ra</a>
 <nav id="nav"></nav>
 <input id="q" placeholder="Pesquisar…" style="flex:1;min-width:120px">
-<a id="acc" href="#conta"><button class="g" type="button">Entrar</button></a>
+<div id="acc" aria-label="Acesso à conta"></div>
 <button class="g" id="th" title="Tema">◐</button>
 </header>
 <main id="app"></main>
@@ -205,12 +213,8 @@ function nav(r){
     ['gl','GL'],
     ['explorar','Explorar'],
     ['atualizacoes','Atualizações'],
-    ['biblioteca','Minha biblioteca'],
-    ['studio','Studio']
+    ['biblioteca','Minha biblioteca']
   ];
-
-  if(user) links.push(['desejos','Lista de desejos'],['perfil','Perfil']);
-  links.push(['notificacoes','Notificações']);
 
   $('#nav').innerHTML=links
     .map(([h,t])=>`<a href="#${h}" class="${r===h?'on':''}" ${h==='notificacoes'?'data-notifications-link':''}>${t}</a>`)
@@ -713,10 +717,46 @@ async function initAuth(){
   }
 }
   
-function head(){
-  const nome=user?.user_metadata?.display_name||user?.email||'Conta';
-  $('#acc').innerHTML=`<button class="g" type="button">${user?esc(nome.split(/[ @]/)[0]):'Entrar'}</button>`;
+let almoraHeaderProfileRequest=0;
+async function head(){
+  const root=$('#acc');
+  if(!root)return;
+  const request=++almoraHeaderProfileRequest;
+  if(!user){
+    root.innerHTML='<a href="#conta"><button class="g" type="button">Entrar</button></a>';
+    return;
+  }
+  const me=user;
+  let profile={};
+  try{
+    const result=await almoraDB.from('profiles').select('avatar_url,display_name').eq('id',me.id).maybeSingle();
+    if(result.error)throw result.error;
+    profile=result.data||{};
+  }catch(error){console.warn('Foto do perfil indisponível no cabeçalho:',error);}
+  if(request!==almoraHeaderProfileRequest||!user||user.id!==me.id)return;
+  const name=profile.display_name||me.user_metadata?.display_name||'Meu perfil';
+  const avatar=profile.avatar_url?'<img src="'+esc(profile.avatar_url)+'" alt="">':(name.trim().charAt(0).toUpperCase()||'👤');
+  root.innerHTML='<a class="almora-header-avatar" href="#perfil" aria-label="Abrir meu perfil" title="Meu perfil">'+avatar+'</a>'+
+    '<button class="g almora-header-gear" type="button" aria-label="Abrir menu de opções" aria-expanded="false" aria-controls="almora-account-menu" onclick="almoraToggleAccountMenu(event)">⚙</button>'+
+    '<div class="almora-account-menu" id="almora-account-menu" hidden>'+
+      '<div class="almora-menu-email">'+esc(me.email||'Conta')+'</div>'+
+      '<a href="#perfil">Perfil</a><a href="#studio">ALMORA Studio</a><a href="#comunidade">Comunidade</a><a href="#desejos">Lista de desejos</a><a href="#notificacoes">Notificações</a><a href="#conta">Minha conta</a>'+
+      '<button type="button" onclick="out();almoraCloseAccountMenu()">Sair</button></div>';
 }
+function almoraToggleAccountMenu(event){
+  event?.stopPropagation();
+  const menu=$('#almora-account-menu'),button=$('#acc .almora-header-gear');
+  if(!menu||!button)return;
+  menu.hidden=!menu.hidden;
+  button.setAttribute('aria-expanded',String(!menu.hidden));
+}
+function almoraCloseAccountMenu(){
+  const menu=$('#almora-account-menu'),button=$('#acc .almora-header-gear');
+  if(menu)menu.hidden=true;
+  if(button)button.setAttribute('aria-expanded','false');
+}
+document.addEventListener('click',event=>{if(!event.target.closest('#acc'))almoraCloseAccountMenu();});
+document.addEventListener('keydown',event=>{if(event.key==='Escape')almoraCloseAccountMenu();});
 
 function conta(){
   if(user){
