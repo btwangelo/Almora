@@ -157,7 +157,7 @@ const almoraDB = window.supabase.createClient(
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let S={works:[],prog:{},lib:{},fav:{},rate:{},pin:null},unlocked=false,draft=[];
+let S={works:[],prog:{},lib:{},fav:{},rate:{},bookmarks:{},pin:null},unlocked=false,draft=[];
 try{Object.assign(S,JSON.parse(localStorage.getItem('almora')||'{}'))}catch(e){}
 
 const save=()=>{
@@ -166,7 +166,8 @@ const save=()=>{
       prog:S.prog||{},
       lib:S.lib||{},
       fav:S.fav||{},
-      rate:S.rate||{}
+      rate:S.rate||{},
+      bookmarks:S.bookmarks||{}
     };
     localStorage.setItem('almora',JSON.stringify(personalData));
     return true;
@@ -490,7 +491,20 @@ async function fav(id){
 function lib(id,v){if(v)S.lib[id]=v;else delete S.lib[id];save();toast('Biblioteca atualizada')}
 function share(id){const u=location.href.split('#')[0]+'#obra/'+id;navigator.clipboard?.writeText(u).then(()=>toast('Link copiado'),()=>toast(u))}
 function biblio(){const L=['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'];
-const fv=pub().filter(w=>S.fav[w.id]);return sec('Favoritas',fv,gridOf)+L.map(l=>sec(l,pub().filter(w=>S.lib[w.id]===l),gridOf)).join('')}
+const fv=pub().filter(w=>S.fav[w.id]);
+const marks=Object.values(S.bookmarks||{}).filter(m=>W(m.work_id));
+const marked=marks.length?`<h2>Páginas marcadas</h2>${marks.sort((a,b)=>(b.created_at||0)-(a.created_at||0)).map(m=>{const w=W(m.work_id),c=w.chapters.find(x=>String(x.n)===String(m.chapter));return `<a class="ch" href="#ler/${w.id}/${m.chapter}"><b>${esc(w.title)} · ${esc(c?almoraChapterDisplay(c):'Capítulo '+m.chapter)}</b><span>Página ${(Number(m.page)||0)+1}</span></a>`}).join('')}`:'<h2>Páginas marcadas</h2><div class="empty">Você ainda não marcou nenhuma página.</div>';
+return sec('Favoritas',fv,gridOf)+L.map(l=>sec(l,pub().filter(w=>S.lib[w.id]===l),gridOf)).join('')+marked}
+function almoraToggleBookmark(id,chapter,page,button){
+  S.bookmarks=S.bookmarks||{};
+  const key=[id,chapter,page].join(':');
+  const exists=!!S.bookmarks[key];
+  if(exists)delete S.bookmarks[key];
+  else S.bookmarks[key]={work_id:id,chapter:String(chapter),page:Number(page)||0,created_at:Date.now()};
+  save();
+  if(button)button.textContent=exists?'☆ Marcar página':'★ Página marcada';
+  toast(exists?'Marcador removido.':'Página marcada!');
+}
 function wishlistButton(id){
   return `<button class="g" id="wishlist-${id}" onclick="wishlistToggle('${id}')">♡ Lista de desejos</button>`;
 }
@@ -563,7 +577,9 @@ setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=
   almoraSaveReadingProgress(id,c.n,S.prog[id].pg);
   }
   }),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
-return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
+const bookmarkKey=[id,c.n,p.pg||0].join(':');
+const isBookmarked=!!(S.bookmarks&&S.bookmarks[bookmarkKey]);
+return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><button class="g" type="button" onclick="almoraToggleBookmark('${id}','${c.n}',${p.pg||0},this)">${isBookmarked?'★ Página marcada':'☆ Marcar página'}</button><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
 <div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
 /* CONTA / AUTH (Firebase Authentication) */
 /* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
