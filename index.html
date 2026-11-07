@@ -120,7 +120,6 @@ h2{font-size:18px;margin:22px 0 10px;border-left:4px solid var(--ac);padding-lef
 .act{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
 .stars span{font-size:24px;cursor:pointer;color:var(--bd)}.stars .on{color:#f5b73d}
 .rd{max-width:var(--w,720px);margin:0 auto}.rd img{display:block;width:100%;min-height:200px;background:var(--sf)}
-.rd.mode-single img,.rd.mode-spread img{display:none}.rd.mode-single img.is-current,.rd.mode-spread img.is-current,.rd.mode-spread img.is-next{display:block}.rd.mode-single img{max-height:calc(100vh - 190px);width:auto;max-width:100%;min-height:0;margin:0 auto;object-fit:contain}.rd.mode-spread{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;align-items:start;max-width:min(100%,1100px)}.rd.mode-spread img{width:100%;min-height:0;object-fit:contain}@media(max-width:640px){.rd.mode-spread{grid-template-columns:1fr;max-width:var(--w,720px)}}.rd-mode-select{width:auto;max-width:150px;padding:7px 8px;font-size:13px}
 .bar{position:sticky;top:calc(env(safe-area-inset-top,0px) + 54px);z-index:4;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--bg);padding:8px 0}
 .th{display:flex;gap:8px;align-items:center;margin:6px 0}.th img{width:40px;height:56px;object-fit:cover;border-radius:6px}
 .gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;background:#fff;color:#1f1f1f;border:1px solid #dadce0}
@@ -588,62 +587,23 @@ async function syncWishlistButton(id){
    }
   }
 let obs;
-function almoraReaderMode(){const m=localStorage.getItem('almora-reader-mode')||'vertical';return ['vertical','single','spread'].includes(m)?m:'vertical'}
-function almoraReaderUpdatePageControls(id,n){
- const w=W(id),c=w&&w.chapters.find(x=>String(x.n)===String(n));if(!c)return;
- const p=S.prog[id]||{},idx=Math.max(0,Math.min(Number(p.pg)||0,c.pages.length-1));
- const label=document.getElementById('almora-reader-page-count');if(label)label.textContent='Página '+(idx+1)+' de '+c.pages.length;
- const prev=document.getElementById('almora-reader-page-prev'),next=document.getElementById('almora-reader-page-next');
- if(prev)prev.disabled=idx<=0;if(next)next.disabled=idx>=c.pages.length-1;
-}
-function almoraReaderSetMode(mode,id,n){
- if(!['vertical','single','spread'].includes(mode))return;
- localStorage.setItem('almora-reader-mode',mode);
- const p=S.prog[id]||{},idx=Number(p.pg)||0,root=document.querySelector('.rd');if(!root)return;
- root.className='rd mode-'+mode;
- root.querySelectorAll('img').forEach((im,k)=>{im.classList.toggle('is-current',k===idx);im.classList.toggle('is-next',mode==='spread'&&k===idx+1)});
- const sel=document.getElementById('almora-reader-mode');if(sel)sel.value=mode;
- almoraReaderUpdatePageControls(id,n);
- if(mode==='vertical')almoraObserveReaderPages(id,n);else obs?.disconnect();
-}
-function almoraReaderGoTo(id,n,index){
- const w=W(id),c=w&&w.chapters.find(x=>String(x.n)===String(n));if(!c||!c.pages.length)return;
- const idx=Math.max(0,Math.min(Number(index)||0,c.pages.length-1));
- S.prog[id]=S.prog[id]||{read:[]};S.prog[id].pg=idx;save();
- const mode=almoraReaderMode(),root=document.querySelector('.rd');
- if(root)root.querySelectorAll('img').forEach((im,k)=>{im.classList.toggle('is-current',k===idx);im.classList.toggle('is-next',mode==='spread'&&k===idx+1)});
- const key=[id,c.n,idx].join(':'),btn=document.getElementById('almora-page-bookmark');
- if(btn)btn.textContent=S.bookmarks&&S.bookmarks[key]?'★ Página marcada':'☆ Marcar página';
- almoraSaveReadingProgress(id,c.n,idx);almoraReaderUpdatePageControls(id,n);
-}
-function almoraReaderStep(id,n,dir){const step=almoraReaderMode()==='spread'?2:1;almoraReaderGoTo(id,n,(Number(S.prog[id]?.pg)||0)+dir*step)}
-function almoraObserveReaderPages(id,n){
- if(!('IntersectionObserver' in window))return;obs?.disconnect();
- obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
-  const idx=Number(e.target.dataset.i);S.prog[id]=S.prog[id]||{read:[]};S.prog[id].pg=idx;
-  const key=[id,n,idx].join(':'),btn=document.getElementById('almora-page-bookmark');
-  if(btn)btn.textContent=S.bookmarks&&S.bookmarks[key]?'★ Página marcada':'☆ Marcar página';
-  save();almoraSaveReadingProgress(id,n,idx);almoraReaderUpdatePageControls(id,n);
- }}),{threshold:.6});
- document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));
-}
-function reader(id,n){
- const w=W(id),c=w&&w.chapters.find(x=>String(x.n)===n);if(!c)return '<div class="empty">Capítulo não encontrado.</div>';
- const cs=[...w.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n)),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
- if(p.n!==c.n)w.reads=(w.reads||0)+1;p.n=c.n;if(!p.read.includes(c.n))p.read.push(c.n);save();
- const mode=almoraReaderMode(),idx=Math.max(0,Math.min(Number(p.pg)||0,c.pages.length-1));
- const chapterNav='<button class="g" '+(i?'onclick="location.hash=\'#ler/'+id+'/'+cs[i-1].n+'\'"':'disabled')+'>◀ Capítulo anterior</button><button class="g" '+(cs[i+1]?'onclick="location.hash=\'#ler/'+id+'/'+cs[i+1].n+'\'"':'disabled')+'>Próximo capítulo ▶</button>';
- setTimeout(()=>{const sel=document.getElementById('almora-reader-mode');if(sel)sel.value=almoraReaderMode();almoraReaderSetMode(almoraReaderMode(),id,n);if(almoraReaderMode()==='vertical'){almoraObserveReaderPages(id,n);if(idx>0)document.querySelector('.rd img[data-i="'+idx+'"]')?.scrollIntoView()}else almoraReaderGoTo(id,n,idx)},60);
- const key=[id,c.n,idx].join(':'),marked=!!(S.bookmarks&&S.bookmarks[key]);
- const images=c.pages.map((src,k)=>'<img data-i="'+k+'" class="'+(k===idx?'is-current':'')+(mode==='spread'&&k===idx+1?' is-next':'')+'" loading="'+(k<3?'eager':'lazy')+'" src="'+src+'" alt="Página '+(k+1)+'" onerror="this.alt=\'Erro ao carregar a página '+(k+1)+'\'">').join('');
- return '<div class="bar"><a href="#obra/'+id+'"><button class="g">← '+esc(w.title)+'</button></a>'+chapterNav+
- '<span>'+esc(almoraChapterDisplay(c))+(c.title?' — '+esc(c.title):'')+'</span>'+
- '<button class="g" type="button" id="almora-page-bookmark" onclick="almoraToggleBookmark(\''+id+'\',\''+c.n+'\',S.prog[\''+id+'\'].pg||0,this)">'+(marked?'★ Página marcada':'☆ Marcar página')+'</button>'+
- '<label for="almora-reader-mode" style="font-size:12px;color:var(--mu)">Modo</label><select id="almora-reader-mode" class="rd-mode-select" aria-label="Modo de leitura" onchange="almoraReaderSetMode(this.value,\''+id+'\',\''+n+'\')"><option value="vertical">Rolagem vertical</option><option value="single">Página única</option><option value="spread">Duas páginas</option></select>'+
- '<button class="g" type="button" onclick="document.documentElement.style.setProperty(\'--w\',Math.max(360,(parseInt(getComputedStyle(document.documentElement).getPropertyValue(\'--w\'))||720)-80)+\'px\')">−</button><button class="g" type="button" onclick="document.documentElement.style.setProperty(\'--w\',Math.min(1100,(parseInt(getComputedStyle(document.documentElement).getPropertyValue(\'--w\'))||720)+80)+\'px\')">+</button><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>'+
- '<div class="bar" style="position:static;justify-content:center"><button class="g" id="almora-reader-page-prev" type="button" onclick="almoraReaderStep(\''+id+'\',\''+n+'\',-1)">◀ Página anterior</button><span id="almora-reader-page-count">Página '+(idx+1)+' de '+c.pages.length+'</span><button class="g" id="almora-reader-page-next" type="button" onclick="almoraReaderStep(\''+id+'\',\''+n+'\',1)">Próxima página ▶</button></div>'+
- '<div class="rd mode-'+mode+'">'+images+'</div><div class="bar" style="position:static;justify-content:center">'+chapterNav+'</div>';
-}
+function reader(id,n){const w=W(id),c=w&&w.chapters.find(c=>String(c.n)===n);if(!c)return`<div class="empty">Capítulo não encontrado.</div>`;
+const cs=[...w.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n)),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
+if(p.n!==c.n){w.reads=(w.reads||0)+1}p.n=c.n;if(!p.read.includes(c.n))p.read.push(c.n);save();
+const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}'"`:'disabled'}>◀</button><button class="g" ${cs[i+1]?`onclick="location.hash='#ler/${id}/${cs[i+1].n}'"`:'disabled'}>▶</button>`;
+setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
+  S.prog[id].pg=+e.target.dataset.i;
+  const currentBookmarkKey=[id,c.n,S.prog[id].pg].join(':');
+  const bookmarkButton=document.getElementById('almora-page-bookmark');
+  if(bookmarkButton)bookmarkButton.textContent=S.bookmarks&&S.bookmarks[currentBookmarkKey]?'★ Página marcada':'☆ Marcar página';
+  save();
+  almoraSaveReadingProgress(id,c.n,S.prog[id].pg);
+  }
+  }),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
+const bookmarkKey=[id,c.n,p.pg||0].join(':');
+const isBookmarked=!!(S.bookmarks&&S.bookmarks[bookmarkKey]);
+return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><button class="g" type="button" id="almora-page-bookmark" onclick="almoraToggleBookmark('${id}','${c.n}',S.prog['${id}'].pg||0,this)">${isBookmarked?'★ Página marcada':'☆ Marcar página'}</button><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
+<div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
 /* CONTA / AUTH (Firebase Authentication) */
 /* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
 
