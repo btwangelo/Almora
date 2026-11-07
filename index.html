@@ -5036,6 +5036,9 @@ window.almoraSavePrivacy = async function() {
         window.almoraToggleFollow(profileId);
       });
     } catch (error) {
+      if (request !== socialProfileRequest ||
+          !mount.isConnected ||
+          mount.dataset.profileId !== profileId) return;
       mount.innerHTML = '<small style="color:var(--mu)">Informações sociais indisponíveis.</small>';
       console.warn('Erro ao carregar relações sociais:', error);
     }
