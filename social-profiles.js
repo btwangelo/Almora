@@ -174,27 +174,34 @@
     if(!profile)return;
     const profileId=location.hash.slice(1).split('/')[1]||currentUser()?.id;
     if(!profileId)return;
-    if(!profile.querySelector('#almora-connections-list')){
-      const social=document.getElementById('almora-profile-social');
-      if(social){
-        const lists=document.createElement('div');
-        lists.className='almora-connection-tools';
-        lists.innerHTML='<button class="g" type="button" onclick="almoraShowConnections(\''+profileId+'\',\'followers\')">Ver seguidores</button><button class="g" type="button" onclick="almoraShowConnections(\''+profileId+'\',\'following\')">Ver seguindo</button><div id="almora-connections-list"></div>';
-        social.insertAdjacentElement('afterend',lists);
-      }
-    }
     const actions=profile.querySelector('.almora-profile-actions');
-    if(actions && currentUser()?.id===profileId && !document.getElementById('almora-customize-profile')){
+    if(actions && !profile.querySelector('#almora-connection-tools')){
+      const lists=document.createElement('section');
+      lists.id='almora-connection-tools';
+      lists.className='almora-connection-tools';
+      lists.innerHTML='<div class="almora-connection-buttons"><button class="g" type="button" onclick="almoraShowConnections(\\''+profileId+'\\',\\'followers\\')">Seguidores</button><button class="g" type="button" onclick="almoraShowConnections(\\''+profileId+'\\',\\'following\\')">Seguindo</button></div><div id="almora-connections-list"></div>';
+      actions.insertAdjacentElement('afterend',lists);
+    }
+    if(actions && currentUser()?.id===profileId && !profile.querySelector('#almora-customize-profile')){
       const button=document.createElement('button');
       button.id='almora-customize-profile';button.className='g';button.type='button';button.textContent='Personalizar perfil';button.onclick=window.almoraOpenProfileEditor;
       actions.prepend(button);
+    } else if(actions && currentUser() && currentUser().id!==profileId && !profile.querySelector('#almora-follow-profile')){
+      const button=document.createElement('button');
+      button.id='almora-follow-profile';button.className='g';button.type='button';button.textContent='Carregando...';button.disabled=true;
+      button.onclick=()=>window.almoraDirectoryToggleFollow(profileId,button);
+      actions.prepend(button);
+      db.from('follows').select('follower_id').eq('follower_id',currentUser().id).eq('following_id',profileId).maybeSingle().then(({data,error})=>{
+        if(!button.isConnected)return;
+        if(error){button.textContent='Seguir';button.disabled=false;return;}
+        button.textContent=data?'Seguindo':'Seguir';button.disabled=false;
+      });
     }
     if(!profile.dataset.appearanceLoaded){
       profile.dataset.appearanceLoaded='1';
       loadAppearance(profileId).catch(error=>console.warn('Aparência do perfil indisponível:',error));
     }
   }
-
 
   const style=document.createElement('style');
   style.textContent='.almora-moodboard-profile{position:relative;overflow:hidden;padding:16px;border-radius:18px;background:var(--profile-soft,#f7e8ee);color:var(--profile-ink,#563344);border:1px solid color-mix(in srgb,var(--profile-accent,#c66f91) 35%,transparent)}.almora-profile-cover{height:clamp(110px,24vw,210px);margin:-16px -16px 18px;background-position:center;background-size:cover;background-color:var(--profile-soft);border-radius:17px 17px 0 0}.almora-moodboard-profile .almora-profile-info h1{color:inherit}.almora-moodboard-profile .almora-username{color:var(--profile-accent)}.almora-moodboard-profile[data-profile-theme="dark"]{--profile-soft:#292330!important;--profile-ink:#f4edf6!important}.almora-moodboard-profile[data-profile-theme="light"]{background:var(--profile-soft);color:var(--profile-ink)}.almora-moodboard-profile[data-decorations="stars"]:after{content:"✧  ♡  ✦";display:block;text-align:right;color:var(--profile-accent);font-size:20px;letter-spacing:8px;padding-top:10px}.almora-directory,.almora-editor{max-width:850px;margin:0 auto}.almora-directory-head p,.almora-editor>p{color:var(--mu)}.almora-search-label,.almora-editor>label{display:block;margin:14px 0 5px;font-weight:600}.almora-directory input[type=search],.almora-editor input,.almora-editor select{width:100%;max-width:100%}.almora-directory-results{display:grid;gap:10px;margin-top:16px}.almora-person-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;background:var(--sf);border:1px solid var(--bd);border-radius:14px}.almora-person-main{display:flex;align-items:center;gap:12px;min-width:0;flex:1}.almora-person-main img,.almora-person-avatar{width:48px;height:48px;flex:0 0 48px;object-fit:cover;border-radius:50%;background:var(--sf2);display:grid;place-items:center}.almora-person-main span:last-child{min-width:0;display:grid}.almora-person-main small{color:var(--mu);overflow-wrap:anywhere}.almora-connection-tools{margin-top:14px}.almora-connection-tools #almora-connections-list{margin-top:12px}.almora-connection-tools #almora-connections-list .almora-person-card{margin:8px 0}.almora-editor{background:var(--sf);border:1px solid var(--bd);border-radius:18px;padding:16px}.almora-editor input[type=file]{margin:6px 0}.almora-palette-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}.almora-palette-picker label{margin:0!important}.almora-palette-picker input{position:absolute;opacity:0;pointer-events:none}.almora-palette-picker span{display:flex;align-items:center;gap:7px;padding:10px;border:2px solid var(--bd);border-radius:12px;cursor:pointer}.almora-palette-picker input:checked+span{outline:2px solid var(--ac);outline-offset:2px}.almora-palette-picker i{width:18px;height:18px;border-radius:50%}.almora-editor-preview{margin:18px 0;padding:24px;border:2px solid var(--bd);border-radius:16px;background:#f7e8ee;color:#563344}.almora-editor-preview b{font-size:20px}.almora-editor-preview p{margin-bottom:0}@media(max-width:520px){.almora-person-card{align-items:flex-start}.almora-person-card>button{padding:7px 10px}.almora-moodboard-profile{padding:12px}.almora-profile-cover{margin:-12px -12px 14px}}';
