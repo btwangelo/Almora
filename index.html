@@ -2075,7 +2075,7 @@ ren();initAuth();
 
   if (app) {
     new MutationObserver(() => prepareImages(app))
-      .observe(app, { childList: true, subtree: true });
+      .observe(app, { childList: true });
   }
 })();
 </script>
@@ -4602,8 +4602,10 @@ window.almoraSavePrivacy = async function() {
     });
   }
 
+  let badgeTimer = null;
   const observer = new MutationObserver(() => {
-    applyBadges();
+    clearTimeout(badgeTimer);
+    badgeTimer = setTimeout(applyBadges, 100);
   });
 
   function start() {
@@ -4768,7 +4770,11 @@ window.almoraSavePrivacy = async function() {
     const app = document.getElementById('app');
     if (!app) return;
 
-    new MutationObserver(() => scan()).observe(app, {
+    let scanTimer = null;
+    new MutationObserver(() => {
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(scan, 100);
+    }).observe(app, {
       childList: true,
       subtree: true
     });
@@ -5048,7 +5054,7 @@ window.almoraSavePrivacy = async function() {
     loadSocialProfile(profileId);
   }
   const app=document.getElementById('app');
-  if(app)new MutationObserver(scanProfile).observe(app,{childList:true,subtree:true});
+  if(app)new MutationObserver(scanProfile).observe(app,{childList:true});
   document.addEventListener('DOMContentLoaded',scanProfile);
 })();
 </script>
