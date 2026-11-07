@@ -92,6 +92,62 @@
     }
   };
 
+  window.almoraOpenConnectionsPage=(profileId,kind)=>{
+    if(!profileId||!['followers','following'].includes(kind))return;
+    location.hash='#conexoes/'+encodeURIComponent(profileId)+'/'+kind;
+  };
+
+  async function renderConnectionsPage(profileId,kind){
+    const app=document.getElementById('app');
+    if(!app)return;
+    const followers=kind==='followers';
+    const title=followers?'Seguidores':'Seguindo';
+    app.innerHTML='<section class="almora-connections-page"><button class="g" type="button" id="almora-connections-back">← Voltar ao perfil</button><h1>'+title+'</h1><div class="empty">Carregando...</div></section>';
+    const back=()=>{location.hash='#perfil/'+encodeURIComponent(profileId);};
+    document.getElementById('almora-connections-back')?.addEventListener('click',back);
+    try{
+      const {data,error}=await db.from('follows').select('follower_id,following_id,created_at')
+        .eq(followers?'following_id':'follower_id',profileId)
+        .order('created_at',{ascending:false}).limit(100);
+      if(error)throw error;
+      const ids=(data||[]).map(row=>followers?row.follower_id:row.following_id);
+      const page=app.querySelector('.almora-connections-page');
+      if(!page)return;
+      if(!ids.length){
+        page.innerHTML='<button class="g" type="button" id="almora-connections-back">← Voltar ao perfil</button><h1>'+title+'</h1><div class="empty">'+(followers?'Este perfil ainda não tem seguidores.':'Este perfil ainda não segue ninguém.')+'</div>';
+        document.getElementById('almora-connections-back')?.addEventListener('click',back);
+        return;
+      }
+      const result=await db.from('profiles').select('id,username,display_name,avatar_url,bio').in('id',ids);
+      if(result.error)throw result.error;
+      const byId=new Map((result.data||[]).map(person=>[person.id,person]));
+      const people=ids.map(id=>byId.get(id)||{id,username:'privado',display_name:'Perfil privado',bio:'Este perfil não está público.'});
+      let followed=new Set();
+      const me=currentUser();
+      if(me){
+        const relation=await db.from('follows').select('following_id').eq('follower_id',me.id).in('following_id',ids);
+        if(relation.error)throw relation.error;
+        followed=new Set((relation.data||[]).map(row=>row.following_id));
+      }
+      page.innerHTML='<button class="g" type="button" id="almora-connections-back">← Voltar ao perfil</button><h1>'+title+'</h1>'+
+        '<label class="almora-search-label" for="almora-connections-search">'+(followers?'Pesquisar seguidores':'Pesquisar pessoas que você segue')+'</label>'+
+        '<input id="almora-connections-search" type="search" placeholder="'+(followers?'Buscar seguidor por nome ou @usuário...':'Buscar pessoa seguida por nome ou @usuário...')+'" autocomplete="off">'+
+        '<div class="almora-connections-results">'+people.map(person=>personCard(person,followed.has(person.id))).join('')+'</div>';
+      document.getElementById('almora-connections-back')?.addEventListener('click',back);
+      const search=document.getElementById('almora-connections-search');
+      search?.addEventListener('input',()=>{
+        const term=search.value.trim().toLocaleLowerCase('pt-BR');
+        page.querySelectorAll('.almora-connections-results .almora-person-card').forEach(card=>{
+          card.hidden=!!term&&!String(card.dataset.search||'').includes(term);
+        });
+      });
+      bindFollowButtons(page);
+    }catch(error){
+      const page=app.querySelector('.almora-connections-page');
+      if(page)page.innerHTML='<button class="g" type="button" onclick="location.hash=\'#perfil/'+encodeURIComponent(profileId)+'\'">← Voltar ao perfil</button><h1>'+title+'</h1><div class="empty">Não foi possível carregar a lista: '+escHtml(error.message)+'</div>';
+    }
+  }
+
   window.almoraShowConnections=async(profileId,kind)=>{
     const mount=document.getElementById('almora-connections-list');
     if(!mount)return;
@@ -199,31 +255,12 @@
   };
 
   function decorateProfile(){
-    const profile=document.querySelector('.almora-profile');
+    // Só a visualização pública recebe decoração. A tela de edição também
+    // usa a classe .almora-profile, mas não deve receber controles sociais.
+    const profile=document.querySelector('.almora-profile-view');
     if(!profile)return;
     const profileId=location.hash.slice(1).split('/')[1]||currentUser()?.id;
     if(!profileId)return;
-    const actions=profile.querySelector('.almora-profile-actions');
-    if(!actions)return;
-    if(currentUser()?.id===profileId&&!profile.querySelector('#almora-customize-profile')){
-      const button=document.createElement('button');
-      button.id='almora-customize-profile';button.className='g';button.type='button';button.textContent='Personalizar perfil';
-      button.addEventListener('click',window.almoraOpenProfileEditor);
-      actions.prepend(button);
-    }
-    const summary=profile.querySelector('#almora-profile-social');
-    let tools=profile.querySelector('#almora-connection-tools');
-    if(!tools){
-      tools=document.createElement('section');
-      tools.id='almora-connection-tools';tools.className='almora-connection-tools';
-      tools.innerHTML='<h2>Conexões</h2><div class="almora-connection-buttons"><button class="g" type="button" data-connection="followers">Ver seguidores</button><button class="g" type="button" data-connection="following">Ver seguindo</button><button class="g" type="button" data-connection="search-followers">Pesquisar seguidores</button></div><div id="almora-connections-list" aria-live="polite"></div>';
-      tools.querySelector('[data-connection="followers"]').addEventListener('click',()=>window.almoraShowConnections(profileId,'followers'));
-      tools.querySelector('[data-connection="following"]').addEventListener('click',()=>window.almoraShowConnections(profileId,'following'));
-      tools.querySelector('[data-connection="search-followers"]').addEventListener('click',()=>window.almoraShowConnections(profileId,'followers'));
-      (summary||actions).insertAdjacentElement('afterend',tools);
-    }else if(summary&&tools.previousElementSibling!==summary){
-      summary.insertAdjacentElement('afterend',tools);
-    }
     if(!profile.dataset.appearanceLoaded){
       profile.dataset.appearanceLoaded='1';
       loadAppearance(profileId,profile).catch(error=>{delete profile.dataset.appearanceLoaded;console.warn('Aparência do perfil indisponível:',error);});
@@ -243,10 +280,10 @@
     '.almora-person-main span:last-child{min-width:0;display:grid;gap:2px}.almora-person-main small{color:var(--mu);overflow-wrap:anywhere}'+
     '#almora-profile-social{display:block!important;margin-top:18px!important}'+
     '.almora-social-counts{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px!important;width:100%;margin:0 0 12px}'+
-    '.almora-social-counts span{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;padding:12px 8px;background:var(--sf);border:1px solid var(--bd);border-radius:12px;text-align:center}'+
+    '.almora-social-count-button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;padding:12px 8px;background:var(--sf);color:var(--tx);border:1px solid var(--bd);border-radius:12px;text-align:center;width:100%}.almora-social-count-button b{font-size:20px;color:var(--tx)}.almora-social-count-button span{font-size:13px;color:var(--mu)}'+
     '.almora-social-counts span b{font-size:20px;color:var(--tx)}'+
     '#almora-profile-social #almora-follow-button{min-height:42px;padding:9px 18px}'+
-    '.almora-connection-tools{margin-top:22px;padding-top:18px;border-top:1px solid var(--bd)}.almora-connection-tools h2{margin:0 0 12px}'+
+    '.almora-connections-page{max-width:850px;margin:0 auto}.almora-connections-page .almora-connections-results{display:grid;gap:10px;margin-top:16px}.almora-connections-page [hidden]{display:none!important}'+
     '.almora-connection-buttons{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}.almora-connection-buttons button{width:100%;min-height:48px;padding:10px 14px;border:1px solid var(--bd);border-radius:12px;white-space:normal}'+
     '.almora-connections-search{width:100%;margin:10px 0}.almora-connections-results{display:grid;gap:10px}.almora-connections-results [hidden]{display:none!important}'+
     '#almora-connections-list{display:grid;gap:10px;margin-top:16px}#almora-connections-list .almora-person-card{margin:0}.almora-connections-heading{font-weight:600;color:var(--mu);margin:4px 0}'+
@@ -267,7 +304,18 @@
   if(app)new MutationObserver(()=>{addCommunityLink();decorateProfile();}).observe(app,{childList:true});
   const nav=document.getElementById('nav');
   if(nav)new MutationObserver(addCommunityLink).observe(nav,{childList:true});
-  window.addEventListener('hashchange',()=>{addCommunityLink();if(location.hash==='#comunidade')renderDirectory();});
+  window.addEventListener('hashchange',()=>{
+    addCommunityLink();
+    if(location.hash==='#comunidade')renderDirectory();
+    const parts=location.hash.slice(1).split('/');
+    if(parts[0]==='conexoes'&&parts[1]&&['followers','following'].includes(parts[2])){
+      renderConnectionsPage(decodeURIComponent(parts[1]),parts[2]);
+    }
+  });
   addCommunityLink();
   if(location.hash==='#comunidade')renderDirectory();
+  const initialRoute=location.hash.slice(1).split('/');
+  if(initialRoute[0]==='conexoes'&&initialRoute[1]&&['followers','following'].includes(initialRoute[2])){
+    renderConnectionsPage(decodeURIComponent(initialRoute[1]),initialRoute[2]);
+  }
 })();
