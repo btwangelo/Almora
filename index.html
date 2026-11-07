@@ -5241,7 +5241,7 @@ window.almoraSavePrivacy = async function() {
 
   window.almoraRefreshNotificationBadge?.();
 
-  const originalRen=window.ren;  const originalRen=window.ren;
+  const originalRen=window.ren;
   if(typeof originalRen==='function'){
     window.ren=function(...args){
       const route=location.hash.slice(1).split('/')[0];
