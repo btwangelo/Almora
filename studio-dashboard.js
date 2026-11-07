@@ -102,7 +102,7 @@
     listNodes.forEach(node=>{node.hidden=activePage!=='works'||node.dataset.studioTranslate==='true';});
     if(search){search.hidden=activePage!=='works';if(activePage==='works')filterWorks(search.value);}
     if(translate)translate.hidden=activePage!=='settings';
-    if(toolbar)toolbar.hidden=activePage!=='settings';
+    if(toolbar){toolbar.hidden=activePage!=='settings';toolbar.style.display=activePage==='settings'?'flex':'none';}
     updateButtons();
   }
 
