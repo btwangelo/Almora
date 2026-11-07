@@ -142,6 +142,7 @@ const almoraDB = window.supabase.createClient(
   ALMORA_URL,
   ALMORA_KEY
 );
+window.almoraDB = almoraDB;
 </script>
 </head>
 <body>
@@ -1432,8 +1433,9 @@ function almoraUpdatePageMeta(route,id,chapter){
   }
 }
 function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
-A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():home();
+A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():r==='comunidade'?'<section class="almora-directory"><h1>Comunidade</h1><div class="empty">Carregando leitores...</div></section>':home();
 if(r==='desejos') loadWishlistPage();
+if(r==='comunidade'&&window.almoraRenderDirectory) window.almoraRenderDirectory();
 if(r==='studio'&&window.almoraBatchRender) almoraBatchRender();
 if(r==='obra'&&user) syncWishlistButton(a);
 if(r==='obra'&&window.almoraLoadWorkFavoriteCount) almoraLoadWorkFavoriteCount(a);
@@ -4314,7 +4316,7 @@ body:has(#nav a[href="#home"].on) #app .empty {
             <button onclick="almoraSavePrivacy()">
               Salvar preferências
             </button>
-            <button class="g" onclick="location.hash='#perfil'">
+            <button class="g" onclick="window.ren()">
               Voltar ao perfil
             </button>
           </div>
@@ -4325,7 +4327,7 @@ body:has(#nav a[href="#home"].on) #app .empty {
         <div class="empty">
           Não foi possível carregar as configurações:
           ${esc(error.message)}
-          <p><button class="g" onclick="location.hash='#perfil'">Voltar</button></p>
+          <p><button class="g" onclick="window.ren()">Voltar ao perfil</button></p>
         </div>
       `;
     }
