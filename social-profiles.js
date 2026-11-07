@@ -11,6 +11,20 @@
     honey:{label:'Mel',accent:'#b58a45',soft:'#f5eedc',ink:'#514126'},
     ocean:{label:'Azul',accent:'#648cae',soft:'#e5eef5',ink:'#2d4356'}
   };
+  const validColor=value=>/^#[0-9a-f]{6}$/i.test(String(value||''));
+  const colorHue=value=>{
+    if(!validColor(value))return 0;
+    const r=parseInt(value.slice(1,3),16)/255,g=parseInt(value.slice(3,5),16)/255,b=parseInt(value.slice(5,7),16)/255;
+    const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+    if(!d)return 0;
+    let h=max===r?((g-b)/d)%6:max===g?(b-r)/d+2:(r-g)/d+4;
+    return Math.round((h*60+360)%360);
+  };
+  const hslHex=(h,s,l)=>{
+    s/=100;l/=100;const k=n=>(n+h/30)%12,a=s*Math.min(l,1-l);
+    const f=n=>Math.round(255*(l-a*Math.max(-1,Math.min(k(n)-3,Math.min(9-k(n),1)))));
+    return '#'+[f(0),f(8),f(4)].map(v=>v.toString(16).padStart(2,'0')).join('');
+  };
   let directoryRequest = 0;
 
   async function fetchProfiles(query) {
@@ -196,15 +210,28 @@
     if(!profile.isConnected||(location.hash.slice(1).split('/')[1]||currentUser()?.id)!==profileId)return;
     const a=data||{theme:'system',layout:'moodboard',settings:{palette:'rose',decorations:'soft'},cover_url:null};
     const palette=palettes[a.settings?.palette]||palettes.rose;
-    profile.dataset.palette=a.settings?.palette||'rose';
+    const colors=a.settings?.colors||{};
+    const colorSet={
+      top:validColor(colors.top)?colors.top:palette.soft,
+      bottom:validColor(colors.bottom)?colors.bottom:palette.soft,
+      bannerA:validColor(colors.bannerA)?colors.bannerA:palette.accent,
+      bannerB:validColor(colors.bannerB)?colors.bannerB:palette.soft,
+      accent:validColor(colors.accent)?colors.accent:palette.accent,
+      text:validColor(colors.text)?colors.text:palette.ink
+    };
+    profile.dataset.palette='custom';
     profile.dataset.profileTheme=a.theme||'system';
-    profile.style.setProperty('--profile-accent',palette.accent);
-    profile.style.setProperty('--profile-soft',palette.soft);
-    profile.style.setProperty('--profile-ink',palette.ink);
-    if(a.cover_url&&!profile.querySelector('.almora-profile-cover')){
+    profile.style.setProperty('--profile-accent',colorSet.accent);
+    profile.style.setProperty('--profile-soft',colorSet.top);
+    profile.style.setProperty('--profile-ink',colorSet.text);
+    profile.style.setProperty('--profile-top',colorSet.top);
+    profile.style.setProperty('--profile-bottom',colorSet.bottom);
+    profile.style.setProperty('--profile-banner-a',colorSet.bannerA);
+    profile.style.setProperty('--profile-banner-b',colorSet.bannerB);
+    if(!profile.querySelector('.almora-profile-cover')){
       const banner=document.createElement('div');
       banner.className='almora-profile-cover';
-      banner.style.backgroundImage='url('+JSON.stringify(String(a.cover_url))+')';
+      if(a.cover_url)banner.style.backgroundImage='linear-gradient(110deg, '+colorSet.bannerA+'99, '+colorSet.bannerB+'99),url('+JSON.stringify(String(a.cover_url))+')';
       profile.prepend(banner);
     }
     profile.classList.add('almora-moodboard-profile');
@@ -219,12 +246,49 @@
       const {data,error}=await db.from('profile_appearance').select('theme,layout,settings,cover_url').eq('user_id',me.id).maybeSingle();
       if(error)throw error;
       const a=data||{theme:'system',layout:'moodboard',settings:{palette:'rose'},cover_url:''};
-      app.innerHTML='<section class="almora-editor"><button class="g" type="button" id="almora-editor-back">← Voltar ao perfil</button><h1>Personalizar perfil</h1><p>Monte seu moodboard escolhendo opções que combinam com você.</p>'+
-        '<label>Paleta de cores</label><div class="almora-palette-picker">'+Object.entries(palettes).map(([key,p])=>'<label><input type="radio" name="almora-palette" value="'+key+'" '+((a.settings?.palette||'rose')===key?'checked':'')+'><span style="background:'+p.soft+';border-color:'+p.accent+'"><i style="background:'+p.accent+'"></i>'+p.label+'</span></label>').join('')+'</div>'+
+      const fallback=palettes[a.settings?.palette]||palettes.rose;
+      const saved=a.settings?.colors||{};
+      const colorValues={
+        top:validColor(saved.top)?saved.top:fallback.soft,
+        bottom:validColor(saved.bottom)?saved.bottom:fallback.soft,
+        bannerA:validColor(saved.bannerA)?saved.bannerA:fallback.accent,
+        bannerB:validColor(saved.bannerB)?saved.bannerB:fallback.soft,
+        accent:validColor(saved.accent)?saved.accent:fallback.accent,
+        text:validColor(saved.text)?saved.text:fallback.ink
+      };
+      const colorControl=(id,title,value)=>'<div class="almora-color-control"><label for="almora-color-'+id+'">'+title+'</label><div class="almora-color-row"><input type="color" id="almora-color-'+id+'" value="'+value+'" aria-label="Escolher '+title+'"><input type="text" id="almora-hex-'+id+'" value="'+value+'" maxlength="7" spellcheck="false" aria-label="Código hexadecimal de '+title+'" placeholder="#RRGGBB"></div><input class="almora-hue-slider" type="range" min="0" max="360" value="'+colorHue(value)+'" id="almora-hue-'+id+'" aria-label="Ajustar matiz de '+title+'"><small class="almora-color-code" id="almora-code-'+id+'">'+value.toUpperCase()+'</small></div>';
+      app.innerHTML='<section class="almora-editor"><button class="g" type="button" id="almora-editor-back">← Voltar ao perfil</button><h1>Personalizar perfil</h1><p>Escolha qualquer cor, digite um código HEX ou ajuste o seletor. As mudanças aparecem na prévia antes de salvar.</p>'+
+        '<h2>Cores do perfil</h2><div class="almora-color-grid">'+colorControl('top','Parte superior do perfil',colorValues.top)+colorControl('bottom','Parte inferior do perfil',colorValues.bottom)+colorControl('accent','Cor de destaque',colorValues.accent)+colorControl('text','Cor dos textos',colorValues.text)+'</div>'+
+        '<h2>Degradê do banner</h2><p>Escolha duas cores para misturar no banner. Se enviar uma imagem de capa, o degradê fica sobre ela suavemente.</p><div class="almora-color-grid">'+colorControl('bannerA','Cor inicial do banner',colorValues.bannerA)+colorControl('bannerB','Cor final do banner',colorValues.bannerB)+'</div>'+
+        '<div class="almora-color-preview" id="almora-color-preview"><span>Prévia das cores</span></div>'+
         '<label for="almora-profile-theme">Tema do perfil</label><select id="almora-profile-theme"><option value="system" '+(a.theme==='system'?'selected':'')+'>Acompanhar tema do site</option><option value="light" '+(a.theme==='light'?'selected':'')+'>Claro</option><option value="dark" '+(a.theme==='dark'?'selected':'')+'>Escuro</option></select>'+
         '<label for="almora-profile-cover">URL da capa (opcional)</label><input id="almora-profile-cover" type="url" maxlength="1000" placeholder="https://..." value="'+escHtml(a.cover_url||'')+'">'+
         '<label for="almora-profile-cover-file">Ou enviar imagem de capa</label><input id="almora-profile-cover-file" type="file" accept="image/*"><small>Imagem de até 5 MB. Formatos de imagem comuns.</small>'+
         '<div class="act"><button type="button" id="almora-editor-save">Salvar personalização</button><button type="button" class="g" id="almora-editor-cancel">Cancelar</button></div></section>';
+      const colorIds=['top','bottom','bannerA','bannerB','accent','text'];
+      const readColor=id=>document.getElementById('almora-color-'+id)?.value||colorValues[id];
+      const updatePreview=()=>{
+        const top=readColor('top'),bottom=readColor('bottom'),bannerA=readColor('bannerA'),bannerB=readColor('bannerB'),accent=readColor('accent'),ink=readColor('text');
+        const preview=document.getElementById('almora-color-preview');
+        preview.style.background='linear-gradient(180deg,'+top+','+bottom+')';
+        preview.style.color=ink;
+        preview.style.borderColor=accent;
+        preview.style.setProperty('--preview-banner','linear-gradient(110deg,'+bannerA+','+bannerB+')');
+        preview.innerHTML='<span>Prévia das cores</span><div class="almora-preview-banner"></div><b>Seu perfil na ALMORA</b><small>Assim ficam o fundo, o banner e os destaques.</small>';
+      };
+      colorIds.forEach(id=>{
+        const picker=document.getElementById('almora-color-'+id),hex=document.getElementById('almora-hex-'+id),slider=document.getElementById('almora-hue-'+id),code=document.getElementById('almora-code-'+id);
+        const setColor=value=>{
+          if(!/^#[0-9a-f]{6}$/i.test(value))return;
+          const normalized=value.toLowerCase();
+          picker.value=normalized;hex.value=normalized;code.textContent=normalized.toUpperCase();slider.value=colorHue(normalized);updatePreview();
+        };
+        picker.addEventListener('input',()=>setColor(picker.value));
+        hex.addEventListener('change',()=>setColor(hex.value.trim().startsWith('#')?hex.value.trim():'#'+hex.value.trim()));
+        slider.addEventListener('input',()=>setColor(hslHex(Number(slider.value),75,55)));
+        hex.addEventListener('input',()=>{if(/^#[0-9a-f]{6}$/i.test(hex.value))setColor(hex.value);});
+      });
+      updatePreview();
       const back=()=>{if(typeof window.ren==='function')window.ren();};
       document.getElementById('almora-editor-back').addEventListener('click',back);
       document.getElementById('almora-editor-cancel').addEventListener('click',back);
@@ -237,7 +301,12 @@
   window.almoraSaveAppearance=async()=>{
     const me=currentUser();
     if(!me)return;
-    const palette=document.querySelector('input[name="almora-palette"]:checked')?.value||'rose';
+    const palette='rose';
+    const colors={};
+    ['top','bottom','bannerA','bannerB','accent','text'].forEach(id=>{
+      const value=document.getElementById('almora-color-'+id)?.value;
+      colors[id]=validColor(value)?value:palettes.rose.soft;
+    });
     const theme=document.getElementById('almora-profile-theme')?.value||'system';
     let cover=document.getElementById('almora-profile-cover')?.value.trim()||null;
     const file=document.getElementById('almora-profile-cover-file')?.files?.[0];
@@ -248,7 +317,7 @@
       try{cover=await almoraUploadToR2(file);}catch(error){return toast('Erro ao enviar capa: '+error.message);}
     }
     if(cover&&!/^https:\/\//i.test(cover))return toast('A URL da capa precisa começar com https://.');
-    const payload={user_id:me.id,theme,layout:'moodboard',settings:{palette,section_order:['about','library','works','achievements'],visible_sections:['about','library','works','achievements']},cover_url:cover,updated_at:new Date().toISOString()};
+    const payload={user_id:me.id,theme,layout:'moodboard',settings:{palette,colors,section_order:['about','library','works','achievements'],visible_sections:['about','library','works','achievements']},cover_url:cover,updated_at:new Date().toISOString()};
     try{
       const {error}=await db.from('profile_appearance').upsert(payload,{onConflict:'user_id'});
       if(error)throw error;
@@ -278,10 +347,10 @@
   window.almoraApplyProfileAppearance=decorateProfile;
 
   const style=document.createElement('style');
-  style.textContent='.almora-moodboard-profile{position:relative;overflow:hidden;padding:16px;border-radius:18px;background:var(--profile-soft,#f7e8ee);color:var(--profile-ink,#563344);border:1px solid color-mix(in srgb,var(--profile-accent,#c66f91) 35%,transparent)}'+
-    '.almora-profile-cover{height:clamp(110px,24vw,210px);margin:-16px -16px 18px;background-position:center;background-size:cover;background-color:var(--profile-soft);border-radius:17px 17px 0 0}'+
+  style.textContent='.almora-moodboard-profile{position:relative;overflow:hidden;padding:16px;border-radius:18px;background:linear-gradient(180deg,var(--profile-top,var(--profile-soft,#f7e8ee)),var(--profile-bottom,var(--profile-soft,#f7e8ee)));color:var(--profile-ink,#563344);border:1px solid color-mix(in srgb,var(--profile-accent,#c66f91) 35%,transparent)}'+
+    '.almora-profile-cover{height:clamp(110px,24vw,210px);margin:-16px -16px 18px;background-image:linear-gradient(110deg,var(--profile-banner-a,var(--profile-accent)),var(--profile-banner-b,var(--profile-soft)));background-position:center;background-size:cover;background-color:var(--profile-soft);border-radius:17px 17px 0 0}'+
     '.almora-moodboard-profile .almora-profile-info h1{color:inherit}.almora-moodboard-profile .almora-username{color:var(--profile-accent)}'+
-    '.almora-moodboard-profile[data-profile-theme="dark"]{--profile-soft:#292330!important;--profile-ink:#f4edf6!important}.almora-moodboard-profile[data-profile-theme="light"]{background:var(--profile-soft);color:var(--profile-ink)}'+
+    '.almora-moodboard-profile[data-profile-theme="dark"]{color:var(--profile-ink)}.almora-moodboard-profile[data-profile-theme="light"]{color:var(--profile-ink)}'+
     '.almora-directory,.almora-editor{max-width:850px;margin:0 auto}.almora-directory-head p,.almora-editor>p{color:var(--mu)}'+
     '.almora-search-label,.almora-editor>label{display:block;margin:14px 0 5px;font-weight:600}.almora-directory input[type=search],.almora-editor input,.almora-editor select{width:100%;max-width:100%}'+
     '.almora-directory-results{display:grid;gap:10px;margin-top:16px}.almora-person-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;background:var(--sf);border:1px solid var(--bd);border-radius:14px}'+
@@ -297,9 +366,8 @@
     '.almora-connections-search{width:100%;margin:10px 0}.almora-connections-results{display:grid;gap:10px}.almora-connections-results [hidden]{display:none!important}'+
     '#almora-connections-list{display:grid;gap:10px;margin-top:16px}#almora-connections-list .almora-person-card{margin:0}.almora-connections-heading{font-weight:600;color:var(--mu);margin:4px 0}'+
     '.almora-editor{background:var(--sf);border:1px solid var(--bd);border-radius:18px;padding:16px}.almora-editor input[type=file]{margin:6px 0}'+
-    '.almora-palette-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:8px}.almora-palette-picker label{margin:0!important}.almora-palette-picker input{position:absolute;opacity:0;pointer-events:none}'+
-    '.almora-palette-picker span{display:flex;align-items:center;gap:7px;padding:10px;border:2px solid var(--bd);border-radius:12px;cursor:pointer}.almora-palette-picker input:checked+span{outline:2px solid var(--ac);outline-offset:2px}'+
-    '.almora-palette-picker i{width:18px;height:18px;border-radius:50%}@media(max-width:520px){.almora-person-card{align-items:flex-start}.almora-person-card>button{padding:7px 10px}.almora-moodboard-profile{padding:12px}.almora-profile-cover{margin:-12px -12px 14px}}';
+    '.almora-color-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.almora-color-control{padding:12px;border:1px solid var(--bd);border-radius:13px;background:var(--sf2)}.almora-color-control>label{display:block;font-weight:600;margin:0 0 8px}.almora-color-row{display:grid;grid-template-columns:54px minmax(0,1fr);gap:10px;align-items:center}.almora-color-row input[type=color]{width:54px;height:44px;padding:3px;cursor:pointer}.almora-color-row input[type=text]{min-width:0;font-family:monospace;text-transform:uppercase}.almora-hue-slider{height:22px;padding:0!important;margin:9px 0 2px;cursor:pointer;accent-color:var(--ac)}.almora-color-code{display:block;color:var(--mu);font:12px monospace}.almora-color-preview{display:grid;gap:8px;margin:16px 0;padding:16px;min-height:130px;border:2px solid;border-radius:14px;overflow:hidden}.almora-color-preview>span{font-weight:700}.almora-preview-banner{height:45px;border-radius:9px;background:var(--preview-banner)}.almora-color-preview small{opacity:.8}'+
+    '@media(max-width:520px){.almora-person-card{align-items:flex-start}.almora-person-card>button{padding:7px 10px}.almora-moodboard-profile{padding:12px}.almora-profile-cover{margin:-12px -12px 14px}.almora-color-grid{grid-template-columns:1fr}}';
   document.head.appendChild(style);
 
   function addCommunityLink(){
