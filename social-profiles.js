@@ -252,7 +252,7 @@
     }
   }
   const app=document.getElementById('app');
-  if(app)new MutationObserver(()=>{addCommunityLink();decorateProfile();}).observe(app,{childList:true,subtree:true});
+  if(app)new MutationObserver(()=>{addCommunityLink();decorateProfile();}).observe(app,{childList:true});
   const nav=document.getElementById('nav');
   if(nav)new MutationObserver(addCommunityLink).observe(nav,{childList:true});
   window.addEventListener('hashchange',()=>{addCommunityLink();if(location.hash==='#comunidade')renderDirectory();});
