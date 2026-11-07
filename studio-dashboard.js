@@ -82,7 +82,7 @@
 
   function updateAnalytics(){
     const target=document.getElementById('almora-studio-stats');if(!target)return;
-    const works=Array.isArray(window.S?.works)?window.S.works:[];
+    const works=typeof S!=='undefined'&&Array.isArray(S.works)?S.works:[];
     const chapters=works.reduce((sum,w)=>sum+(w.chapters?.length||0),0);
     const published=works.filter(w=>!w.archived).length;
     target.innerHTML=[
@@ -110,7 +110,7 @@
     const workHeading=[...section.querySelectorAll(':scope > h2')].find(h=>h.textContent.toLowerCase().includes('obras cadastradas'));
     const search=document.getElementById('almora-studio-work-search');
     const listNodes=[];
-    if(workHeading){let n=workHeading;while(n&&n.tagName!=='H2'){listNodes.push(n);n=n.nextElementSibling;}}
+    if(workHeading){let n=workHeading.nextElementSibling;while(n&&n.tagName!=='H2'){listNodes.push(n);n=n.nextElementSibling;}}
     section.hidden=activePage==='analytics'||activePage==='settings'||activePage==='moderation';
     if(moderation)moderation.style.display=activePage==='moderation'?'block':'none';
     if(analytics)analytics.hidden=activePage!=='analytics';
@@ -135,6 +135,11 @@
     }
     if(activePage==='analytics')updateAnalytics();
   }
+
+
+  const style=document.createElement('style');
+  style.textContent='.almora-studio-dashboard-nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin:12px 0 20px}.almora-studio-dashboard-nav button{min-height:44px}.almora-studio-dashboard-nav button.on{background:var(--ac2);color:#fff}.almora-studio-work-search{width:100%;margin:8px 0 14px}.almora-studio-chapter-details{margin-top:10px;border-top:1px solid var(--bd);padding-top:8px}.almora-studio-chapter-details summary{cursor:pointer;color:var(--ac);font-weight:600}.almora-studio-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.almora-studio-stat-grid .box{margin:0}.almora-studio-stat-grid strong{display:block;font-size:28px;margin-top:5px}.almora-studio-extra-page[hidden]{display:none!important}';
+  document.head.appendChild(style);
 
   function observe(){
     if(!app)return;
