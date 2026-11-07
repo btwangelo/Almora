@@ -4785,5 +4785,78 @@ window.almoraSavePrivacy = async function() {
   });
 })();
 </script>
+
+<script id="almora-studio-statistics-enhancement">
+(() => {
+  const originalStudio = window.studio;
+  if (typeof originalStudio !== 'function') return;
+
+  window.studio = function(...args) {
+    let html = originalStudio.apply(this, args);
+    if (!html.includes('id="almora-studio-works"')) return html;
+    html = html.replace(
+      '<button id="almora-tab-mod" class="g" onclick="almoraStudioTab(\\'mod\\')">Moderação</button>',
+      '<button id="almora-tab-mod" class="g" onclick="almoraStudioTab(\\'mod\\')">Moderação</button><button id="almora-tab-stats" class="g" onclick="almoraStudioTab(\\'stats\\')">Estatísticas</button>'
+    );
+    return html + '\\n<section class="almora-mod" id="almora-studio-statistics" style="display:none"><h2>Estatísticas da ALMORA</h2><p style="color:var(--mu)">Visão geral dos dados cadastrados na plataforma.</p><div id="almora-stats-content"><div class="empty">Carregando estatísticas...</div></div><button class="g" type="button" style="width:100%;margin-top:12px" onclick="almoraLoadStudioStats()">Atualizar estatísticas</button></section>';
+  };
+
+  const previousTab = window.almoraStudioTab;
+  window.almoraStudioTab = function(tab) {
+    if (tab !== 'stats') return previousTab(tab);
+    const works = document.getElementById('almora-studio-works');
+    const moderation = document.getElementById('almora-moderation');
+    const stats = document.getElementById('almora-studio-statistics');
+    const buttons = {
+      works: document.getElementById('almora-tab-works'),
+      mod: document.getElementById('almora-tab-mod'),
+      stats: document.getElementById('almora-tab-stats')
+    };
+    if (!works || !moderation || !stats || !buttons.stats) return;
+    works.style.display = 'none';
+    moderation.style.display = 'none';
+    stats.style.display = 'block';
+    Object.entries(buttons).forEach(([key, button]) => {
+      if (!button) return;
+      button.classList.toggle('on', key === 'stats');
+      button.classList.toggle('g', key !== 'stats');
+    });
+    window.almoraLoadStudioStats();
+  };
+
+  window.almoraLoadStudioStats = async function() {
+    const mount = document.getElementById('almora-stats-content');
+    if (!mount) return;
+    mount.innerHTML = '<div class="empty">Carregando estatísticas...</div>';
+    try {
+      const { data: allowed, error: permissionError } = await almoraDB.rpc('is_admin');
+      if (permissionError) throw permissionError;
+      if (allowed !== true) throw new Error('Acesso restrito à administração.');
+      const metrics = [
+        ['Obras cadastradas', 'works'],
+        ['Capítulos publicados', 'chapters'],
+        ['Páginas publicadas', 'pages'],
+        ['Contas de leitores', 'profiles'],
+        ['Comentários', 'comments'],
+        ['Denúncias recebidas', 'reports']
+      ];
+      const results = await Promise.all(metrics.map(async ([label, table]) => {
+        const { count, error } = await almoraDB.from(table).select('*', { count: 'exact', head: true });
+        return { label, count, error };
+      }));
+      mount.innerHTML = '<div class="grid">' + results.map(item =>
+        '<article class="box" style="margin:0"><div style="color:var(--mu);font-size:13px">' +
+        esc(item.label) + '</div><strong style="display:block;font-size:28px;margin-top:5px">' +
+        (item.error ? '—' : Number(item.count || 0).toLocaleString('pt-BR')) +
+        '</strong>' + (item.error ? '<small style="color:var(--mu)">Contagem indisponível</small>' : '') +
+        '</article>'
+      ).join('') + '</div>';
+    } catch (error) {
+      mount.innerHTML = '<div class="empty">Não foi possível carregar as estatísticas: ' + esc(error.message) + '</div>';
+    }
+  };
+})();
+</script>
+
 </body>
 </html>
