@@ -1865,12 +1865,6 @@ ren();initAuth();
   }
 }
 
-#app.almora-leaving {
-  opacity: 0;
-  transform: translateY(-6px);
-  transition: opacity .16s ease, transform .16s ease;
-}
-
 #app.almora-entering > * {
   animation: almoraPageIn .4s ease both;
 }
@@ -1915,6 +1909,7 @@ ren();initAuth();
   if (!app || typeof originalRender !== 'function') return;
 
   let renderTimer;
+  let enterTimer;
 
   window.ren = function(...args) {
     const route = (location.hash.slice(1) || 'home').split('/')[0];
@@ -1924,8 +1919,10 @@ ren();initAuth();
       (chapterFile && chapterFile.files.length > 0) ||
       (typeof draft !== 'undefined' && draft.length > 0);
 
+    clearTimeout(renderTimer);
+    clearTimeout(enterTimer);
+
     if (route === 'studio' && hasPendingChapter) {
-      clearTimeout(renderTimer);
       app.classList.remove('almora-leaving', 'almora-entering');
       return;
     }
@@ -1933,24 +1930,20 @@ ren();initAuth();
     if (window.matchMedia(
       '(prefers-reduced-motion: reduce)'
     ).matches) {
+      app.classList.remove('almora-leaving', 'almora-entering');
       return originalRender.apply(this, args);
     }
 
-    clearTimeout(renderTimer);
-    app.classList.remove('almora-entering');
-    app.classList.add('almora-leaving');
+    // Renderiza imediatamente: não há animação nem atraso de saída.
+    originalRender.apply(this, args);
 
-    renderTimer = setTimeout(() => {
-      originalRender.apply(this, args);
+    app.classList.remove('almora-leaving', 'almora-entering');
+    void app.offsetWidth;
+    app.classList.add('almora-entering');
 
-      app.classList.remove('almora-leaving');
-      void app.offsetWidth;
-      app.classList.add('almora-entering');
-
-      setTimeout(() => {
-        app.classList.remove('almora-entering');
-      }, 700);
-    }, 160);
+    enterTimer = setTimeout(() => {
+      app.classList.remove('almora-entering');
+    }, 700);
   };
 
   app.classList.add('almora-entering');
