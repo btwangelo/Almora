@@ -2473,6 +2473,9 @@ a:active {
       app.innerHTML += await almoraRenderAchievements(id, own);
       if (!isCurrentProfileRequest()) return;
       delete app.dataset.almoraProfileLoading;
+      if (typeof window.almoraApplyProfileAppearance === 'function') {
+        window.almoraApplyProfileAppearance();
+      }
       if (typeof window.almoraInitProfileSocial === 'function') {
         window.almoraInitProfileSocial();
       }
@@ -5202,7 +5205,7 @@ window.almoraSavePrivacy = async function() {
 })();
 </script>
 
-<script src="social-profiles.js?v=profile-stability1"></script>
+<script src="social-profiles.js?v=profile-appearance-stable1"></script>
 <script src="studio-dashboard.js"></script>
 </body>
 </html>
