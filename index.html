@@ -4803,7 +4803,11 @@ window.almoraSavePrivacy = async function() {
 
   const previousTab = window.almoraStudioTab;
   window.almoraStudioTab = function(tab) {
-    if (tab !== 'stats') return previousTab(tab);
+    if (tab !== 'stats') {
+      const statsPanel = document.getElementById('almora-studio-statistics');
+      if (statsPanel) statsPanel.style.display = 'none';
+      return previousTab(tab);
+    }
     const works = document.getElementById('almora-studio-works');
     const moderation = document.getElementById('almora-moderation');
     const stats = document.getElementById('almora-studio-statistics');
