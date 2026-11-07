@@ -1,66 +1,48 @@
-/* ALMORA Studio: dashboard navigation over the existing admin tools */
+/* ALMORA Studio — navegação única sobre os formulários e painéis existentes */
 (() => {
   'use strict';
-  let activePage = 'works';
-  let appObserver = null;
-  const app = document.getElementById('app');
-  const esc = value => String(value ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const pages = [
-    ['works','Obras','library-big'],
-    ['launch','Lançamento','file-plus'],
-    ['moderation','Moderação','shield-check'],
-    ['analytics','Análises','chart'],
-    ['chapters','Capítulos','book-open'],
-    ['settings','Configurações','settings']
-  ];
+  const app=document.getElementById('app');
+  const pages=[['works','Obras'],['launch','Publicar obra'],['chapters','Capítulos'],['moderation','Moderação'],['analytics','Estatísticas'],['settings','Configurações']];
+  let activePage='works';
+  let observer=null;
+  const isStudio=()=>location.hash.split('/')[0]==='#studio';
+  const boxes=section=>[...section.querySelectorAll(':scope > .box')];
+  const workHeading=section=>[...section.querySelectorAll(':scope > h2')].find(h=>h.textContent.toLocaleLowerCase('pt-BR').includes('obras cadastradas'));
 
-  function isStudio(){return location.hash.split('/')[0]==='#studio';}
-  function installNav(){
-    if(!isStudio()||!app)return;
+  function install(){
+    if(!app||!isStudio()){app?.classList.remove('almora-studio-dashboard-active');return;}
     const section=document.getElementById('almora-studio-works');
     if(!section)return;
+    app.classList.add('almora-studio-dashboard-active');
     let nav=document.getElementById('almora-studio-dashboard-nav');
     if(!nav){
-      nav=document.createElement('div');
-      nav.id='almora-studio-dashboard-nav';
-      nav.className='almora-studio-dashboard-nav';
-      nav.innerHTML=pages.map(([id,label])=>'<button type="button" class="g" data-studio-page="'+id+'" onclick="almoraStudioPage(\''+id+'\')">'+label+'</button>').join('');
-      const heading=app.querySelector('h2');
-      if(heading)heading.insertAdjacentElement('afterend',nav);else app.prepend(nav);
+      nav=document.createElement('nav');nav.id='almora-studio-dashboard-nav';nav.className='almora-studio-dashboard-nav';nav.setAttribute('aria-label','Seções do Studio');
+      pages.forEach(([id,label])=>{
+        const button=document.createElement('button');button.type='button';button.className='g';button.dataset.studioPage=id;button.textContent=label;
+        button.addEventListener('click',()=>window.almoraStudioPage(id));nav.appendChild(button);
+      });
+      section.insertAdjacentElement('beforebegin',nav);
     }
-    const sectionBoxes=[...section.querySelectorAll(':scope > .box')];
-    const listHeading=[...section.querySelectorAll(':scope > h2')].find(h=>h.textContent.toLowerCase().includes('obras cadastradas'));
-    if(listHeading && !document.getElementById('almora-studio-work-search')){
-      const search=document.createElement('input');
-      search.id='almora-studio-work-search';search.type='search';search.placeholder='⌕ Pesquisar obras por título ou autora...';
-      search.className='almora-studio-work-search';
-      search.addEventListener('input',()=>filterWorks(search.value));
-      listHeading.insertAdjacentElement('afterend',search);
-      collapseChapterRows(listHeading);
+    const heading=workHeading(section);
+    if(heading&&!document.getElementById('almora-studio-work-search')){
+      const search=document.createElement('input');search.id='almora-studio-work-search';search.type='search';search.className='almora-studio-work-search';
+      search.placeholder='⌕ Pesquisar obras por título ou autora...';search.setAttribute('aria-label','Pesquisar obras cadastradas');
+      search.addEventListener('input',()=>filterWorks(search.value));heading.insertAdjacentElement('afterend',search);
+      collapseChapterRows(section,heading);
     }
-    let analytics=document.getElementById('almora-studio-analytics');
-    if(!analytics){
-      analytics=document.createElement('section');analytics.id='almora-studio-analytics';analytics.className='almora-studio-extra-page';analytics.hidden=true;
-      analytics.innerHTML='<h2>Análises da ALMORA</h2><p style="color:var(--mu)">Indicadores gerais do catálogo.</p><div class="almora-studio-stat-grid" id="almora-studio-stats"></div>';
-      section.insertAdjacentElement('afterend',analytics);
-    }
-    let settings=document.getElementById('almora-studio-settings');
-    if(!settings){
-      settings=document.createElement('section');settings.id='almora-studio-settings';settings.className='almora-studio-extra-page';settings.hidden=true;
-      settings.innerHTML='<h2>Configurações</h2><div class="box"><b>Ferramentas administrativas</b><p style="color:var(--mu)">Faça backup dos dados e encerre sua sessão administrativa.</p><div class="act"><button class="g" type="button" onclick="bk()">Exportar backup (sem imagens)</button><button class="d" type="button" onclick="unlocked=false;ren()">Sair do Studio</button></div></div>';
-      analytics.insertAdjacentElement('afterend',settings);
-    }
+    const translate=boxes(section).find(box=>box.textContent.includes('ALMORA TRANSLATE'));
+    if(translate)translate.dataset.studioTranslate='true';
     applyPage();
   }
 
-  function collapseChapterRows(listHeading){
-    let node=listHeading.nextElementSibling;
-    while(node && node.tagName!=='H2'){
-      if(node.classList?.contains('box')){
+  function collapseChapterRows(section,heading){
+    let node=heading.nextElementSibling;
+    while(node&&node.tagName!=='H2'){
+      if(node.classList?.contains('box')&&!node.querySelector('.almora-studio-chapter-details')){
         const rows=[...node.querySelectorAll(':scope > .ch')];
         if(rows.length){
           const details=document.createElement('details');details.className='almora-studio-chapter-details';
-          const summary=document.createElement('summary');summary.textContent='Ver '+rows.length+' capítulos';details.appendChild(summary);
+          const summary=document.createElement('summary');summary.textContent='Mostrar '+rows.length+' capítulos';details.appendChild(summary);
           rows.forEach(row=>details.appendChild(row));node.appendChild(details);
         }
       }
@@ -69,86 +51,77 @@
   }
 
   function filterWorks(query){
-    const section=document.getElementById('almora-studio-works');if(!section)return;
-    const h=[...section.querySelectorAll(':scope > h2')].find(x=>x.textContent.toLowerCase().includes('obras cadastradas'));
-    if(!h)return;
-    let node=h.nextElementSibling;
-    const q=query.trim().toLocaleLowerCase('pt-BR');
-    while(node && node.tagName!=='H2'){
-      if(node.classList?.contains('box'))node.hidden=!!q&&!node.textContent.toLocaleLowerCase('pt-BR').includes(q);
+    const section=document.getElementById('almora-studio-works');const heading=section&&workHeading(section);if(!heading)return;
+    const q=String(query||'').trim().toLocaleLowerCase('pt-BR');let node=heading.nextElementSibling;
+    while(node&&node.tagName!=='H2'){
+      if(node.classList?.contains('box')&&node.dataset.studioTranslate!=='true')node.hidden=!!q&&!node.textContent.toLocaleLowerCase('pt-BR').includes(q);
       node=node.nextElementSibling;
     }
   }
 
-  function updateAnalytics(){
-    const target=document.getElementById('almora-studio-stats');if(!target)return;
-    const works=typeof S!=='undefined'&&Array.isArray(S.works)?S.works:[];
-    const chapters=works.reduce((sum,w)=>sum+(w.chapters?.length||0),0);
-    const published=works.filter(w=>!w.archived).length;
-    target.innerHTML=[
-      ['Obras cadastradas',works.length],['Obras ativas',published],['Capítulos',chapters],
-      ['Arquivadas',works.length-published]
-    ].map(([label,value])=>'<article class="box"><small style="color:var(--mu)">'+label+'</small><strong>'+Number(value).toLocaleString('pt-BR')+'</strong></article>').join('');
+  function updateButtons(){
+    const nav=document.getElementById('almora-studio-dashboard-nav');if(!nav)return;
+    nav.querySelectorAll('[data-studio-page]').forEach(button=>{
+      const active=button.dataset.studioPage===activePage;
+      button.classList.toggle('on',active);button.classList.toggle('g',!active);
+      if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
+    });
   }
 
-  window.almoraStudioPage = page => {
-    if(!pages.some(item=>item[0]===page))return;
-    activePage=page;applyPage();
-  };
+  window.almoraStudioPage=page=>{if(!pages.some(item=>item[0]===page))return;activePage=page;applyPage();};
 
   function applyPage(){
     if(!isStudio()||!app)return;
     const section=document.getElementById('almora-studio-works');
     const moderation=document.getElementById('almora-moderation');
-    const analytics=document.getElementById('almora-studio-analytics');
-    const settings=document.getElementById('almora-studio-settings');
+    const analytics=document.getElementById('almora-studio-statistics');
     const nav=document.getElementById('almora-studio-dashboard-nav');
     if(!section||!nav)return;
-    const buttons=[...nav.querySelectorAll('[data-studio-page]')];
-    buttons.forEach(b=>{const active=b.dataset.studioPage===activePage;b.classList.toggle('on',active);b.classList.toggle('g',!active);});
-    const boxes=[...section.querySelectorAll(':scope > .box')];
-    const workHeading=[...section.querySelectorAll(':scope > h2')].find(h=>h.textContent.toLowerCase().includes('obras cadastradas'));
-    const search=document.getElementById('almora-studio-work-search');
+    const allBoxes=boxes(section);const forms=allBoxes.filter(box=>box.dataset.studioTranslate!=='true');
+    const translate=allBoxes.find(box=>box.dataset.studioTranslate==='true');
+    const heading=workHeading(section);const search=document.getElementById('almora-studio-work-search');
     const listNodes=[];
-    if(workHeading){let n=workHeading.nextElementSibling;while(n&&n.tagName!=='H2'){listNodes.push(n);n=n.nextElementSibling;}}
-    section.hidden=activePage==='analytics'||activePage==='settings'||activePage==='moderation';
-    section.style.display=activePage==='moderation'?'none':'block';
-    if(moderation)moderation.style.display=activePage==='moderation'?'block':'none';
-    if(analytics)analytics.hidden=activePage!=='analytics';
-    if(settings)settings.hidden=activePage!=='settings';
-    if(activePage==='works'){
-      boxes.slice(0,3).forEach(x=>x.hidden=true);
-      listNodes.forEach(x=>x.hidden=false);
-      if(search)search.hidden=false;
-    }else if(activePage==='launch'){
-      boxes.forEach((x,i)=>x.hidden=i!==0);
-      listNodes.forEach(x=>x.hidden=true);
-      if(search)search.hidden=true;
-    }else if(activePage==='chapters'){
-      boxes.forEach((x,i)=>x.hidden=i===0||i>2);
-      listNodes.forEach(x=>x.hidden=true);
-      if(search)search.hidden=true;
-    }else if(activePage==='moderation'){
-      const modTab=document.getElementById('almora-tab-mod');
-      if(modTab && moderation && moderation.style.display!=='block' && window.almoraStudioTab)window.almoraStudioTab('mod');
-    }else{
-      if(search)search.hidden=true;
-    }
-    if(activePage==='analytics')updateAnalytics();
-  }
+    if(heading){let node=heading.nextElementSibling;while(node&&node.tagName!=='H2'){listNodes.push(node);node=node.nextElementSibling;}}
+    if(activePage==='moderation'&&typeof window.almoraStudioTab==='function')window.almoraStudioTab('mod');
+    else if(activePage==='analytics'&&typeof window.almoraStudioTab==='function')window.almoraStudioTab('stats');
+    else if(typeof window.almoraStudioTab==='function')window.almoraStudioTab('works');
 
+    const showMain=['works','launch','chapters','settings'].includes(activePage);
+    section.hidden=!showMain;section.style.display=showMain?'block':'none';
+    if(moderation)moderation.style.display=activePage==='moderation'?'block':'none';
+    if(analytics)analytics.style.display=activePage==='analytics'?'block':'none';
+    forms.forEach((box,index)=>{
+      if(activePage==='launch')box.hidden=index!==0;
+      else if(activePage==='chapters')box.hidden=index===0||index>2;
+      else box.hidden=true;
+    });
+    if(heading)heading.hidden=activePage!=='works';
+    listNodes.forEach(node=>{node.hidden=activePage!=='works'||node.dataset.studioTranslate==='true';});
+    if(search){search.hidden=activePage!=='works';if(activePage==='works')filterWorks(search.value);}
+    if(translate)translate.hidden=activePage!=='settings';
+    updateButtons();
+  }
 
   const style=document.createElement('style');
-  style.textContent='.almora-studio-tabs{display:none!important}.almora-studio-dashboard-nav{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin:12px 0 20px}.almora-studio-dashboard-nav button{min-height:44px}.almora-studio-dashboard-nav button.on{background:var(--ac2);color:#fff}.almora-studio-work-search{width:100%;margin:8px 0 14px}.almora-studio-chapter-details{margin-top:10px;border-top:1px solid var(--bd);padding-top:8px}.almora-studio-chapter-details summary{cursor:pointer;color:var(--ac);font-weight:600}.almora-studio-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.almora-studio-stat-grid .box{margin:0}.almora-studio-stat-grid strong{display:block;font-size:28px;margin-top:5px}.almora-studio-extra-page[hidden]{display:none!important}';
+  style.textContent='#app.almora-studio-dashboard-active .almora-studio-tabs{display:none!important}'+
+    '.almora-studio-dashboard-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0 22px}'+
+    '.almora-studio-dashboard-nav button{min-height:46px;padding:10px 8px;white-space:normal}'+
+    '.almora-studio-dashboard-nav button.on{background:var(--ac2);color:#fff}'+
+    '.almora-studio-work-search{display:block;width:100%;margin:8px 0 14px}'+
+    '.almora-studio-chapter-details{margin-top:10px;border-top:1px solid var(--bd);padding-top:9px}'+
+    '.almora-studio-chapter-details summary{cursor:pointer;color:var(--ac);font-weight:600;padding:5px 0}'+
+    '@media(max-width:420px){.almora-studio-dashboard-nav{grid-template-columns:repeat(2,minmax(0,1fr))}}';
   document.head.appendChild(style);
 
-  function observe(){
-    if(!app)return;
-    if(appObserver)appObserver.disconnect();
-    appObserver=new MutationObserver(()=>{if(isStudio())installNav();});
-    appObserver.observe(app,{childList:true,subtree:true});
-    if(isStudio())installNav();
+  function start(){
+    if(!app||observer)return;
+    observer=new MutationObserver(()=>{if(isStudio())install();else app.classList.remove('almora-studio-dashboard-active');});
+    observer.observe(app,{childList:true});
+    if(isStudio())install();
   }
-  window.addEventListener('hashchange',()=>{if(isStudio()){activePage='works';setTimeout(installNav,0);}});
-  observe();
+  window.addEventListener('hashchange',()=>{
+    if(isStudio()){activePage='works';app?.classList.remove('almora-studio-dashboard-active');Promise.resolve().then(install);}
+    else app?.classList.remove('almora-studio-dashboard-active');
+  });
+  start();
 })();
