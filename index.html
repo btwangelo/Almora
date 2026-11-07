@@ -740,7 +740,7 @@ async function head(){
     '<button class="g almora-header-gear" type="button" aria-label="Abrir menu de opções" aria-expanded="false" aria-controls="almora-account-menu" onclick="almoraToggleAccountMenu(event)">⚙</button>'+
     '<div class="almora-account-menu" id="almora-account-menu" hidden>'+
       '<div class="almora-menu-email">'+esc(me.email||'Conta')+'</div>'+
-      '<a href="#studio" onclick="almoraCloseAccountMenu()">ALMORA Studio</a><a href="#comunidade" onclick="almoraCloseAccountMenu()">Comunidade</a><a href="#desejos" onclick="almoraCloseAccountMenu()">Lista de desejos</a><a href="#notificacoes" data-notifications-link onclick="almoraCloseAccountMenu()">Notificações</a><a href="#conta" onclick="almoraCloseAccountMenu()">Minha conta</a>'+
+      '<a href="#perfil" onclick="almoraCloseAccountMenu()">Perfil</a><a href="#studio" onclick="almoraCloseAccountMenu()">ALMORA Studio</a><a href="#comunidade" onclick="almoraCloseAccountMenu()">Comunidade</a><a href="#desejos" onclick="almoraCloseAccountMenu()">Lista de desejos</a><a href="#notificacoes" data-notifications-link onclick="almoraCloseAccountMenu()">Notificações</a><a href="#conta" onclick="almoraCloseAccountMenu()">Minha conta</a>'+
       '<button type="button" onclick="out();almoraCloseAccountMenu()">Sair</button></div>';
 }
 function almoraToggleAccountMenu(event){
@@ -2271,21 +2271,7 @@ a:active {
   let currentProfile = null;
   let profileRequest = 0;
 
-  // Adiciona o acesso ao perfil no menu.
-  const oldNav = window.nav;
-
-  window.nav = function(route) {
-    oldNav(route);
-
-    if (user && !document.querySelector('#nav a[href="#perfil"]')) {
-      const active = route === 'perfil' ? 'on' : '';
-
-      $('#nav').insertAdjacentHTML(
-        'beforeend',
-        `<a href="#perfil" class="${active}">Perfil</a>`
-      );
-    }
-  };
+  // O acesso ao perfil fica no menu da engrenagem, não no cabeçalho.
 
   // Conquistas públicas do leitor. O próprio usuário também visualiza as ainda bloqueadas.
   async function almoraRenderAchievements(profileId, ownProfile) {
@@ -3835,24 +3821,9 @@ window.almoraSaveProfile = async function() {
   const originalNav = window.nav;
   const originalStudio = window.studio;
 
-  // Mostra Studio somente para administradores
+  // O Studio é acessado pelo menu da engrenagem, sem duplicação no cabeçalho.
   window.nav = function(route) {
     originalNav(route);
-
-    const links = document.querySelectorAll('#nav a');
-    links.forEach(link => {
-      if (link.getAttribute('href') === '#studio') {
-        link.remove();
-      }
-    });
-
-    if (adminStatus) {
-      const link = document.createElement('a');
-      link.href = '#studio';
-      link.textContent = 'Studio';
-      link.className = route === 'studio' ? 'on' : '';
-      document.querySelector('#nav').appendChild(link);
-    }
   };
 
   // Bloqueia acesso direto à rota Studio
