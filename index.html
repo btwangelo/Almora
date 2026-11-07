@@ -257,7 +257,7 @@ function obra(id){const w=W(id);if(!w)return`<div class="empty">Obra não encont
 const lp=S.prog[id],cs=[...w.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n)),r=S.rate[id]||0,ls=S.lib[id]||'';
 return `<div class="hero"><div class="cv" ${cover(w)}></div><div><h1 style="margin:0">${esc(w.title)}</h1><div style="color:var(--mu)">${esc(w.alt)}</div>
 <div style="margin:8px 0"><span class="pill">${w.cat}</span><span class="pill">${esc(w.status)}</span><span class="pill">${esc(w.age)}</span>${(w.genres||'').split(',').filter(x=>x.trim()).map(g=>`<span class="pill">${esc(g.trim())}</span>`).join('')}${(w.tropes||[]).map(tag=>`<span class="pill almora-tag">#${esc(tag)}</span>`).join('')}</div>
-<div>Autor: ${esc(w.author||'—')} · Ilustrador: ${esc(w.illus||'—')}</div><div>${cs.length} capítulos · 👁 ${w.reads||0} leituras</div>
+<div>Autor: ${esc(w.author||'—')} · Ilustrador: ${esc(w.illus||'—')}</div><div>${cs.length} capítulos · 👁 ${w.reads||0} leituras</div><div id="almora-work-like-count" style="color:var(--mu);font-size:13px;margin-top:4px"></div>
 <div class="stars" id="stars">${[1,2,3,4,5].map(i=>`<span class="${i<=r?'on':''}" onclick="rate('${id}',${i})">★</span>`).join('')}</div>
 <div class="act">${cs.length?`<button onclick="location.hash='#ler/${id}/${lp?lp.n:cs[0].n}'">${lp?'Continuar lendo (cap. '+esc(lp.n)+')':'Começar a ler'}</button>`:''}
 <button class="g" onclick="fav('${id}')">${S.fav[id]?'♥ Favorita':'♡ Favoritar'}</button>
@@ -1436,6 +1436,7 @@ A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL',
 if(r==='desejos') loadWishlistPage();
 if(r==='studio'&&window.almoraBatchRender) almoraBatchRender();
 if(r==='obra'&&user) syncWishlistButton(a);
+if(r==='obra'&&window.almoraLoadWorkFavoriteCount) almoraLoadWorkFavoriteCount(a);
 almoraUpdatePageMeta(r,a,b)}
 addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
 $('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
@@ -4841,8 +4842,8 @@ window.almoraSavePrivacy = async function() {
       if (allowed !== true) throw new Error('Acesso restrito à administração.');
       const metrics = [
         ['Obras cadastradas', 'works'],
-        ['Capítulos publicados', 'chapters'],
-        ['Páginas publicadas', 'pages'],
+        ['Capítulos cadastrados', 'chapters'],
+        ['Páginas cadastradas', 'pages'],
         ['Contas de leitores', 'profiles'],
         ['Comentários', 'comments'],
         ['Denúncias recebidas', 'reports']
