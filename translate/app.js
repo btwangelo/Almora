@@ -99,7 +99,7 @@
           method: "POST",
           headers: {
             "Content-Type": file.type || "application/octet-stream",
-            "X-File-Name": encodeURIComponent(file.name)
+            "X-File-Name": file.name
           },
           body: file
         });
