@@ -1,0 +1,11 @@
+name = "almora-translate"
+main = "src/index.js"
+compatibility_date = "2026-11-08"
+
+[[r2_buckets]]
+binding = "ALMORA_BUCKET"
+bucket_name = "almora-obras"
+
+[vars]
+CORS_ORIGINS = "https://btwangelo.github.io,https://almoraverse.pages.dev"
+MAX_UPLOAD_BYTES = "52428800"
