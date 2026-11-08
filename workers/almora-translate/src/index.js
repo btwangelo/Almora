@@ -243,12 +243,10 @@ async function reconstructWithAI(env, input) {
     error.status = 400;
     throw error;
   }
-  for (const value of mask) {
-    if (!Number.isInteger(value) || value < 0 || value > 255) {
-      const error = new Error("A máscara contém bytes inválidos.");
-      error.status = 400;
-      throw error;
-    }
+  if (mask.some(value => !Number.isInteger(value) || value < 0 || value > 255)) {
+    const error = new Error("A máscara contém bytes inválidos.");
+    error.status = 400;
+    throw error;
   }
   if (mask[0] !== 0x89 || mask[1] !== 0x50 || mask[2] !== 0x4e || mask[3] !== 0x47) {
     const error = new Error("A máscara precisa ser uma imagem PNG.");
@@ -257,32 +255,32 @@ async function reconstructWithAI(env, input) {
   }
   const width = Number(input.width);
   const height = Number(input.height);
-  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 256 || height < 256 || width > 2048 || height > 2048 || width * height > 4_194_304) {
-    const error = new Error("Dimensões inválidas. Use imagens entre 256 e 2.048 pixels por lado.");
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 256 || height < 256 || width > 1920 || height > 1920 || width * height > 3_686_400) {
+    const error = new Error("Dimensões inválidas. Use imagens entre 256 e 1.920 pixels por lado.");
     error.status = 400;
     throw error;
   }
-  const model = env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting";
+  const imageBytes = decodeBase64(image);
+  const maskBytes = new Uint8Array(mask);
+  const imageMime = /^data:(image\/(?:png|jpeg|webp));base64,/i.exec(image)?.[1] || "image/png";
+  const form = new FormData();
+  form.append("prompt", String(input.prompt ||
+    "Image 0 is the original comic page. Image 1 is a black-and-white edit guide: white painted regions identify the ONLY areas that may be reconstructed. Remove lettering and restore the underlying original speech-bubble interior or artwork in those white areas. Preserve the exact manga/manhwa drawing style, line art, colors, characters, panel layout and composition. Do not add text, letters, symbols, objects or characters. Keep everything outside the marked regions unchanged.").slice(0, 1800));
+  form.append("input_image_0", new Blob([imageBytes], { type: imageMime }), "original.png");
+  form.append("input_image_1", new Blob([maskBytes], { type: "image/png" }), "edit-guide.png");
+  form.append("width", String(width));
+  form.append("height", String(height));
+  form.append("guidance", "3.5");
+  const serialized = new Response(form);
+  const model = env.INPAINT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b";
   const result = await env.AI.run(model, {
-    prompt: String(input.prompt || "Reconstruct the original comic artwork naturally. Preserve line art, colors, textures, and all visual details. Do not add text, letters, speech bubbles, objects, or characters.").slice(0, 1200),
-    image_b64: image.replace(/^data:[^,]+,/, ""),
-    mask,
-    width,
-    height,
-    num_steps: 20,
-    strength: 1,
-    guidance: 7.5
+    multipart: {
+      body: serialized.body,
+      contentType: serialized.headers.get("content-type")
+    }
   });
-  let output = result && result.image !== undefined ? result.image : result;
-  let bytes;
-  if (output instanceof Uint8Array) bytes = output;
-  else if (output instanceof ArrayBuffer) bytes = new Uint8Array(output);
-  else if (output instanceof ReadableStream) bytes = new Uint8Array(await new Response(output).arrayBuffer());
-  else if (Array.isArray(output)) bytes = new Uint8Array(output);
-  else if (typeof output === "string") bytes = decodeBase64(output);
-  else if (result && result.image_b64) bytes = decodeBase64(result.image_b64);
-  else throw new Error("O motor de reconstrução não retornou uma imagem reconhecível.");
-  return bytes;
+  if (!result || !result.image) throw new Error("O modelo de edição não retornou uma imagem.");
+  return decodeBase64(result.image);
 }
 \nasync function handle(request, env) {
   const origin = request.headers.get("origin") || "";
@@ -311,9 +309,10 @@ async function reconstructWithAI(env, input) {
         translation: { available: Boolean(env.AI), model: env.TRANSLATION_MODEL || "@cf/zai-org/glm-4.7-flash" },
         reconstruction: {
           available: Boolean(env.AI),
-          model: env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting",
+          model: env.INPAINT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b",
           experimental: true,
-          notice: "Provider beta com descontinuação anunciada para 2026-11-20."
+          mode: "image-editing-with-reference-mask-guide",
+          notice: "Edição por imagem de referência; a máscara é enviada como guia visual e a composição final limita a alteração às áreas pintadas."
         }
       }
     }, 200, origin, env);
@@ -401,7 +400,7 @@ async function reconstructWithAI(env, input) {
         const input = await request.json();
         const imageBytes = await reconstructWithAI(env, input);
         await addEvent(env, projectId, auth.user.id, "image_reconstructed", {
-          model: env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting",
+          model: env.INPAINT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b",
           width: Number(input.width),
           height: Number(input.height)
         });
