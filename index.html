@@ -1002,6 +1002,7 @@ ${S.works.map(w=>`<option value="${w.id}">${esc(w.title)}</option>`).join('')}
 <label>Páginas (imagens, CBZ ou ZIP)</label>
 <input id="c_f" type="file" accept="image/*,.cbz,.zip,application/zip,application/x-cbz" multiple onchange="pages(this)">
 <small style="color:var(--mu)">Envie imagens individuais ou um arquivo CBZ/ZIP com as páginas. A ALMORA organiza as páginas automaticamente.</small>
+<div id="almora-page-status" role="status" aria-live="polite" hidden style="margin-top:12px;padding:10px 12px;border-radius:9px;background:var(--sf2);color:var(--mu);font-size:13px"></div>
 <div id="dr"></div>
 
 <div class="act">
@@ -1096,7 +1097,15 @@ function almoraFilterChapterWorks(){
     select.value=selected;
   }
 }
-  function drawD(){
+  function setPageStatus(message,loading=false){
+  const status=document.getElementById('almora-page-status');
+  if(!status)return;
+  status.hidden=!message;
+  status.textContent=message||'';
+  status.style.color=loading?'var(--ac)':'var(--mu)';
+}
+
+function drawD(){
   const box=$('#dr');
   if(!box)return;
 
@@ -1112,13 +1121,21 @@ function almoraFilterChapterWorks(){
           <img src="${src}" style="width:100%;aspect-ratio:2/3;object-fit:contain;border-radius:5px">
           <small>Página ${i+1}</small>
           <div style="display:flex;gap:4px;margin-top:5px">
-            <button type="button" class="g" onclick="moveDraft(${i},-1)" ${i===0?'disabled':''}>←</button>
-            <button type="button" class="g" onclick="moveDraft(${i},1)" ${i===draft.length-1?'disabled':''}>→</button>
+            <button type="button" class="g" onclick="moveDraft(${i},-1)" ${i===0?'disabled':''} aria-label="Mover página para a esquerda">←</button>
+            <button type="button" class="g" onclick="moveDraft(${i},1)" ${i===draft.length-1?'disabled':''} aria-label="Mover página para a direita">→</button>
+            <button type="button" class="d" onclick="removeDraft(${i})" aria-label="Remover página ${i+1}" title="Remover página">✕</button>
           </div>
         </div>
       `).join('')}
     </div>
   `;
+}
+
+function removeDraft(index){
+  if(index<0||index>=draft.length)return;
+  draft.splice(index,1);
+  drawD();
+  setPageStatus(draft.length?draft.length+' páginas na pré-visualização.':'Todas as páginas foram removidas.');
 }
 
 function moveDraft(index,direction){
@@ -1133,9 +1150,12 @@ async function pages(el){
   if(!files.length)return;
   draft=[];
   drawD();
+  setPageStatus('Carregando conteúdo...',true);
   try{
     const expanded=[];
-    for(const file of files){
+    for(let fileIndex=0;fileIndex<files.length;fileIndex++){
+      const file=files[fileIndex];
+      setPageStatus('Lendo '+file.name+' ('+(fileIndex+1)+' de '+files.length+')...',true);
       const ext=file.name.split('.').pop().toLowerCase();
 
       if(ext==='cbz'||ext==='zip'){
@@ -1147,6 +1167,7 @@ async function pages(el){
 
         if(!entries.length)throw new Error('O arquivo '+file.name+' não contém imagens compatíveis.');
 
+        setPageStatus('Extraindo '+entries.length+' páginas de '+file.name+'...',true);
         for(const entry of entries){
           const blob=await entry.async('blob');
           const name=entry.name.split('/').pop();
@@ -1163,14 +1184,17 @@ async function pages(el){
     const totalBytes=expanded.reduce((sum,file)=>sum+file.size,0);
     if(totalBytes>120*1024*1024)throw new Error('O capítulo ultrapassa o limite de 120 MB descompactados.');
 
+    setPageStatus('Preparando pré-visualização de '+expanded.length+' páginas...',true);
     draft=(await Promise.all(expanded.map(file=>comp(file,900)))).filter(Boolean);
     if(!draft.length)throw new Error('Não foi possível encontrar imagens válidas nesses arquivos.');
 
     drawD();
+    setPageStatus(draft.length+' páginas carregadas. Revise, remova ou reorganize antes de publicar.');
     toast(draft.length+' páginas prontas para publicar.');
   }catch(e){
     draft=[];
     drawD();
+    setPageStatus('Erro ao carregar conteúdo: '+e.message);
     toast('Erro ao ler capítulo: '+e.message);
   }finally{
     el.value='';
