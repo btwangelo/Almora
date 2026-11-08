@@ -26,7 +26,7 @@ O modelo `@cf/runwayml/stable-diffusion-v1-5-inpainting` está em beta e tem des
 
 - `POST /api/projects/:id/reconstruct`
   - JSON: `{ "image_b64": "data:image/png;base64,...", "mask": [0,255,...], "width": 800, "height": 1200 }`
-  - A máscara tem uma amostra por pixel (0–255); branco marca a região a reconstruir e preto preserva.
+  - A máscara é enviada como bytes de um PNG (cada byte entre 0 e 255); o pincel cria branco nas áreas a reconstruir e preto nas áreas preservadas.
   - Dimensões entre 256 e 2.048 px por lado; imagem de até 5 MiB.
   - Retorna PNG. Exige tradutor ou administrador.
 
