@@ -255,6 +255,13 @@ async function reconstructWithAI(env, input) {
     error.status = 400;
     throw error;
   }
+  for (const value of mask) {
+    if (!Number.isInteger(value) || value < 0 || value > 255) {
+      const error = new Error("A máscara contém valores inválidos.");
+      error.status = 400;
+      throw error;
+    }
+  }
   const model = env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting";
   const result = await env.AI.run(model, {
     prompt: String(input.prompt || "Reconstruct the original comic artwork naturally. Preserve line art, colors, textures, and all visual details. Do not add text, letters, speech bubbles, objects, or characters.").slice(0, 1200),
@@ -389,6 +396,8 @@ async function reconstructWithAI(env, input) {
 
       if (request.method === "POST" && action === "reconstruct") {
         if (!isTranslator(auth)) return fail("Apenas tradutores autorizados e administradores podem reconstruir imagens.", 403, origin, env);
+        const declared = Number(request.headers.get("content-length") || 0);
+        if (declared > 30 * 1024 * 1024) return fail("A solicitação excede o limite de 30 MiB.", 413, origin, env);
         const input = await request.json();
         const imageBytes = await reconstructWithAI(env, input);
         await addEvent(env, projectId, auth.user.id, "image_reconstructed", {
