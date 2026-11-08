@@ -1,5 +1,5 @@
 name = "almora-translate"
-main = "src/index.js"
+main = "src/index.js"\n\n[ai]\nbinding = "AI"
 compatibility_date = "2026-11-08"
 
 [[r2_buckets]]
@@ -9,3 +9,4 @@ bucket_name = "almora-obras"
 [vars]
 CORS_ORIGINS = "https://btwangelo.github.io,https://almoraverse.pages.dev"
 MAX_UPLOAD_BYTES = "52428800"
+\nTRANSLATION_MODEL = "@cf/zai-org/glm-4.7-flash"\nINPAINT_MODEL = "@cf/runwayml/stable-diffusion-v1-5-inpainting"\n
