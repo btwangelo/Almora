@@ -38,13 +38,13 @@ jobs:
           from pathlib import Path
 
           html = Path("index.html").read_text(encoding="utf-8")
-          blocks = re.findall(r"<script\\b([^>]*)>([\\s\\S]*?)</script\\s*>", html, re.IGNORECASE)
+          blocks = re.findall(r"<script\b([^>]*)>([\s\S]*?)</script\s*>", html, re.IGNORECASE)
           checked = 0
 
           for attrs, source in blocks:
-              if re.search(r"\\bsrc\\s*=", attrs, re.IGNORECASE):
+              if re.search(r"\bsrc\s*=", attrs, re.IGNORECASE):
                   continue
-              type_match = re.search(r"""\\btype\\s*=\\s*["']([^"']+)["']""", attrs, re.IGNORECASE)
+              type_match = re.search(r"""\btype\s*=\s*["']([^"']+)["']""", attrs, re.IGNORECASE)
               if type_match and type_match.group(1).lower() not in ("text/javascript", "application/javascript", "module"):
                   continue
               if not source.strip():
