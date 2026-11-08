@@ -134,8 +134,8 @@
         }
         try {
           const image = await loadImage(await readDataUrl(file));
-          if (image.width > 2048 || image.height > 2048 || image.width < 256 || image.height < 256) {
-            throw new Error("Use uma página entre 256 e 2.048 pixels por lado.");
+          if (image.width > 1920 || image.height > 1920 || image.width < 256 || image.height < 256) {
+            throw new Error("Use uma página entre 256 e 1.920 pixels por lado.");
           }
           const preview = card.querySelector(".mask-preview");
           const overlay = card.querySelector(".mask-overlay");
@@ -284,22 +284,56 @@
           const dataUrl = await readDataUrl(original);
           const image = await loadImage(dataUrl);
           if (image.width !== maskCanvas.width || image.height !== maskCanvas.height) throw new Error("A máscara não corresponde à página selecionada.");
-          const maskBlob = await new Promise(resolve => maskCanvas.toBlob(resolve, "image/png"));
+          if (image.width > 1920 || image.height > 1920) throw new Error("Para este motor, a página deve ter até 1.920 pixels por lado.");
+          const scale = Math.min(1, 511 / Math.max(image.width, image.height));
+          const refWidth = Math.max(1, Math.round(image.width * scale));
+          const refHeight = Math.max(1, Math.round(image.height * scale));
+          const refImage = document.createElement("canvas");
+          refImage.width = refWidth; refImage.height = refHeight;
+          refImage.getContext("2d").drawImage(image, 0, 0, refWidth, refHeight);
+          const refMask = document.createElement("canvas");
+          refMask.width = refWidth; refMask.height = refHeight;
+          refMask.getContext("2d").drawImage(maskCanvas, 0, 0, refWidth, refHeight);
+          const maskBlob = await new Promise(resolve => refMask.toBlob(resolve, "image/png"));
           if (!maskBlob) throw new Error("Não foi possível preparar a máscara PNG.");
           const mask = Array.from(new Uint8Array(await maskBlob.arrayBuffer()));
           const result = await fetch(API_BASE.replace(/\/$/, "") + "/api/projects/" + card.dataset.project + "/reconstruct", {
             method: "POST",
             headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
-            body: JSON.stringify({ image_b64: dataUrl, mask, width: maskCanvas.width, height: maskCanvas.height })
+            body: JSON.stringify({ image_b64: refImage.toDataURL("image/png"), mask, width: image.width, height: image.height })
           });
           if (!result.ok) {
             const error = await result.json().catch(() => ({}));
-            throw new Error(error.error || "Falha na reconstrução da imagem.");
+            throw new Error(error.error || "Falha na edição da imagem.");
           }
-          const blob = await result.blob();
-          const imageUrl = URL.createObjectURL(blob);
-          output.innerHTML = '<img class="reconstruction-preview" alt="Imagem reconstruída" src="' + imageUrl + '"><a class="download-result" download="almora-reconstruida.png" href="' + imageUrl + '">Baixar resultado</a>';
-          notice("Reconstrução concluída. Confira a imagem antes de utilizá-la.");
+          const generated = await loadImage(URL.createObjectURL(await result.blob()));
+          const finalCanvas = document.createElement("canvas");
+          finalCanvas.width = image.width; finalCanvas.height = image.height;
+          const finalContext = finalCanvas.getContext("2d");
+          finalContext.drawImage(image, 0, 0);
+          const patch = document.createElement("canvas");
+          patch.width = image.width; patch.height = image.height;
+          const patchContext = patch.getContext("2d");
+          patchContext.drawImage(generated, 0, 0, image.width, image.height);
+          const alphaMask = document.createElement("canvas");
+          alphaMask.width = image.width; alphaMask.height = image.height;
+          const alphaContext = alphaMask.getContext("2d", { willReadFrequently: true });
+          alphaContext.drawImage(maskCanvas, 0, 0);
+          const maskPixels = alphaContext.getImageData(0, 0, image.width, image.height);
+          for (let i = 0; i < maskPixels.data.length; i += 4) {
+            const amount = Math.round((maskPixels.data[i] + maskPixels.data[i+1] + maskPixels.data[i+2]) / 3);
+            maskPixels.data[i] = 255; maskPixels.data[i+1] = 255; maskPixels.data[i+2] = 255;
+            maskPixels.data[i+3] = amount;
+          }
+          alphaContext.putImageData(maskPixels, 0, 0);
+          patchContext.globalCompositeOperation = "destination-in";
+          patchContext.drawImage(alphaMask, 0, 0);
+          finalContext.drawImage(patch, 0, 0);
+          const finalBlob = await new Promise(resolve => finalCanvas.toBlob(resolve, "image/png"));
+          if (!finalBlob) throw new Error("Não foi possível montar a página final.");
+          const imageUrl = URL.createObjectURL(finalBlob);
+          output.innerHTML = '<img class="reconstruction-preview" alt="Imagem editada" src="' + imageUrl + '"><a class="download-result" download="almora-reconstruida.png" href="' + imageUrl + '">Baixar resultado</a>';
+          notice("Edição concluída. As alterações foram compostas somente nas áreas pintadas; revise o resultado.");
         } catch (error) {
           output.textContent = error.message;
           notice(error.message, true);
