@@ -210,12 +210,9 @@
           const dataUrl = await readDataUrl(original);
           const image = await loadImage(dataUrl);
           if (image.width !== maskCanvas.width || image.height !== maskCanvas.height) throw new Error("A máscara não corresponde à página selecionada.");
-          const ctx = maskCanvas.getContext("2d", { willReadFrequently: true });
-          const pixels = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
-          const mask = new Array(maskCanvas.width * maskCanvas.height);
-          for (let i = 0, j = 0; i < pixels.length; i += 4, j++) {
-            mask[j] = Math.round((pixels[i] + pixels[i+1] + pixels[i+2]) / 3);
-          }
+          const maskBlob = await new Promise(resolve => maskCanvas.toBlob(resolve, "image/png"));
+          if (!maskBlob) throw new Error("Não foi possível preparar a máscara PNG.");
+          const mask = Array.from(new Uint8Array(await maskBlob.arrayBuffer()));
           const result = await fetch(API_BASE.replace(/\/$/, "") + "/api/projects/" + card.dataset.project + "/reconstruct", {
             method: "POST",
             headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
