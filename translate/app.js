@@ -76,8 +76,10 @@
         '<span class="status">' + esc(labels[project.status] || project.status) + '</span></div>' +
         '<div class="meta" style="margin-top:10px">' + Number(project.total_pages || 0) + ' páginas · ' +
         Number(project.completed_pages || 0) + ' concluídas · ' + Number(project.failed_pages || 0) + ' com falha</div>' +
-        (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' : '') +
-        '<div class="file-list" data-file-list>' +
+        (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' +
+          '<section class="engine-panel"><h4>Motor de tradução · teste</h4><textarea class="source-text" rows="3" maxlength="6000" placeholder="Cole uma fala ou trecho para testar a tradução…"></textarea><button class="small-button translate-text">Traduzir para PT-BR</button><div class="engine-output" data-translation-output></div></section>' +
+          '<section class="engine-panel"><h4>Reconstrução de imagem · teste</h4><p>Envie a página e uma máscara PNG do mesmo tamanho. Áreas brancas na máscara serão reconstruídas.</p><label>Página original <input class="rebuild-image" type="file" accept="image/png,image/jpeg,image/webp"></label><label>Máscara PNG <input class="rebuild-mask" type="file" accept="image/png"></label><button class="small-button reconstruct-image">Reconstruir área marcada</button><div class="engine-output" data-reconstruction-output></div></section>' : '') +
+        '<div class="file-list" data-file-list>'
         ((project.almora_translation_files || []).length
           ? project.almora_translation_files.map(file => '✓ ' + esc(file.original_name) + ' · ' + bytes(Number(file.file_size_bytes || 0))).join('<br>')
           : 'Nenhum arquivo enviado ainda.') +
@@ -86,9 +88,99 @@
     document.querySelectorAll(".project .upload").forEach(button => {
       button.addEventListener("click", () => uploadFiles(button.closest(".project")));
     });
+
+    document.querySelectorAll(".project .translate-text").forEach(button => {
+      button.addEventListener("click", async () => {
+        const card = button.closest(".project");
+        const input = card.querySelector(".source-text");
+        const output = card.querySelector("[data-translation-output]");
+        const project = projects.find(item => item.id === card.dataset.project);
+        if (!input.value.trim()) return notice("Cole o texto que deseja traduzir.", true);
+        button.disabled = true;
+        output.textContent = "Traduzindo…";
+        try {
+          const result = await api("/api/projects/" + card.dataset.project + "/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: input.value.trim(),
+              source_language: project.source_language,
+              context: project.narrative_context || ""
+            })
+          });
+          output.textContent = result.translation;
+          notice("Tradução concluída pelo motor " + esc(result.model) + ".");
+        } catch (error) {
+          output.textContent = error.message;
+          notice(error.message, true);
+        } finally { button.disabled = false; }
+      });
+    });
+    document.querySelectorAll(".project .reconstruct-image").forEach(button => {
+      button.addEventListener("click", async () => {
+        const card = button.closest(".project");
+        const original = card.querySelector(".rebuild-image").files[0];
+        const maskFile = card.querySelector(".rebuild-mask").files[0];
+        const output = card.querySelector("[data-reconstruction-output]");
+        if (!original || !maskFile) return notice("Selecione a página original e a máscara PNG.", true);
+        if (original.size > 5 * 1024 * 1024 || maskFile.size > 5 * 1024 * 1024) return notice("Cada imagem deve ter no máximo 5 MiB.", true);
+        button.disabled = true;
+        output.textContent = "Reconstruindo…";
+        try {
+          const dataUrl = await readDataUrl(original);
+          const maskUrl = await readDataUrl(maskFile);
+          const image = await loadImage(dataUrl);
+          const maskImage = await loadImage(maskUrl);
+          if (image.width !== maskImage.width || image.height !== maskImage.height) throw new Error("A máscara precisa ter exatamente as mesmas dimensões da página.");
+          if (image.width > 2048 || image.height > 2048 || image.width < 256 || image.height < 256) throw new Error("Use uma página entre 256 e 2.048 pixels por lado.");
+          const canvas = document.createElement("canvas");
+          canvas.width = image.width; canvas.height = image.height;
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          ctx.drawImage(maskImage, 0, 0);
+          const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+          const mask = new Array(canvas.width * canvas.height);
+          for (let i = 0, j = 0; i < pixels.length; i += 4, j++) {
+            mask[j] = Math.round((pixels[i] + pixels[i+1] + pixels[i+2]) / 3);
+          }
+          const result = await fetch(API_BASE.replace(/\/$/, "") + "/api/projects/" + card.dataset.project + "/reconstruct", {
+            method: "POST",
+            headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
+            body: JSON.stringify({ image_b64: dataUrl, mask, width: image.width, height: image.height })
+          });
+          if (!result.ok) {
+            const error = await result.json().catch(() => ({}));
+            throw new Error(error.error || "Falha na reconstrução da imagem.");
+          }
+          const blob = await result.blob();
+          const imageUrl = URL.createObjectURL(blob);
+          output.innerHTML = '<img class="reconstruction-preview" alt="Imagem reconstruída" src="' + imageUrl + '"><a class="download-result" download="almora-reconstruida.png" href="' + imageUrl + '">Baixar resultado</a>';
+          notice("Reconstrução concluída. Confira a imagem antes de utilizá-la.");
+        } catch (error) {
+          output.textContent = error.message;
+          notice(error.message, true);
+        } finally { button.disabled = false; }
+      });
+    });
   }
 
-  async function uploadFiles(card) {
+
+  function readDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Não foi possível ler a imagem."));
+      reader.readAsDataURL(file);
+    });
+  }
+  function loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error("Imagem inválida."));
+      image.src = src;
+    });
+  }
+\n  async function uploadFiles(card) {
     const input = card.querySelector(".files");
     const files = [...(input.files || [])];
     if (!files.length) return notice("Escolha pelo menos um arquivo antes de enviar.", true);
