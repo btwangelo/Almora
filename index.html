@@ -179,7 +179,7 @@ window.almoraDB = almoraDB;
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let S={works:[],prog:{},lib:{},fav:{},rate:{},bookmarks:{},pin:null},unlocked=false,draft=[],draftStatus='';
+let S={works:[],prog:{},lib:{},fav:{},rate:{},bookmarks:{},pin:null},unlocked=false,draft=[],draftStatus='',chapterOrderDraft={};
 try{Object.assign(S,JSON.parse(localStorage.getItem('almora')||'{}'))}catch(e){}
  
 // Restaura imediatamente o catálogo da última visita; o Supabase atualiza em segundo plano.
@@ -1031,14 +1031,17 @@ ${S.works.map(w=>`
 <button class="d" onclick="delW('${w.id}')">Excluir</button>
 </div>
 
-${w.chapters.map(c=>`
+${adminChapterOrder(w).map((c,index,list)=>`
 <div class="ch" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
-<span style="flex:1">${esc(almoraChapterDisplay(c))}${almoraChapterSubtitle(c)} (${c.pages.length} pág.) ${c.archived?'<small>(arquivado)</small>':''}</span>
+<span style="flex:1;min-width:130px">${index+1}. ${esc(almoraChapterDisplay(c))}${almoraChapterSubtitle(c)} (${c.pages.length} pág.) ${c.archived?'<small>(arquivado)</small>':''}</span>
+<button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},-1)" ${index===0?'disabled':''} title="Mover para cima">↑</button>
+<button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},1)" ${index===list.length-1?'disabled':''} title="Mover para baixo">↓</button>
 <button class="g" onclick="archC('${w.id}','${c.n}')">${c.archived?'Restaurar':'Arquivar'}</button>
 <button class="g" onclick="editChapter('${w.id}','${c.n}')">Editar</button>
 <button class="d" onclick="delC('${w.id}','${c.n}')">✕</button>
 </div>
 `).join('')}
+${chapterOrderChanged(w)?`<div class="act" style="margin-top:10px"><button type="button" class="g" onclick="cancelChapterOrder('${w.id}')">Cancelar</button><button type="button" id="save-chapter-order-${w.id}" onclick="saveChapterOrder('${w.id}')">Concluir reordenação</button></div>`:''}
 </div>
 `).join('')||'<div class="empty">Nenhuma obra.</div>'}
 
@@ -1411,45 +1414,92 @@ async function archC(id,n){
   }
 }
 
-async function editWork(id){
-  const w=W(id);
-  if(!w)return;
-  const fields=[
-    ['Título',w.title],['Título alternativo',w.alt||''],['Categoria (BL ou GL)',w.cat||'BL'],
-    ['Autor',w.author||''],['Ilustrador',w.illus||''],['Gêneros separados por vírgula',w.genres||''],
-    ['Classificação (Livre, 14+, 16+, 18+)',w.age||'Livre'],
-    ['Status (Em andamento, Concluída, Pausada)',w.status||'Em andamento'],
-    ['Titular dos direitos/licença',w.rights||''],['Sinopse',w.synopsis||''],['URL da capa (vazio mantém a atual)',w.cover||'']
-  ];
-  const values=[];
-  for(const [label,current] of fields){
-    const value=prompt(label,current);
-    if(value===null)return;
-    values.push(value.trim());
-  }
-  if(!values[0])return toast('O título não pode ficar vazio.');
-  if(!values[8])return toast('Informe o titular dos direitos/licença.');
-  const payload={
-    title:values[0],alternative_title:values[1]||null,
-    work_type:/^gl$/i.test(values[2])?'GL':'BL',
-    author_name:values[3]||null,illustrator:values[4]||null,
-    genre:values[5].split(',').map(x=>x.trim()).filter(Boolean),
-    age_rating:values[6]||'Livre',work_status:values[7]||'Em andamento',
-    rights_holder:values[8],synopsis:values[9]||null,
-    cover_url:values[10]||w.cover||null
-  };
+function editWork(id){
+  const w=W(id);if(!w)return;
+  document.getElementById('almora-work-editor')?.remove();
+  const modal=document.createElement('div');
+  modal.id='almora-work-editor';
+  modal.style.cssText='position:fixed;inset:0;z-index:10000;background:#000b;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto';
+  modal.innerHTML=`
+    <form class="box" style="width:min(680px,100%);margin:20px auto;padding:20px" onsubmit="event.preventDefault();saveWorkEditor('${esc(w.id)}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><h2 style="margin:0">Editar obra</h2><button class="g" type="button" onclick="closeWorkEditor()">✕</button></div>
+      <p style="color:var(--mu)">Altere todos os dados da obra de uma só vez.</p>
+      <label>Título</label><input id="we_title" required value="${esc(w.title)}">
+      <label>Título alternativo</label><input id="we_alt" value="${esc(w.alt||'')}">
+      <label>Categoria</label><select id="we_cat"><option value="BL" ${w.cat==='BL'?'selected':''}>BL</option><option value="GL" ${w.cat==='GL'?'selected':''}>GL</option></select>
+      <label>Autor</label><input id="we_author" value="${esc(w.author||'')}">
+      <label>Ilustrador</label><input id="we_illus" value="${esc(w.illus||'')}">
+      <label>Gêneros (separados por vírgula)</label><input id="we_genres" value="${esc(w.genres||'')}">
+      <label>Classificação</label><select id="we_age">${['Livre','14+','16+','18+'].map(x=>'<option '+(String(w.age||'Livre')===x?'selected':'')+'>'+x+'</option>').join('')}</select>
+      <label>Status da obra</label><select id="we_status">${['Em andamento','Concluída','Pausada'].map(x=>'<option '+(String(w.status||'Em andamento')===x?'selected':'')+'>'+x+'</option>').join('')}</select>
+      <label>Titular dos direitos / licença</label><input id="we_rights" required value="${esc(w.rights||'')}">
+      <label>Sinopse</label><textarea id="we_synopsis" rows="5">${esc(w.synopsis||'')}</textarea>
+      <label>URL da capa atual</label><input id="we_cover_url" value="${esc(w.cover||'')}" placeholder="https://...">
+      <label>Ou enviar uma nova capa</label><input id="we_cover_file" type="file" accept="image/*">
+      <div class="act" style="justify-content:flex-end;margin-top:18px"><button class="g" type="button" onclick="closeWorkEditor()">Cancelar</button><button type="submit" id="we_save">Salvar todas as informações</button></div>
+    </form>`;
+  modal.addEventListener('click',event=>{if(event.target===modal)closeWorkEditor()});
+  document.body.appendChild(modal);
+}
+function closeWorkEditor(){document.getElementById('almora-work-editor')?.remove()}
+async function saveWorkEditor(id){
+  const w=W(id);if(!w)return;
+  const get=id=>document.getElementById(id);
+  const title=get('we_title').value.trim(),rights=get('we_rights').value.trim();
+  if(!title)return toast('Informe o título da obra.');
+  if(!rights)return toast('Informe o titular dos direitos/licença.');
+  const button=get('we_save');button.disabled=true;button.textContent='Salvando...';
   try{
-    const {error}=await almoraDB.from('works').update(payload).eq('id',id);
-    if(error)throw error;
-    await loadCatalog();
-    toast('Informações da obra atualizadas!');
-    ren();
+    let cover=get('we_cover_url').value.trim()||null;
+    const file=get('we_cover_file').files[0];
+    if(file)cover=await almoraUploadToR2(file);
+    const payload={
+      title,alternative_title:get('we_alt').value.trim()||null,
+      work_type:get('we_cat').value,author_name:get('we_author').value.trim()||null,
+      illustrator:get('we_illus').value.trim()||null,
+      genre:get('we_genres').value.split(',').map(x=>x.trim()).filter(Boolean),
+      age_rating:get('we_age').value,work_status:get('we_status').value,
+      rights_holder:rights,synopsis:get('we_synopsis').value.trim()||null,cover_url:cover
+    };
+    const {data,error}=await almoraDB.from('works').update(payload).eq('id',id).select('id').single();
+    if(error)throw error;if(!data)throw new Error('A obra não foi atualizada. Verifique sua permissão administrativa.');
+    await loadCatalog();closeWorkEditor();toast('Todas as informações da obra foram atualizadas!');ren();
   }catch(e){
-    console.error('Erro ao editar obra:',e);
-    toast('Não foi possível atualizar a obra: '+e.message);
+    console.error('Erro ao editar obra:',e);toast('Não foi possível atualizar a obra: '+e.message);
+    button.disabled=false;button.textContent='Salvar todas as informações';
   }
 }
-
+function adminChapterOrder(work){
+  if(!chapterOrderDraft[work.id])chapterOrderDraft[work.id]=[...work.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n));
+  return chapterOrderDraft[work.id];
+}
+function moveChapterOrder(workId,index,direction){
+  const work=W(workId),list=work&&adminChapterOrder(work),target=index+direction;
+  if(!list||target<0||target>=list.length)return;
+  [list[index],list[target]]=[list[target],list[index]];ren();
+}
+function chapterOrderChanged(work){
+  const list=chapterOrderDraft[work.id];if(!list)return false;
+  const original=[...work.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n));
+  return list.some((chapter,index)=>chapter.id!==original[index]?.id);
+}
+async function saveChapterOrder(workId){
+  const work=W(workId),list=work&&chapterOrderDraft[workId];
+  if(!work||!list||!chapterOrderChanged(work))return;
+  const button=document.getElementById('save-chapter-order-'+workId);
+  if(button){button.disabled=true;button.textContent='Salvando ordem...';}
+  try{
+    for(let index=0;index<list.length;index++){
+      const {error}=await almoraDB.from('chapters').update({reading_order:(index+1)*10}).eq('id',list[index].id);
+      if(error)throw error;
+    }
+    delete chapterOrderDraft[workId];await loadCatalog();toast('Nova ordem dos capítulos salva com sucesso!');ren();
+  }catch(e){
+    console.error('Erro ao salvar ordem dos capítulos:',e);toast('Não foi possível concluir a reordenação: '+e.message);
+    if(button){button.disabled=false;button.textContent='Concluir reordenação';}
+  }
+}
+function cancelChapterOrder(workId){delete chapterOrderDraft[workId];ren()}
 async function editChapter(id,n){
   const w=W(id);
   const c=w&&w.chapters.find(x=>String(x.n)===String(n));
