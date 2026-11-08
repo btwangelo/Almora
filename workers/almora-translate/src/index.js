@@ -33,7 +33,9 @@ function fail(message, status, origin, env, code) {
 }
 
 function safeName(name) {
-  const leaf = String(name || "upload").split(/[\\/]/).pop();
+  let decoded = String(name || "upload");
+  try { decoded = decodeURIComponent(decoded); } catch (_) {}
+  const leaf = decoded.split(/[\\/]/).pop();
   return leaf.normalize("NFKC").replace(/[\u0000-\u001f\u007f]/g, "")
     .replace(/[^a-zA-Z0-9._() -]/g, "_").replace(/\s+/g, "_").slice(0, 140) || "upload";
 }
