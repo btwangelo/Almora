@@ -288,7 +288,7 @@ function catalog(cat,t){
 }
 
 function obra(id){const w=W(id);if(!w)return`<div class="empty">Obra não encontrada.</div>`;                 
-const lp=S.prog[id],cs=[...w.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n)),r=S.rate[id]||0,ls=S.lib[id]||'';
+const lp=S.prog[id],cs=[...w.chapters].filter(c=>!c.archived).sort((a,b)=>(a.order??a.n)-(b.order??b.n)),r=S.rate[id]||0,ls=S.lib[id]||'';
 return `<div class="hero"><div class="cv" ${cover(w)}></div><div><h1 style="margin:0">${esc(w.title)}</h1><div style="color:var(--mu)">${esc(w.alt)}</div>
 <div style="margin:8px 0"><span class="pill">${w.cat}</span><span class="pill">${esc(w.status)}</span><span class="pill">${esc(w.age)}</span>${(w.genres||'').split(',').filter(x=>x.trim()).map(g=>`<span class="pill">${esc(g.trim())}</span>`).join('')}${(w.tropes||[]).map(tag=>`<span class="pill almora-tag">#${esc(tag)}</span>`).join('')}</div>
 <div>Autor: ${esc(w.author||'—')} · Ilustrador: ${esc(w.illus||'—')}</div><div>${cs.length} capítulos · 👁 ${w.reads||0} leituras</div><div id="almora-work-like-count" style="color:var(--mu);font-size:13px;margin-top:4px"></div>
@@ -601,7 +601,7 @@ async function syncWishlistButton(id){
    }
   }
 let obs;
-function reader(id,n){const w=W(id),c=w&&w.chapters.find(c=>String(c.n)===n);if(!c)return`<div class="empty">Capítulo não encontrado.</div>`;
+function reader(id,n){const w=W(id),c=w&&!w.archived&&w.chapters.find(c=>String(c.n)===n&&!c.archived);if(!c)return`<div class="empty">Capítulo não encontrado ou arquivado.</div>`;
 const cs=[...w.chapters].filter(x=>!x.archived).sort((a,b)=>(a.order??a.n)-(b.order??b.n)),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
 if(p.n!==c.n){w.reads=(w.reads||0)+1}p.n=c.n;if(!p.read.includes(c.n))p.read.push(c.n);save();
 const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}'"`:'disabled'}>◀</button><button class="g" ${cs[i+1]?`onclick="location.hash='#ler/${id}/${cs[i+1].n}'"`:'disabled'}>▶</button>`;
@@ -674,6 +674,7 @@ async function loadCatalog(){
         type:c.chapter_type||'chapter',
         label:c.chapter_label||'',
         order:Number(c.reading_order??c.chapter_number),
+        archived:!!c.archived,
         date:new Date(c.created_at).getTime(),
         pages:chapterPages
       });
@@ -698,7 +699,7 @@ async function loadCatalog(){
         cover:w.cover_url||'',
         created:new Date(w.created_at).getTime(),
         reads:old?.reads||0,
-        archived:old?.archived||false,
+        archived:!!w.archived,
         chapters:chapterGroups[w.id]||[]
       };
     });
@@ -1026,12 +1027,15 @@ ${S.works.map(w=>`
 
 <div class="act">
 <button class="g" onclick="arch('${w.id}')">${w.archived?'Restaurar':'Arquivar'}</button>
+<button class="g" onclick="editWork('${w.id}')">Editar informações</button>
 <button class="d" onclick="delW('${w.id}')">Excluir</button>
 </div>
 
 ${w.chapters.map(c=>`
-<div class="ch">
-${esc(almoraChapterDisplay(c))} (${c.pages.length} pág.)
+<div class="ch" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+<span style="flex:1">${esc(almoraChapterDisplay(c))}${almoraChapterSubtitle(c)} (${c.pages.length} pág.) ${c.archived?'<small>(arquivado)</small>':''}</span>
+<button class="g" onclick="archC('${w.id}','${c.n}')">${c.archived?'Restaurar':'Arquivar'}</button>
+<button class="g" onclick="editChapter('${w.id}','${c.n}')">Editar</button>
 <button class="d" onclick="delC('${w.id}','${c.n}')">✕</button>
 </div>
 `).join('')}
@@ -1281,7 +1285,7 @@ async function pages(el){
       illus:data.illustrator||'',genres:(data.genre||[]).join(', '),
       age:data.age_rating,status:data.work_status,rights:data.rights_holder,
       synopsis:data.synopsis||'',cover:data.cover_url||'',
-      created:Date.now(),reads:0,chapters:[]
+      created:Date.now(),reads:0,archived:!!data.archived,chapters:[]
     });
 
     toast('Obra cadastrada e publicada!');
@@ -1328,7 +1332,8 @@ async function addC(){
         status:'published',
         chapter_type:'chapter',
         chapter_label:String(n),
-        reading_order:Math.max(0,...w.chapters.map(c=>Number(c.order??c.n)||0))+1
+        reading_order:Math.max(0,...w.chapters.map(c=>Number(c.order??c.n)||0))+1,
+        archived:false
       })
       .select()
       .single();
@@ -1355,6 +1360,7 @@ async function addC(){
       label:String(n),
       order:Math.max(0,...w.chapters.map(c=>Number(c.order??c.n)||0))+1,
       date:Date.now(),
+      archived:false,
       pages:uploaded.map(p=>p.image_url)
     });
 
@@ -1369,13 +1375,109 @@ async function addC(){
   }
     }
     
-const arch=id=>{
+async function arch(id){
   const w=W(id);
   if(!w)return;
-  w.archived=!w.archived;
-  save();
-  ren();
-};
+  const next=!w.archived;
+  try{
+    const {data,error}=await almoraDB.from('works').update({archived:next}).eq('id',id).select('id,archived').single();
+    if(error)throw error;
+    w.archived=!!data.archived;
+    await loadCatalog();
+    toast(w.archived?'Obra arquivada.':'Obra restaurada.');
+    ren();
+  }catch(e){
+    console.error('Erro ao arquivar obra:',e);
+    toast('Não foi possível arquivar a obra: '+e.message);
+  }
+}
+
+async function archC(id,n){
+  const w=W(id);
+  const c=w&&w.chapters.find(x=>String(x.n)===String(n));
+  if(!c)return;
+  const next=!c.archived;
+  try{
+    const {data,error}=await almoraDB.from('chapters').update({archived:next}).eq('id',c.id).select('id,archived').single();
+    if(error)throw error;
+    c.archived=!!data.archived;
+    await loadCatalog();
+    toast(c.archived?'Capítulo arquivado.':'Capítulo restaurado.');
+    ren();
+  }catch(e){
+    console.error('Erro ao arquivar capítulo:',e);
+    toast('Não foi possível arquivar o capítulo: '+e.message);
+  }
+}
+
+async function editWork(id){
+  const w=W(id);
+  if(!w)return;
+  const fields=[
+    ['Título',w.title],['Título alternativo',w.alt||''],['Categoria (BL ou GL)',w.cat||'BL'],
+    ['Autor',w.author||''],['Ilustrador',w.illus||''],['Gêneros separados por vírgula',w.genres||''],
+    ['Classificação (Livre, 14+, 16+, 18+)',w.age||'Livre'],
+    ['Status (Em andamento, Concluída, Pausada)',w.status||'Em andamento'],
+    ['Titular dos direitos/licença',w.rights||''],['Sinopse',w.synopsis||''],['URL da capa (vazio mantém a atual)',w.cover||'']
+  ];
+  const values=[];
+  for(const [label,current] of fields){
+    const value=prompt(label,current);
+    if(value===null)return;
+    values.push(value.trim());
+  }
+  if(!values[0])return toast('O título não pode ficar vazio.');
+  if(!values[8])return toast('Informe o titular dos direitos/licença.');
+  const payload={
+    title:values[0],alternative_title:values[1]||null,
+    work_type:/^gl$/i.test(values[2])?'GL':'BL',
+    author_name:values[3]||null,illustrator:values[4]||null,
+    genre:values[5].split(',').map(x=>x.trim()).filter(Boolean),
+    age_rating:values[6]||'Livre',work_status:values[7]||'Em andamento',
+    rights_holder:values[8],synopsis:values[9]||null,
+    cover_url:values[10]||w.cover||null
+  };
+  try{
+    const {error}=await almoraDB.from('works').update(payload).eq('id',id);
+    if(error)throw error;
+    await loadCatalog();
+    toast('Informações da obra atualizadas!');
+    ren();
+  }catch(e){
+    console.error('Erro ao editar obra:',e);
+    toast('Não foi possível atualizar a obra: '+e.message);
+  }
+}
+
+async function editChapter(id,n){
+  const w=W(id);
+  const c=w&&w.chapters.find(x=>String(x.n)===String(n));
+  if(!c)return;
+  const number=prompt('Número do capítulo:',String(c.n));
+  if(number===null)return;
+  if(number.trim()===''||!Number.isFinite(Number(number)))return toast('Informe um número válido.');
+  if(w.chapters.some(x=>x!==c&&Number(x.n)===Number(number)))return toast('Já existe um capítulo com esse número.');
+  const title=prompt('Título do capítulo:',c.title||'');
+  if(title===null)return;
+  const order=prompt('Ordem de leitura:',String(c.order??c.n));
+  if(order===null)return;
+  if(order.trim()===''||!Number.isFinite(Number(order)))return toast('Informe uma ordem de leitura válida.');
+  let label=(c.type||'chapter')==='chapter'?String(Number(number)):prompt('Identificação exibida:',c.label||'');
+  if(label===null)return;
+  try{
+    const {error}=await almoraDB.from('chapters').update({
+      chapter_number:Number(number),title:title.trim()||label,
+      chapter_label:label,reading_order:Number(order)
+    }).eq('id',c.id);
+    if(error)throw error;
+    await loadCatalog();
+    toast('Informações do capítulo atualizadas!');
+    ren();
+  }catch(e){
+    console.error('Erro ao editar capítulo:',e);
+    toast('Não foi possível atualizar o capítulo: '+e.message);
+  }
+}
 
 async function delW(id){
   if(!confirm('Excluir esta obra e todos os seus capítulos e páginas?'))return;
@@ -1804,7 +1906,7 @@ async function almoraPublishBatch() {
       work.chapters.push({
         id:chapter.id,n:chapterNumber,title:item.title||item.label,
         type:item.type,label:item.label,order:Number(item.order),
-        date:Date.now(),pages:uploaded.map(p=>p.image_url)
+        date:Date.now(),archived:false,pages:uploaded.map(p=>p.image_url)
       });
     } catch(error) {
       item.status='Falhou'; item.error=error.message||'Erro desconhecido';
