@@ -1,33 +1,33 @@
 -- ALMORA: add indexes for unindexed foreign keys and cache auth.uid() in RLS policies.
 -- These changes preserve authorization logic while reducing row-by-row policy evaluation.
 
-CREATE INDEX idx_announcement_reads_announcement_id_fk ON public.announcement_reads USING btree (announcement_id)
-CREATE INDEX idx_announcements_created_by_fk ON public.announcements USING btree (created_by)
-CREATE INDEX idx_audit_log_actor_id_fk ON public.audit_log USING btree (actor_id)
-CREATE INDEX idx_chapter_notifications_chapter_id_fk ON public.chapter_notifications USING btree (chapter_id)
-CREATE INDEX idx_chapter_notifications_work_id_fk ON public.chapter_notifications USING btree (work_id)
-CREATE INDEX idx_chapter_reactions_chapter_id_fk ON public.chapter_reactions USING btree (chapter_id)
-CREATE INDEX idx_chapter_releases_created_by_fk ON public.chapter_releases USING btree (created_by)
-CREATE INDEX idx_comments_chapter_id_fk ON public.comments USING btree (chapter_id)
-CREATE INDEX idx_comments_user_id_fk ON public.comments USING btree (user_id)
-CREATE INDEX idx_favorites_work_id_fk ON public.favorites USING btree (work_id)
-CREATE INDEX idx_follow_notifications_follower_id_fk ON public.follow_notifications USING btree (follower_id)
-CREATE INDEX idx_library_work_id_fk ON public.library USING btree (work_id)
-CREATE INDEX idx_page_bookmarks_work_id_fk ON public.page_bookmarks USING btree (work_id)
-CREATE INDEX idx_progress_chapter_id_fk ON public.progress USING btree (chapter_id)
-CREATE INDEX idx_progress_work_id_fk ON public.progress USING btree (work_id)
-CREATE INDEX idx_ratings_work_id_fk ON public.ratings USING btree (work_id)
-CREATE INDEX idx_reading_activity_chapter_id_fk ON public.reading_activity USING btree (chapter_id)
-CREATE INDEX idx_reading_activity_work_id_fk ON public.reading_activity USING btree (work_id)
-CREATE INDEX idx_reading_progress_chapter_id_fk ON public.reading_progress USING btree (chapter_id)
-CREATE INDEX idx_reading_progress_work_id_fk ON public.reading_progress USING btree (work_id)
-CREATE INDEX idx_reports_comment_id_fk ON public.reports USING btree (comment_id)
-CREATE INDEX idx_reports_reporter_id_fk ON public.reports USING btree (reporter_id)
-CREATE INDEX idx_reports_work_id_fk ON public.reports USING btree (work_id)
-CREATE INDEX idx_staff_roles_assigned_by_fk ON public.staff_roles USING btree (assigned_by)
-CREATE INDEX idx_user_achievements_achievement_id_fk ON public.user_achievements USING btree (achievement_id)
-CREATE INDEX idx_wishlists_work_id_fk ON public.wishlists USING btree (work_id)
-CREATE INDEX idx_works_created_by_fk ON public.works USING btree (created_by)
+CREATE INDEX IF NOT EXISTS idx_announcement_reads_announcement_id_fk ON public.announcement_reads USING btree (announcement_id);
+CREATE INDEX IF NOT EXISTS idx_announcements_created_by_fk ON public.announcements USING btree (created_by);
+CREATE INDEX IF NOT EXISTS idx_audit_log_actor_id_fk ON public.audit_log USING btree (actor_id);
+CREATE INDEX IF NOT EXISTS idx_chapter_notifications_chapter_id_fk ON public.chapter_notifications USING btree (chapter_id);
+CREATE INDEX IF NOT EXISTS idx_chapter_notifications_work_id_fk ON public.chapter_notifications USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_chapter_reactions_chapter_id_fk ON public.chapter_reactions USING btree (chapter_id);
+CREATE INDEX IF NOT EXISTS idx_chapter_releases_created_by_fk ON public.chapter_releases USING btree (created_by);
+CREATE INDEX IF NOT EXISTS idx_comments_chapter_id_fk ON public.comments USING btree (chapter_id);
+CREATE INDEX IF NOT EXISTS idx_comments_user_id_fk ON public.comments USING btree (user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_work_id_fk ON public.favorites USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_follow_notifications_follower_id_fk ON public.follow_notifications USING btree (follower_id);
+CREATE INDEX IF NOT EXISTS idx_library_work_id_fk ON public.library USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_page_bookmarks_work_id_fk ON public.page_bookmarks USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_progress_chapter_id_fk ON public.progress USING btree (chapter_id);
+CREATE INDEX IF NOT EXISTS idx_progress_work_id_fk ON public.progress USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_ratings_work_id_fk ON public.ratings USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_reading_activity_chapter_id_fk ON public.reading_activity USING btree (chapter_id);
+CREATE INDEX IF NOT EXISTS idx_reading_activity_work_id_fk ON public.reading_activity USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_reading_progress_chapter_id_fk ON public.reading_progress USING btree (chapter_id);
+CREATE INDEX IF NOT EXISTS idx_reading_progress_work_id_fk ON public.reading_progress USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_reports_comment_id_fk ON public.reports USING btree (comment_id);
+CREATE INDEX IF NOT EXISTS idx_reports_reporter_id_fk ON public.reports USING btree (reporter_id);
+CREATE INDEX IF NOT EXISTS idx_reports_work_id_fk ON public.reports USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_staff_roles_assigned_by_fk ON public.staff_roles USING btree (assigned_by);
+CREATE INDEX IF NOT EXISTS idx_user_achievements_achievement_id_fk ON public.user_achievements USING btree (achievement_id);
+CREATE INDEX IF NOT EXISTS idx_wishlists_work_id_fk ON public.wishlists USING btree (work_id);
+CREATE INDEX IF NOT EXISTS idx_works_created_by_fk ON public.works USING btree (created_by);
 
 -- Supabase recommends wrapping stable auth helpers in SELECT so PostgreSQL can
 -- evaluate them once per statement instead of once per candidate row.
