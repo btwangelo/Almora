@@ -77,7 +77,11 @@
         '<div class="meta" style="margin-top:10px">' + Number(project.total_pages || 0) + ' páginas · ' +
         Number(project.completed_pages || 0) + ' concluídas · ' + Number(project.failed_pages || 0) + ' com falha</div>' +
         (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' : '') +
-        '<div class="file-list" data-file-list>Os arquivos enviados aparecerão aqui.</div></article>';
+        '<div class="file-list" data-file-list>' +
+        ((project.almora_translation_files || []).length
+          ? project.almora_translation_files.map(file => '✓ ' + esc(file.original_name) + ' · ' + bytes(Number(file.file_size_bytes || 0))).join('<br>')
+          : 'Nenhum arquivo enviado ainda.') +
+        '</div></article>';
     }).join("");
     document.querySelectorAll(".project .upload").forEach(button => {
       button.addEventListener("click", () => uploadFiles(button.closest(".project")));
@@ -99,7 +103,7 @@
           method: "POST",
           headers: {
             "Content-Type": file.type || "application/octet-stream",
-            "X-File-Name": file.name
+            "X-File-Name": encodeURIComponent(file.name)
           },
           body: file
         });
