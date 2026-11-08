@@ -272,7 +272,7 @@ async function reconstructWithAI(env, input) {
   form.append("height", String(height));
   form.append("guidance", "3.5");
   const serialized = new Response(form);
-  const model = env.INPAINT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b";
+  const model = env.IMAGE_EDIT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b";
   const result = await env.AI.run(model, {
     multipart: {
       body: serialized.body,
@@ -309,7 +309,7 @@ async function reconstructWithAI(env, input) {
         translation: { available: Boolean(env.AI), model: env.TRANSLATION_MODEL || "@cf/zai-org/glm-4.7-flash" },
         reconstruction: {
           available: Boolean(env.AI),
-          model: env.INPAINT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b",
+          model: env.IMAGE_EDIT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b",
           experimental: true,
           mode: "image-editing-with-reference-mask-guide",
           notice: "Edição por imagem de referência; a máscara é enviada como guia visual e a composição final limita a alteração às áreas pintadas."
@@ -400,7 +400,7 @@ async function reconstructWithAI(env, input) {
         const input = await request.json();
         const imageBytes = await reconstructWithAI(env, input);
         await addEvent(env, projectId, auth.user.id, "image_reconstructed", {
-          model: env.INPAINT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b",
+          model: env.IMAGE_EDIT_MODEL || "@cf/black-forest-labs/flux-2-klein-4b",
           width: Number(input.width),
           height: Number(input.height)
         });
