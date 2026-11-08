@@ -136,16 +136,36 @@ async function decrypt(bytes, env) {
 }
 
 async function addEvent(env, projectId, actorId, eventType, details) {
-  await db(env, "almora_translation_events", {
-    method: "POST",
-    headers: { "prefer": "return=minimal" },
-    body: JSON.stringify({
-      project_id: projectId,
-      actor_id: actorId,
-      event_type: eventType,
-      details: details || {}
-    })
-  });
+  try {
+    await db(env, "almora_translation_events", {
+      method: "POST",
+      headers: { "prefer": "return=minimal" },
+      body: JSON.stringify({
+        project_id: projectId,
+        actor_id: actorId,
+        event_type: eventType,
+        details: details || {}
+      })
+    });
+  } catch (_) {
+    // An audit-event outage must not turn a successful upload into a retryable failure.
+  }
+}
+
+function validFileSignature(extension, bytes) {
+  const b = new Uint8Array(bytes);
+  if (["zip", "cbz"].includes(extension)) {
+    return b.length >= 4 && b[0] === 0x50 && b[1] === 0x4b &&
+      [0x03, 0x05, 0x07].includes(b[2]) && [0x04, 0x06, 0x08].includes(b[3]);
+  }
+  if (extension === "pdf") return new TextDecoder().decode(b.slice(0, 5)) === "%PDF-";
+  if (extension === "png") return b.length >= 8 &&
+    [0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a].every((v,i) => b[i] === v);
+  if (["jpg", "jpeg"].includes(extension)) return b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff;
+  if (extension === "webp") return b.length >= 12 &&
+    new TextDecoder().decode(b.slice(0,4)) === "RIFF" &&
+    new TextDecoder().decode(b.slice(8,12)) === "WEBP";
+  return false;
 }
 
 async function handle(request, env) {
@@ -253,6 +273,7 @@ async function handle(request, env) {
         if (declared > maxBytes) return fail("Arquivo excede o limite técnico configurado.", 413, origin, env);
         const original = await request.arrayBuffer();
         if (!original.byteLength || original.byteLength > maxBytes) return fail("Arquivo vazio ou acima do limite técnico.", 413, origin, env);
+        if (!validFileSignature(extension, original)) return fail("O conteúdo do arquivo não corresponde à extensão informada.", 415, origin, env, "invalid_file_signature");
 
         const fileId = crypto.randomUUID();
         const objectKey = "translate/" + projectId + "/originals/" + fileId + "/" + name;
@@ -290,10 +311,15 @@ async function handle(request, env) {
           throw error;
         }
 
+        const allFiles = await db(env, "almora_translation_files?project_id=eq." + projectId + "&select=id");
         await db(env, "almora_translation_projects?id=eq." + projectId, {
           method: "PATCH",
           headers: { "prefer": "return=minimal" },
-          body: JSON.stringify({ status: "uploaded", updated_at: new Date().toISOString() })
+          body: JSON.stringify({
+            status: "uploaded",
+            total_files: (allFiles || []).length,
+            updated_at: new Date().toISOString()
+          })
         });
         await addEvent(env, projectId, auth.user.id, "file_uploaded", {
           file_id: fileId, extension, size_bytes: original.byteLength, checksum_sha256: checksum
