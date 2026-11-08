@@ -196,6 +196,77 @@
       });
     });
 
+
+    document.querySelectorAll(".project .letter-image").forEach(input => {
+      input.addEventListener("change", async () => {
+        const card = input.closest(".project");
+        const file = input.files[0];
+        const stage = card.querySelector(".letter-stage");
+        if (!file) { stage.hidden = true; card._letterBase = null; return; }
+        if (file.size > 5 * 1024 * 1024) {
+          notice("A página para lettering deve ter no máximo 5 MiB.", true);
+          input.value = "";
+          return;
+        }
+        try {
+          const image = await loadImage(await readDataUrl(file));
+          if (image.width > 4096 || image.height > 4096) throw new Error("A página deve ter até 4.096 pixels por lado.");
+          const canvas = card.querySelector(".letter-canvas");
+          canvas.width = image.width;
+          canvas.height = image.height;
+          card._letterBase = image;
+          card._letterBlocks = [];
+          canvas.onclick = event => {
+            const text = card.querySelector(".letter-text").value.trim();
+            if (!text) return notice("Digite a fala antes de tocar no balão.", true);
+            const rect = canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) * canvas.width / rect.width;
+            const y = (event.clientY - rect.top) * canvas.height / rect.height;
+            card._letterBlocks.push({ text, x, y });
+            drawLettering(card);
+          };
+          stage.hidden = false;
+          drawLettering(card);
+        } catch (error) {
+          stage.hidden = true;
+          card._letterBase = null;
+          notice(error.message, true);
+        }
+      });
+    });
+    document.querySelectorAll(".project .use-translation").forEach(button => {
+      button.addEventListener("click", () => {
+        const card = button.closest(".project");
+        const translated = card.querySelector("[data-translation-output]").textContent.trim();
+        if (!translated) return notice("Faça uma tradução primeiro.", true);
+        card.querySelector(".letter-text").value = translated;
+      });
+    });
+    document.querySelectorAll(".project .clear-lettering").forEach(button => {
+      button.addEventListener("click", () => {
+        const card = button.closest(".project");
+        card._letterBlocks = [];
+        drawLettering(card);
+      });
+    });
+    document.querySelectorAll(".project .letter-size").forEach(input => {
+      input.addEventListener("input", () => drawLettering(input.closest(".project")));
+    });
+    document.querySelectorAll(".project .export-lettering").forEach(button => {
+      button.addEventListener("click", () => {
+        const card = button.closest(".project");
+        const canvas = card.querySelector(".letter-canvas");
+        if (!card._letterBase || !card._letterBlocks || !card._letterBlocks.length) return notice("Adicione pelo menos uma fala à página.", true);
+        canvas.toBlob(blob => {
+          if (!blob) return notice("Não foi possível exportar a página.", true);
+          const url = URL.createObjectURL(blob);
+          const output = card.querySelector("[data-lettering-output]");
+          output.innerHTML = '<a class="download-result" download="almora-pagina-legendada.png" href="' + url + '">Baixar página legendada</a>';
+          notice("Lettering aplicado. O arquivo original permanece intacto.");
+        }, "image/png");
+      });
+    });
+
     document.querySelectorAll(".project .reconstruct-image").forEach(button => {
       button.addEventListener("click", async () => {
         const card = button.closest(".project");
@@ -235,6 +306,62 @@
     });
   }
 
+
+
+  function wrapLetterText(ctx, text, maxWidth) {
+    const lines = [];
+    for (const paragraph of String(text).split("\n")) {
+      const words = paragraph.split(/\s+/).filter(Boolean);
+      if (!words.length) { lines.push(""); continue; }
+      let line = "";
+      for (const word of words) {
+        const candidate = line ? line + " " + word : word;
+        if (line && ctx.measureText(candidate).width > maxWidth) {
+          lines.push(line);
+          line = word;
+        } else line = candidate;
+      }
+      lines.push(line);
+    }
+    return lines;
+  }
+
+  function drawLettering(card) {
+    const canvas = card.querySelector(".letter-canvas");
+    if (!canvas || !card._letterBase) return;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(card._letterBase, 0, 0);
+    for (const block of card._letterBlocks || []) {
+      let size = Math.max(12, Number(card.querySelector(".letter-size").value) * canvas.width / 1000);
+      const maxWidth = canvas.width * 0.76;
+      const maxHeight = canvas.height * 0.30;
+      let lines = [];
+      let lineHeight = size * 1.12;
+      while (size >= 10) {
+        ctx.font = "700 " + size + "px Arial, sans-serif";
+        lines = wrapLetterText(ctx, block.text, maxWidth);
+        lineHeight = size * 1.12;
+        if (lines.every(line => ctx.measureText(line).width <= maxWidth) && lines.length * lineHeight <= maxHeight) break;
+        size -= 1;
+      }
+      ctx.font = "700 " + size + "px Arial, sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      const x = Math.max(maxWidth / 2 + 4, Math.min(canvas.width - maxWidth / 2 - 4, block.x));
+      const totalHeight = lines.length * lineHeight;
+      const y = Math.max(totalHeight / 2 + 4, Math.min(canvas.height - totalHeight / 2 - 4, block.y));
+      lines.forEach((line, index) => {
+        const lineY = y - totalHeight / 2 + lineHeight * (index + 0.5);
+        ctx.lineJoin = "round";
+        ctx.lineWidth = Math.max(2, size * 0.10);
+        ctx.strokeStyle = "rgba(255,255,255,.92)";
+        ctx.strokeText(line, x, lineY, maxWidth);
+        ctx.fillStyle = "#17131f";
+        ctx.fillText(line, x, lineY, maxWidth);
+      });
+    }
+  }
 
   function readDataUrl(file) {
     return new Promise((resolve, reject) => {
