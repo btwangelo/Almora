@@ -3,7 +3,7 @@
 Esta branch adiciona dois adaptadores independentes ao Worker:
 
 - **Tradução textual:** Cloudflare Workers AI, por padrão `@cf/zai-org/glm-4.7-flash`.
-- **Reconstrução de imagem:** Cloudflare Workers AI, por padrão `@cf/runwayml/stable-diffusion-v1-5-inpainting`.
+- **Reconstrução de imagem:** Cloudflare Workers AI, por padrão `@cf/black-forest-labs/flux-2-klein-4b`.
 
 O binding `AI` está declarado em `wrangler.toml`. Os modelos podem ser trocados por variáveis de ambiente sem alterar a interface:
 
@@ -14,7 +14,7 @@ O binding `AI` está declarado em `wrangler.toml`. Os modelos podem ser trocados
 
 Workers AI oferece uma alocação gratuita de **10.000 Neurons por dia** no plano Free. Ao exceder a cota, as inferências falham até a renovação diária; não habilite um plano pago para contornar isso sem autorização explícita.
 
-O modelo `@cf/runwayml/stable-diffusion-v1-5-inpainting` está em beta e tem descontinuação anunciada para **20/11/2026**. Portanto, o adaptador de reconstrução é apenas um teste temporário, não uma dependência de produção. Antes dessa data, deve ser substituído por outro serviço gratuito validado ou por um backend de reconstrução próprio. Não prometa disponibilidade permanente.
+O modelo `@cf/black-forest-labs/flux-2-klein-4b` está em beta e tem descontinuação anunciada para **removida a previsão de descontinuação do modelo anterior**. Portanto, o adaptador de reconstrução é apenas um teste temporário, não uma dependência de produção. Antes dessa data, deve ser substituído por outro serviço gratuito validado ou por um backend de reconstrução próprio. Não prometa disponibilidade permanente.
 
 ## Rotas autenticadas
 
@@ -26,7 +26,7 @@ O modelo `@cf/runwayml/stable-diffusion-v1-5-inpainting` está em beta e tem des
 
 - `POST /api/projects/:id/reconstruct`
   - JSON: `{ "image_b64": "data:image/png;base64,...", "mask": [0,255,...], "width": 800, "height": 1200 }`
-  - A máscara é enviada como bytes de um PNG (cada byte entre 0 e 255); o pincel cria branco nas áreas a reconstruir e preto nas áreas preservadas.
+  - A máscara PNG é enviada como segunda imagem de referência; o pincel cria branco nas áreas a reconstruir e preto nas áreas preservadas. O navegador compõe o resultado apenas na região marcada.
   - Dimensões entre 256 e 2.048 px por lado; imagem de até 5 MiB.
   - Retorna PNG. Exige tradutor ou administrador.
 
