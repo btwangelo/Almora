@@ -79,7 +79,7 @@
         (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' +
           '<section class="engine-panel"><h4>Motor de tradução · teste</h4><textarea class="source-text" rows="3" maxlength="6000" placeholder="Cole uma fala ou trecho para testar a tradução…"></textarea><button class="small-button translate-text">Traduzir para PT-BR</button><div class="engine-output" data-translation-output></div></section>' +
           '<section class="engine-panel"><h4>Reconstrução de imagem · teste</h4><p>Envie a página e uma máscara PNG do mesmo tamanho. Áreas brancas na máscara serão reconstruídas.</p><label>Página original <input class="rebuild-image" type="file" accept="image/png,image/jpeg,image/webp"></label><label>Máscara PNG <input class="rebuild-mask" type="file" accept="image/png"></label><button class="small-button reconstruct-image">Reconstruir área marcada</button><div class="engine-output" data-reconstruction-output></div></section>' : '') +
-        '<div class="file-list" data-file-list>'
+        '<div class="file-list" data-file-list>' +
         ((project.almora_translation_files || []).length
           ? project.almora_translation_files.map(file => '✓ ' + esc(file.original_name) + ' · ' + bytes(Number(file.file_size_bytes || 0))).join('<br>')
           : 'Nenhum arquivo enviado ainda.') +
@@ -127,6 +127,7 @@
         button.disabled = true;
         output.textContent = "Reconstruindo…";
         try {
+          if (API_BASE.includes("YOUR_SUBDOMAIN")) throw new Error("A API do Translate ainda não foi publicada.");
           const dataUrl = await readDataUrl(original);
           const maskUrl = await readDataUrl(maskFile);
           const image = await loadImage(dataUrl);
@@ -180,7 +181,8 @@
       image.src = src;
     });
   }
-\n  async function uploadFiles(card) {
+
+  async function uploadFiles(card) {
     const input = card.querySelector(".files");
     const files = [...(input.files || [])];
     if (!files.length) return notice("Escolha pelo menos um arquivo antes de enviar.", true);
