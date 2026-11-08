@@ -238,8 +238,20 @@ async function reconstructWithAI(env, input) {
   if (!env.AI) throw new Error("O motor de IA ainda não está vinculado ao Worker.");
   const image = String(input.image_b64 || "");
   const mask = input.mask;
-  if (!image || image.length > 7 * 1024 * 1024 || !Array.isArray(mask) || !mask.length || mask.length > 16_000_000) {
+  if (!image || image.length > 7 * 1024 * 1024 || !Array.isArray(mask) || mask.length < 8 || mask.length > 5 * 1024 * 1024) {
     const error = new Error("Imagem ou máscara inválida. Limite de entrada: 5 MiB por imagem.");
+    error.status = 400;
+    throw error;
+  }
+  for (const value of mask) {
+    if (!Number.isInteger(value) || value < 0 || value > 255) {
+      const error = new Error("A máscara contém bytes inválidos.");
+      error.status = 400;
+      throw error;
+    }
+  }
+  if (mask[0] !== 0x89 || mask[1] !== 0x50 || mask[2] !== 0x4e || mask[3] !== 0x47) {
+    const error = new Error("A máscara precisa ser uma imagem PNG.");
     error.status = 400;
     throw error;
   }
@@ -249,18 +261,6 @@ async function reconstructWithAI(env, input) {
     const error = new Error("Dimensões inválidas. Use imagens entre 256 e 2.048 pixels por lado.");
     error.status = 400;
     throw error;
-  }
-  if (mask.length !== width * height && mask.length !== width * height * 4) {
-    const error = new Error("A máscara precisa ter as mesmas dimensões da imagem.");
-    error.status = 400;
-    throw error;
-  }
-  for (const value of mask) {
-    if (!Number.isInteger(value) || value < 0 || value > 255) {
-      const error = new Error("A máscara contém valores inválidos.");
-      error.status = 400;
-      throw error;
-    }
   }
   const model = env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting";
   const result = await env.AI.run(model, {
