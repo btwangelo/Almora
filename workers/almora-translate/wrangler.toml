@@ -14,4 +14,4 @@ CORS_ORIGINS = "https://btwangelo.github.io,https://almoraverse.pages.dev"
 MAX_UPLOAD_BYTES = "52428800"
 
 TRANSLATION_MODEL = "@cf/zai-org/glm-4.7-flash"
-INPAINT_MODEL = "@cf/black-forest-labs/flux-2-klein-4b"
+IMAGE_EDIT_MODEL = "@cf/black-forest-labs/flux-2-klein-4b"
