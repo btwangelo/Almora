@@ -1,9 +1,9 @@
 name = "almora-translate"
 main = "src/index.js"
+compatibility_date = "2026-11-08"
 
 [ai]
 binding = "AI"
-compatibility_date = "2026-11-08"
 
 [[r2_buckets]]
 binding = "ALMORA_BUCKET"
