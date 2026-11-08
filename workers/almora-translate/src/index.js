@@ -170,7 +170,111 @@ function validFileSignature(extension, bytes) {
   return false;
 }
 
-async function handle(request, env) {
+
+function sourceLanguageName(code) {
+  return ({ en: "inglês", ko: "coreano", ja: "japonês", zh: "chinês" })[code] || code;
+}
+
+async function translateWithAI(env, input) {
+  if (!env.AI) throw new Error("O motor de IA ainda não está vinculado ao Worker.");
+  const text = String(input.text || "").trim();
+  const sourceLanguage = String(input.source_language || "").toLowerCase();
+  if (!text || text.length > 6000) {
+    const error = new Error("O texto deve ter entre 1 e 6.000 caracteres.");
+    error.status = 400;
+    throw error;
+  }
+  if (!["en", "ko", "ja", "zh"].includes(sourceLanguage)) {
+    const error = new Error("Idioma de origem não suportado.");
+    error.status = 400;
+    throw error;
+  }
+  const glossary = Array.isArray(input.glossary)
+    ? input.glossary.slice(0, 80).map(item => {
+        const from = String(item.source || "").slice(0, 120);
+        const to = String(item.target || "").slice(0, 120);
+        return from && to ? from + " → " + to : "";
+      }).filter(Boolean).join("\n")
+    : "";
+  const system = [
+    "Você é tradutor literário especializado em mangá, manhwa e manhua.",
+    "Traduza para português brasileiro natural, fluido e adequado a balões de quadrinhos.",
+    "Preserve significado, intenção, subtexto, humor, sarcasmo, intimidade, relações e voz individual dos personagens.",
+    "Não invente fatos, emoções, falas ou informações. Não intensifique declarações nem altere relações.",
+    "Preserve nomes próprios e honoríficos quando forem narrativamente relevantes. Respeite o glossário.",
+    "Considere o contexto narrativo fornecido, mas não acrescente explicações à fala.",
+    "Responda somente com a tradução, sem aspas, comentários ou alternativas."
+  ].join(" ");
+  const user = [
+    "Idioma original: " + sourceLanguageName(sourceLanguage) + ".",
+    "Idioma final: português brasileiro.",
+    input.context ? "Contexto da obra/personagem: " + String(input.context).slice(0, 5000) : "",
+    glossary ? "Glossário obrigatório:\n" + glossary : "",
+    "Texto a traduzir:\n" + text
+  ].filter(Boolean).join("\n\n");
+  const model = env.TRANSLATION_MODEL || "@cf/zai-org/glm-4.7-flash";
+  const result = await env.AI.run(model, {
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user }
+    ],
+    temperature: 0.2,
+    max_tokens: Math.min(2048, Math.max(256, text.length * 2))
+  });
+  const translated = String(result && (result.response || result.output_text || "")).trim();
+  if (!translated) throw new Error("O provedor não retornou uma tradução válida.");
+  return { translation: translated, model, source_language: sourceLanguage, target_language: "pt-BR" };
+}
+
+function decodeBase64(value) {
+  const clean = String(value || "").replace(/^data:[^,]+,/, "");
+  const binary = atob(clean);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+async function reconstructWithAI(env, input) {
+  if (!env.AI) throw new Error("O motor de IA ainda não está vinculado ao Worker.");
+  const image = String(input.image_b64 || "");
+  const mask = input.mask;
+  if (!image || image.length > 7 * 1024 * 1024 || !Array.isArray(mask) || !mask.length || mask.length > 16_000_000) {
+    const error = new Error("Imagem ou máscara inválida. Limite de entrada: 5 MiB por imagem.");
+    error.status = 400;
+    throw error;
+  }
+  const width = Number(input.width);
+  const height = Number(input.height);
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 256 || height < 256 || width > 2048 || height > 2048 || width * height > 4_194_304) {
+    const error = new Error("Dimensões inválidas. Use imagens entre 256 e 2.048 pixels por lado.");
+    error.status = 400;
+    throw error;
+  }
+  if (mask.length !== width * height && mask.length !== width * height * 4) {
+    const error = new Error("A máscara precisa ter as mesmas dimensões da imagem.");
+    error.status = 400;
+    throw error;
+  }
+  const model = env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting";
+  const result = await env.AI.run(model, {
+    prompt: String(input.prompt || "Reconstruct the original comic artwork naturally. Preserve line art, colors, textures, and all visual details. Do not add text, letters, speech bubbles, objects, or characters.").slice(0, 1200),
+    image_b64: image,
+    mask,
+    width,
+    height,
+    num_steps: 20,
+    strength: 1,
+    guidance: 7.5
+  });
+  let bytes;
+  if (result instanceof Uint8Array) bytes = result;
+  else if (result instanceof ArrayBuffer) bytes = new Uint8Array(result);
+  else if (result && Array.isArray(result.image)) bytes = new Uint8Array(result.image);
+  else if (result && result.image_b64) bytes = decodeBase64(result.image_b64);
+  else throw new Error("O motor de reconstrução não retornou uma imagem reconhecível.");
+  return bytes;
+}
+\nasync function handle(request, env) {
   const origin = request.headers.get("origin") || "";
   const cors = corsHeaders(origin, env);
 
@@ -249,6 +353,43 @@ async function handle(request, env) {
       const action = projectMatch[2] || "";
       const project = await getProject(env, projectId);
       if (!canReadProject(auth, project)) return fail("Projeto não encontrado ou sem permissão.", 404, origin, env);
+
+
+      if (request.method === "POST" && action === "translate") {
+        if (!isTranslator(auth)) return fail("Apenas tradutores autorizados e administradores podem usar o motor de tradução.", 403, origin, env);
+        const input = await request.json();
+        const result = await translateWithAI(env, {
+          ...input,
+          source_language: input.source_language || project.source_language,
+          context: [project.narrative_context || "", input.context || ""].filter(Boolean).join("\n\n")
+        });
+        await addEvent(env, projectId, auth.user.id, "text_translated", {
+          model: result.model,
+          source_language: result.source_language,
+          input_characters: String(input.text || "").length
+        });
+        return response(result, 200, origin, env);
+      }
+
+      if (request.method === "POST" && action === "reconstruct") {
+        if (!isTranslator(auth)) return fail("Apenas tradutores autorizados e administradores podem reconstruir imagens.", 403, origin, env);
+        const input = await request.json();
+        const imageBytes = await reconstructWithAI(env, input);
+        await addEvent(env, projectId, auth.user.id, "image_reconstructed", {
+          model: env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting",
+          width: Number(input.width),
+          height: Number(input.height)
+        });
+        return new Response(imageBytes, {
+          status: 200,
+          headers: {
+            ...cors,
+            "content-type": "image/png",
+            "cache-control": "private, no-store",
+            "x-content-type-options": "nosniff"
+          }
+        });
+      }
 
       if (request.method === "GET" && !action) {
         const [files, pages, jobs, versions, reviews, events] = await Promise.all([
