@@ -226,6 +226,11 @@ function almoraChapterDisplay(c){
   if(type==='epilogue')return c.label||'Epílogo';
   return 'Capítulo '+c.n;
 }
+function almoraChapterSubtitle(c){
+  const title=String(c.title||'').trim();
+  const label=String(c.label||'').trim();
+  return title&&title!==label?' — '+esc(title):'';
+}
 const upd=ws=>`<div class="grid">${ws.map(w=>card(w,[...w.chapters].sort((a,b)=>b.date-a.date).slice(0,2).map(c=>`<div class="ch"><b>${esc(almoraChapterDisplay(c))}${Date.now()-c.date<864e5*3?' <span class="new">New</span>':''}</b><span>${ago(c.date)}</span></div>`).join(''))).join('')}</div>`;
 const pub=()=>S.works.filter(w=>!w.archived);
 function nav(r){
@@ -294,7 +299,7 @@ ${user?wishlistButton(id):''}
 <select onchange="lib('${id}',this.value)"><option value="">+ Biblioteca</option>${['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'].map(x=>`<option ${ls===x?'selected':''}>${x}</option>`).join('')}</select>
 <button class="g" onclick="share('${id}')">Compartilhar</button></div></div></div>
 <h2>Sinopse</h2><p>${esc(w.synopsis||'Sem sinopse.')}</p>
-<h2>Capítulos</h2>${cs.length?[...cs].sort((a,b)=>(a.order??a.n)-(b.order??b.n)).map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>${esc(almoraChapterDisplay(c))}${c.title&&c.title.trim()!==almoraChapterDisplay(c)?' — '+esc(c.title):''}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join(''):'<div class="empty">Sem capítulos publicados.</div>'}`}
+<h2>Capítulos</h2>${cs.length?[...cs].sort((a,b)=>(a.order??a.n)-(b.order??b.n)).map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>${esc(almoraChapterDisplay(c))}${almoraChapterSubtitle(c)}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join(''):'<div class="empty">Sem capítulos publicados.</div>'}`}
 function rate(id,n){S.rate[id]=n;save();ren()}
 async function fav(id){
   const next=!S.fav[id];
@@ -611,7 +616,7 @@ setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=
   }),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
 const bookmarkKey=[id,c.n,p.pg||0].join(':');
 const isBookmarked=!!(S.bookmarks&&S.bookmarks[bookmarkKey]);
-return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${c.title?' — '+esc(c.title):''}</span><button class="g" type="button" id="almora-page-bookmark" onclick="almoraToggleBookmark('${id}','${c.n}',S.prog['${id}'].pg||0,this)">${isBookmarked?'★ Página marcada':'☆ Marcar página'}</button><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
+return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${almoraChapterSubtitle(c)}</span><button class="g" type="button" id="almora-page-bookmark" onclick="almoraToggleBookmark('${id}','${c.n}',S.prog['${id}'].pg||0,this)">${isBookmarked?'★ Página marcada':'☆ Marcar página'}</button><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
 <div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
 /* CONTA / AUTH (Firebase Authentication) */
 /* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
