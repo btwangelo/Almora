@@ -36,18 +36,18 @@ Set `CORS_ORIGINS` to the exact production origins. The existing app currently u
 - `POST /api/projects/:id/files` — upload ZIP, CBZ, PDF, PNG, JPG/JPEG or WebP as encrypted R2 objects.
 - `GET /api/projects/:id/files/:fileId/download` — authorized download and decryption.
 - `POST /api/projects/:id/translate` — contextual text translation with Workers AI; translator/admin only.
-- `POST /api/projects/:id/reconstruct` — experimental image inpainting using an uploaded page and a mask painted in the browser; translator/admin only.
+- `POST /api/projects/:id/reconstruct` — experimental image image editing using an uploaded page and a mask painted in the browser; translator/admin only.
 
 The initial upload limit is a technical default of 50 MiB and is configurable. It is not a per-user credit quota.
 
 ## Prototype status and limitations
 
-Text translation and experimental image reconstruction adapters are now present in this branch. The UI exposes a text test field, touch-painted inpainting mask, and a manual multi-balloon lettering editor with PNG export. They are not deployed and have not yet been validated against real comic pages.
+Text translation and experimental image reconstruction adapters are now present in this branch. The UI exposes a text test field, touch-painted image editing mask, and a manual multi-balloon lettering editor with PNG export. They are not deployed and have not yet been validated against real comic pages.
 
 - Translation defaults to `@cf/zai-org/glm-4.7-flash`; Workers AI Free has 10,000 Neurons/day, after which requests fail until the daily reset.
-- Reconstruction defaults to `@cf/runwayml/stable-diffusion-v1-5-inpainting`. This model is beta and scheduled for deprecation on 2026-11-20. It is a temporary test adapter, not a production dependency.
+- Reconstruction defaults to `@cf/black-forest-labs/flux-2-klein-4b`. This model is beta and scheduled for deprecation on 2026-11-20. It is a temporary test adapter, not a production dependency.
 - OCR, automatic speech-bubble detection, archive/PDF extraction, per-page pipeline, automatic lettering, visual QA, package export, asynchronous queue consumer, and editorial review/publish endpoints remain unimplemented.
-- The reconstruction test lets the translator paint the inpainting mask directly over the page; marked pixels are converted to a same-size mask before sending.
+- The reconstruction test lets the translator paint the image editing mask directly over the page; marked pixels are converted to a same-size mask before sending.
 
 Do not present a project as translated just because its source files uploaded. Do not publish generated pages without editorial review.
 
