@@ -99,6 +99,7 @@
         if (!input.value.trim()) return notice("Cole o texto que deseja traduzir.", true);
         button.disabled = true;
         output.textContent = "Traduzindo…";
+        card._lastTranslation = "";
         try {
           const result = await api("/api/projects/" + card.dataset.project + "/translate", {
             method: "POST",
@@ -110,6 +111,7 @@
             })
           });
           output.textContent = result.translation;
+          card._lastTranslation = result.translation;
           notice("Tradução concluída pelo motor " + esc(result.model) + ".");
         } catch (error) {
           output.textContent = error.message;
@@ -237,8 +239,8 @@
     document.querySelectorAll(".project .use-translation").forEach(button => {
       button.addEventListener("click", () => {
         const card = button.closest(".project");
-        const translated = card.querySelector("[data-translation-output]").textContent.trim();
-        if (!translated) return notice("Faça uma tradução primeiro.", true);
+        const translated = String(card._lastTranslation || "").trim();
+        if (!translated) return notice("Faça uma tradução bem-sucedida primeiro.", true);
         card.querySelector(".letter-text").value = translated;
       });
     });
