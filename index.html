@@ -1940,7 +1940,7 @@ ren();initAuth();
   }
 }
 
-#app.almora-entering > * {
+#app.almora-entering {
   animation: almoraPageIn .4s ease both;
 }
 
@@ -1964,9 +1964,7 @@ ren();initAuth();
   animation-delay: .16s;
 }
 
-#app.almora-entering .rd img {
-  animation: almoraPageIn .45s ease both;
-}
+/* As imagens do leitor usam apenas o fade-in de carregamento abaixo. */
 
 @media (prefers-reduced-motion: reduce) {
   #app, #app * {
@@ -1979,61 +1977,13 @@ ren();initAuth();
 <script>
 (() => {
   const app = document.querySelector('#app');
-  const originalRender = window.ren;
+  if (!app) return;
 
-  if (!app || typeof originalRender !== 'function') return;
-
-  let enterTimer;
-  let lastAnimatedHash = null;
-
-  window.ren = function(...args) {
-    const route = (location.hash.slice(1) || 'home').split('/')[0];
-    const currentHash = location.hash || '#home';
-    const isNewPage = currentHash !== lastAnimatedHash;
-    const chapterFile = app.querySelector('#c_f');
-
-    const hasPendingChapter =
-      (chapterFile && chapterFile.files.length > 0) ||
-      (typeof draft !== 'undefined' && draft.length > 0);
-
-    clearTimeout(enterTimer);
-
-    if (route === 'studio' && hasPendingChapter) {
-      app.classList.remove('almora-leaving', 'almora-entering');
-      lastAnimatedHash = currentHash;
-      return;
-    }
-
-    // Chamadas internas de atualização não devem reiniciar a animação.
-    if (!isNewPage) {
-      app.classList.remove('almora-entering');
-      return originalRender.apply(this, args);
-    }
-
-    lastAnimatedHash = currentHash;
-
-    if (window.matchMedia(
-      '(prefers-reduced-motion: reduce)'
-    ).matches) {
-      app.classList.remove('almora-leaving', 'almora-entering');
-      return originalRender.apply(this, args);
-    }
-
-    // Anima apenas quando o endereço da página realmente muda.
-    originalRender.apply(this, args);
-
-    app.classList.remove('almora-leaving', 'almora-entering');
-    void app.offsetWidth;
-    app.classList.add('almora-entering');
-
-    enterTimer = setTimeout(() => {
-      app.classList.remove('almora-entering');
-    }, 700);
-  };
-
+  // A entrada acontece uma única vez por carregamento completo do site.
+  // Navegações e re-renderizações internas não reiniciam a animação.
   app.classList.add('almora-entering');
 
-  enterTimer = setTimeout(() => {
+  window.setTimeout(() => {
     app.classList.remove('almora-entering');
   }, 700);
 })();
@@ -2117,18 +2067,25 @@ ren();initAuth();
       el.classList.add('almora-cover-loading');
 
       const img = new Image();
+      let coverFinished = false;
 
-      img.onload = () => {
+      const finishCover = () => {
+        if (coverFinished) return;
+        coverFinished = true;
+        clearTimeout(coverFallback);
         el.classList.remove('almora-cover-loading');
         el.classList.add('almora-cover-ready');
       };
 
-      img.onerror = () => {
-        el.classList.remove('almora-cover-loading');
-        el.classList.add('almora-cover-ready');
-      };
+      // Evita que o brilho fique repetindo indefinidamente se a imagem travar.
+      const coverFallback = window.setTimeout(finishCover, 8000);
 
+      img.onload = finishCover;
+      img.onerror = finishCover;
       img.src = match[1];
+
+      // Trata também imagens que já estavam no cache do navegador.
+      if (img.complete) finishCover();
     });
 
     root.querySelectorAll('.rd img').forEach(img => {
