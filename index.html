@@ -181,6 +181,15 @@ window.almoraDB = almoraDB;
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S={works:[],prog:{},lib:{},fav:{},rate:{},bookmarks:{},pin:null},unlocked=false,draft=[];
 try{Object.assign(S,JSON.parse(localStorage.getItem('almora')||'{}'))}catch(e){}
+ 
+// Restaura imediatamente o catálogo da última visita; o Supabase atualiza em segundo plano.
+try{
+  const cachedCatalog=JSON.parse(localStorage.getItem('almora_catalog_cache')||'null');
+  const currentRoute=(location.hash.slice(1)||'home').split('/')[0];
+  if(Array.isArray(cachedCatalog)&&cachedCatalog.length&&currentRoute!=='ler'){
+    S.works=cachedCatalog;
+  }
+}catch(e){console.warn('Cache local do catálogo indisponível:',e)}
 
 const save=()=>{
   try{
@@ -690,6 +699,13 @@ async function loadCatalog(){
     });
 
     S.works=remoteWorks;
+    // Guarda os dados de navegação sem as imagens das páginas, evitando exceder a cota local.
+    try{
+      const catalogCache=remoteWorks.map(w=>({...w,chapters:(w.chapters||[]).map(c=>({...c,pages:[]}))}));
+      localStorage.setItem('almora_catalog_cache',JSON.stringify(catalogCache));
+    }catch(cacheError){
+      console.warn('Não foi possível atualizar o cache do catálogo:',cacheError);
+    }
   }catch(e){
     console.error('Erro ao carregar catálogo:',e);
     toast('Erro ao carregar catálogo: '+e.message);
@@ -704,9 +720,12 @@ async function initAuth(){
     user=data.session?.user||null;
     head();
 
+    // Mantém a página já desenhada visível enquanto os dados atuais são sincronizados.
     await loadCatalog();
-    await almoraSyncFavorites();
-    await almoraSyncReadingProgress();
+    await Promise.all([
+      almoraSyncFavorites(),
+      almoraSyncReadingProgress()
+    ]);
     ren();
 
     almoraDB.auth.onAuthStateChange((event,session)=>{
