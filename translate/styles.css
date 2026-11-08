@@ -8,3 +8,9 @@
 .engine-output{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);font-size:13px;line-height:1.65;margin-top:10px}
 .reconstruction-preview{display:block;width:100%;max-height:600px;object-fit:contain;border:1px solid var(--line);border-radius:8px;margin-top:10px}
 .download-result{display:inline-block;color:var(--accent);font-size:12px;margin-top:9px}
+
+.mask-stage{position:relative;width:100%;max-height:680px;overflow:auto;border:1px solid var(--line);border-radius:9px;background:#0e0b13}
+.mask-preview{display:block;width:100%;height:auto}
+.mask-overlay{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:crosshair}
+.mask-editor>label{margin-top:12px}
+.mask-editor input[type=range]{padding:0;accent-color:var(--accent);border:0;background:transparent}
