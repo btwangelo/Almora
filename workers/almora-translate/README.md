@@ -35,21 +35,31 @@ Set `CORS_ORIGINS` to the exact production origins. The existing app currently u
 - `GET /api/projects/:id` — project details and its files/jobs/pages/reviews/events.
 - `POST /api/projects/:id/files` — upload ZIP, CBZ, PDF, PNG, JPG/JPEG or WebP as encrypted R2 objects.
 - `GET /api/projects/:id/files/:fileId/download` — authorized download and decryption.
+- `POST /api/projects/:id/translate` — contextual text translation with Workers AI; translator/admin only.
+- `POST /api/projects/:id/reconstruct` — experimental image inpainting using an uploaded page and a manually prepared mask; translator/admin only.
 
 The initial upload limit is a technical default of 50 MiB and is configurable. It is not a per-user credit quota.
 
-## Important: not yet enabled
+## Prototype status and limitations
 
-The OCR, contextual translation, inpainting, lettering, visual QA, packaging queue consumer, and mandatory editorial publication workflow are not deployed yet. Do not present a project as translated just because its source files uploaded. The next implementation phase must add the processing provider adapters and asynchronous queue consumer, then the editorial review/publish endpoints.
+Text translation and experimental image reconstruction adapters are now present in this branch. The UI exposes a text test field and a manual-mask reconstruction test. They are not deployed and have not yet been validated against real comic pages.
+
+- Translation defaults to `@cf/zai-org/glm-4.7-flash`; Workers AI Free has 10,000 Neurons/day, after which requests fail until the daily reset.
+- Reconstruction defaults to `@cf/runwayml/stable-diffusion-v1-5-inpainting`. This model is beta and scheduled for deprecation on 2026-11-20. It is a temporary test adapter, not a production dependency.
+- OCR, automatic speech-bubble detection, archive/PDF extraction, per-page pipeline, automatic lettering, visual QA, package export, asynchronous queue consumer, and editorial review/publish endpoints remain unimplemented.
+- A manual reconstruction test requires a same-size mask PNG; white marks pixels to inpaint and black preserves them.
+
+Do not present a project as translated just because its source files uploaded. Do not publish generated pages without editorial review.
 
 ## Deploying this separate Worker
 
 1. Create a new Worker named `almora-translate`; do not edit `almora-storage-v2`.
-2. Add the R2 binding above.
+2. Add the R2 binding above and the Workers AI binding from `wrangler.toml`.
 3. Add the four secrets above.
 4. Set the origins and upload limit.
-5. Deploy this Worker and test `GET /api/health`.
-6. Add its actual `workers.dev` URL to the Translate front-end configuration.
-7. Test an upload and download with a translator account and confirm a reader account receives 403.
+5. Deploy this Worker and test `GET /api/health`; verify that both provider bindings are reported.
+6. Test text translation and image reconstruction with a staff account, then monitor Workers AI daily Neuron usage.
+7. Add its actual `workers.dev` URL to the Translate front-end configuration.
+8. Test an upload and download with a translator account and confirm a reader account receives 403.
 
 Do not enable public access to the new Translate paths. Keep the R2 bucket private to server-side access wherever possible; encryption is an additional protection because the existing legacy Worker exposes a generic object-read route.
