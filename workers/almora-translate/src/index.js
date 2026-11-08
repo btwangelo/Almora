@@ -258,7 +258,7 @@ async function reconstructWithAI(env, input) {
   const model = env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting";
   const result = await env.AI.run(model, {
     prompt: String(input.prompt || "Reconstruct the original comic artwork naturally. Preserve line art, colors, textures, and all visual details. Do not add text, letters, speech bubbles, objects, or characters.").slice(0, 1200),
-    image_b64: image,
+    image_b64: image.replace(/^data:[^,]+,/, ""),
     mask,
     width,
     height,
@@ -266,10 +266,13 @@ async function reconstructWithAI(env, input) {
     strength: 1,
     guidance: 7.5
   });
+  let output = result && result.image !== undefined ? result.image : result;
   let bytes;
-  if (result instanceof Uint8Array) bytes = result;
-  else if (result instanceof ArrayBuffer) bytes = new Uint8Array(result);
-  else if (result && Array.isArray(result.image)) bytes = new Uint8Array(result.image);
+  if (output instanceof Uint8Array) bytes = output;
+  else if (output instanceof ArrayBuffer) bytes = new Uint8Array(output);
+  else if (output instanceof ReadableStream) bytes = new Uint8Array(await new Response(output).arrayBuffer());
+  else if (Array.isArray(output)) bytes = new Uint8Array(output);
+  else if (typeof output === "string") bytes = decodeBase64(output);
   else if (result && result.image_b64) bytes = decodeBase64(result.image_b64);
   else throw new Error("O motor de reconstrução não retornou uma imagem reconhecível.");
   return bytes;
@@ -293,7 +296,20 @@ async function reconstructWithAI(env, input) {
   const path = url.pathname.replace(/\/+$/, "") || "/";
 
   if (request.method === "GET" && path === "/api/health") {
-    return response({ service: "ALMORA Translate", status: "online", stage: "secure-upload-foundation" }, 200, origin, env);
+    return response({
+      service: "ALMORA Translate",
+      status: "online",
+      stage: "provider-prototype",
+      providers: {
+        translation: { available: Boolean(env.AI), model: env.TRANSLATION_MODEL || "@cf/zai-org/glm-4.7-flash" },
+        reconstruction: {
+          available: Boolean(env.AI),
+          model: env.INPAINT_MODEL || "@cf/runwayml/stable-diffusion-v1-5-inpainting",
+          experimental: true,
+          notice: "Provider beta com descontinuação anunciada para 2026-11-20."
+        }
+      }
+    }, 200, origin, env);
   }
 
   if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY || !env.SUPABASE_SERVICE_ROLE_KEY || !env.ALMORA_BUCKET) {
