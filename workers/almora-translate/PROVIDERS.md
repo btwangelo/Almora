@@ -30,7 +30,7 @@ O modelo `@cf/runwayml/stable-diffusion-v1-5-inpainting` está em beta e tem des
   - Dimensões entre 256 e 2.048 px por lado; imagem de até 5 MiB.
   - Retorna PNG. Exige tradutor ou administrador.
 
-A UI permite testar texto colado e reconstruir uma imagem com máscara PNG preparada externamente. A máscara precisa ter exatamente as mesmas dimensões da página.
+A UI permite testar texto colado e pintar diretamente sobre a página, no celular ou computador, as regiões que devem ser reconstruídas. O pincel gera uma máscara alinhada à imagem.
 
 ## O que ainda não está implementado
 
