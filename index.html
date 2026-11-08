@@ -3927,7 +3927,7 @@ window.almoraSaveProfile = async function() {
 
     try {
       const {data: ratings, error} = await almoraDB
-        .from('ratings')
+        .from('work_rating_scores')
         .select('score')
         .eq('work_id', workId);
 
