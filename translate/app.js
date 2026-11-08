@@ -78,7 +78,7 @@
         Number(project.completed_pages || 0) + ' concluídas · ' + Number(project.failed_pages || 0) + ' com falha</div>' +
         (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' +
           '<section class="engine-panel"><h4>Motor de tradução · teste</h4><textarea class="source-text" rows="3" maxlength="6000" placeholder="Cole uma fala ou trecho para testar a tradução…"></textarea><button class="small-button translate-text">Traduzir para PT-BR</button><div class="engine-output" data-translation-output></div></section>' +
-          '<section class="engine-panel"><h4>Reconstrução de imagem · teste</h4><p>Envie a página e uma máscara PNG do mesmo tamanho. Áreas brancas na máscara serão reconstruídas.</p><label>Página original <input class="rebuild-image" type="file" accept="image/png,image/jpeg,image/webp"></label><label>Máscara PNG <input class="rebuild-mask" type="file" accept="image/png"></label><button class="small-button reconstruct-image">Reconstruir área marcada</button><div class="engine-output" data-reconstruction-output></div></section>' : '') +
+          '<section class="engine-panel"><h4>Reconstrução de imagem · teste</h4><p>Envie uma página e pinte diretamente sobre as áreas com texto. O pincel marca em vermelho o que deve ser reconstruído.</p><label>Página original <input class="rebuild-image" type="file" accept="image/png,image/jpeg,image/webp"></label><div class="mask-editor" hidden><div class="mask-stage"><canvas class="mask-preview"></canvas><canvas class="mask-overlay"></canvas></div><label>Pincel <input class="brush-size" type="range" min="8" max="120" value="36"></label><button class="small-button clear-mask" type="button">Limpar marcação</button></div><button class="small-button reconstruct-image">Reconstruir área marcada</button><div class="engine-output" data-reconstruction-output></div></section>' : '') +
         '<div class="file-list" data-file-list>' +
         ((project.almora_translation_files || []).length
           ? project.almora_translation_files.map(file => '✓ ' + esc(file.original_name) + ' · ' + bytes(Number(file.file_size_bytes || 0))).join('<br>')
@@ -116,37 +116,110 @@
         } finally { button.disabled = false; }
       });
     });
+
+    document.querySelectorAll(".project .rebuild-image").forEach(input => {
+      input.addEventListener("change", async () => {
+        const card = input.closest(".project");
+        const file = input.files[0];
+        const editor = card.querySelector(".mask-editor");
+        if (!file) { editor.hidden = true; card._maskCanvas = null; return; }
+        if (file.size > 5 * 1024 * 1024) {
+          notice("A página deve ter no máximo 5 MiB.", true);
+          input.value = "";
+          editor.hidden = true;
+          return;
+        }
+        try {
+          const image = await loadImage(await readDataUrl(file));
+          if (image.width > 2048 || image.height > 2048 || image.width < 256 || image.height < 256) {
+            throw new Error("Use uma página entre 256 e 2.048 pixels por lado.");
+          }
+          const preview = card.querySelector(".mask-preview");
+          const overlay = card.querySelector(".mask-overlay");
+          const maskCanvas = document.createElement("canvas");
+          [preview, overlay, maskCanvas].forEach(canvas => { canvas.width = image.width; canvas.height = image.height; });
+          preview.getContext("2d").drawImage(image, 0, 0);
+          const maskContext = maskCanvas.getContext("2d", { willReadFrequently: true });
+          maskContext.fillStyle = "#000";
+          maskContext.fillRect(0, 0, image.width, image.height);
+          card._maskCanvas = maskCanvas;
+          const overlayContext = overlay.getContext("2d");
+          let drawing = false;
+          let previous = null;
+          const point = event => {
+            const rect = overlay.getBoundingClientRect();
+            return { x: (event.clientX - rect.left) * overlay.width / rect.width, y: (event.clientY - rect.top) * overlay.height / rect.height };
+          };
+          const stroke = (ctx, from, to, radius, color) => {
+            ctx.beginPath();
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = color;
+            ctx.lineWidth = radius * 2;
+            ctx.moveTo(from.x, from.y);
+            ctx.lineTo(to.x, to.y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.arc(to.x, to.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+          };
+          overlay.onpointerdown = event => {
+            drawing = true;
+            previous = point(event);
+            overlay.setPointerCapture(event.pointerId);
+            const radius = Number(card.querySelector(".brush-size").value) / 2;
+            stroke(maskContext, previous, previous, radius, "#fff");
+            stroke(overlayContext, previous, previous, radius, "rgba(255,55,105,.58)");
+          };
+          overlay.onpointermove = event => {
+            if (!drawing || !previous) return;
+            const next = point(event);
+            const radius = Number(card.querySelector(".brush-size").value) / 2;
+            stroke(maskContext, previous, next, radius, "#fff");
+            stroke(overlayContext, previous, next, radius, "rgba(255,55,105,.58)");
+            previous = next;
+          };
+          overlay.onpointerup = overlay.onpointercancel = () => { drawing = false; previous = null; };
+          card.querySelector(".clear-mask").onclick = () => {
+            maskContext.fillStyle = "#000";
+            maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+            overlayContext.clearRect(0, 0, overlay.width, overlay.height);
+          };
+          editor.hidden = false;
+        } catch (error) {
+          editor.hidden = true;
+          card._maskCanvas = null;
+          notice(error.message, true);
+        }
+      });
+    });
+
     document.querySelectorAll(".project .reconstruct-image").forEach(button => {
       button.addEventListener("click", async () => {
         const card = button.closest(".project");
         const original = card.querySelector(".rebuild-image").files[0];
-        const maskFile = card.querySelector(".rebuild-mask").files[0];
+        const maskCanvas = card._maskCanvas;
         const output = card.querySelector("[data-reconstruction-output]");
-        if (!original || !maskFile) return notice("Selecione a página original e a máscara PNG.", true);
-        if (original.size > 5 * 1024 * 1024 || maskFile.size > 5 * 1024 * 1024) return notice("Cada imagem deve ter no máximo 5 MiB.", true);
+        if (!original || !maskCanvas) return notice("Envie uma página e marque pelo menos uma área para reconstrução.", true);
+        if (original.size > 5 * 1024 * 1024) return notice("A página deve ter no máximo 5 MiB.", true);
         button.disabled = true;
         output.textContent = "Reconstruindo…";
         try {
           if (API_BASE.includes("YOUR_SUBDOMAIN")) throw new Error("A API do Translate ainda não foi publicada.");
           const dataUrl = await readDataUrl(original);
-          const maskUrl = await readDataUrl(maskFile);
           const image = await loadImage(dataUrl);
-          const maskImage = await loadImage(maskUrl);
-          if (image.width !== maskImage.width || image.height !== maskImage.height) throw new Error("A máscara precisa ter exatamente as mesmas dimensões da página.");
-          if (image.width > 2048 || image.height > 2048 || image.width < 256 || image.height < 256) throw new Error("Use uma página entre 256 e 2.048 pixels por lado.");
-          const canvas = document.createElement("canvas");
-          canvas.width = image.width; canvas.height = image.height;
-          const ctx = canvas.getContext("2d", { willReadFrequently: true });
-          ctx.drawImage(maskImage, 0, 0);
-          const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-          const mask = new Array(canvas.width * canvas.height);
+          if (image.width !== maskCanvas.width || image.height !== maskCanvas.height) throw new Error("A máscara não corresponde à página selecionada.");
+          const ctx = maskCanvas.getContext("2d", { willReadFrequently: true });
+          const pixels = ctx.getImageData(0, 0, maskCanvas.width, maskCanvas.height).data;
+          const mask = new Array(maskCanvas.width * maskCanvas.height);
           for (let i = 0, j = 0; i < pixels.length; i += 4, j++) {
             mask[j] = Math.round((pixels[i] + pixels[i+1] + pixels[i+2]) / 3);
           }
           const result = await fetch(API_BASE.replace(/\/$/, "") + "/api/projects/" + card.dataset.project + "/reconstruct", {
             method: "POST",
             headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
-            body: JSON.stringify({ image_b64: dataUrl, mask, width: image.width, height: image.height })
+            body: JSON.stringify({ image_b64: dataUrl, mask, width: maskCanvas.width, height: maskCanvas.height })
           });
           if (!result.ok) {
             const error = await result.json().catch(() => ({}));
