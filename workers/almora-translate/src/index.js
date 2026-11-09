@@ -282,7 +282,8 @@ async function reconstructWithAI(env, input) {
   if (!result || !result.image) throw new Error("O modelo de edição não retornou uma imagem.");
   return decodeBase64(result.image);
 }
-\nasync function handle(request, env) {
+
+async function handle(request, env) {
   const origin = request.headers.get("origin") || "";
   const cors = corsHeaders(origin, env);
 
