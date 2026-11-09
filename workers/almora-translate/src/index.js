@@ -20,7 +20,7 @@ function corsHeaders(origin, env) {
     .split(",").map(x => x.trim()).filter(Boolean);
   const headers = {
     "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "Authorization,Content-Type,X-File-Name",
+    "access-control-allow-headers": "Authorization,Content-Type,X-File-Name,X-Output-Format",
     "access-control-max-age": "86400",
     "vary": "Origin"
   };
@@ -532,7 +532,7 @@ async function handle(request, env) {
         const completedPages = (allPages || []).filter(page => String(page.ocr_data?.translated_text || "").trim()).length;
         await db(env, "almora_translation_projects?id=eq." + projectId, {
           method: "PATCH", headers: { "prefer": "return=minimal" },
-          body: JSON.stringify({ total_pages: (allPages || []).length, completed_pages: completedPages, updated_at: new Date().toISOString() })
+          body: JSON.stringify({ total_pages: (allPages || []).length, completed_pages: completedPages, status: project.status === "pending_upload" ? "uploaded" : project.status, updated_at: new Date().toISOString() })
         });
         if (existing?.[0]?.original_object_key && existing[0].original_object_key !== objectKey) {
           await env.ALMORA_BUCKET.delete(existing[0].original_object_key);
