@@ -115,6 +115,49 @@
     return data;
   }
   async function apiBlob(path) { return (await request(path)).blob(); }
+  async function uploadFileToWorker(path, file, onProgress) {
+    const current = await withTimeout(supabase.auth.getSession(), "A leitura da sessão ALMORA");
+    if (current.error) throw new Error("Não foi possível recuperar sua sessão ALMORA: " + current.error.message);
+    let token = current.data.session?.access_token;
+    if (!token) throw new Error("Sua sessão ALMORA expirou. Entre novamente.");
+
+    const send = accessToken => new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", API_BASE.replace(/\/$/, "") + path, true);
+      xhr.timeout = 10 * 60 * 1000;
+      xhr.setRequestHeader("Authorization", "Bearer " + accessToken);
+      xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+      xhr.setRequestHeader("X-File-Name", encodeURIComponent(file.name));
+      xhr.upload.addEventListener("progress", event => {
+        if (event.lengthComputable && onProgress) onProgress(event.loaded, event.total);
+      });
+      xhr.addEventListener("load", () => {
+        let data = {};
+        try { data = xhr.responseText ? JSON.parse(xhr.responseText) : {}; }
+        catch (_) { reject(new Error("O servidor respondeu em formato inválido durante o envio.")); return; }
+        resolve({ status: xhr.status, data });
+      });
+      xhr.addEventListener("error", () => reject(new Error("A conexão foi interrompida durante o envio. Verifique a rede e tente novamente.")));
+      xhr.addEventListener("timeout", () => reject(new Error("O envio ultrapassou 10 minutos. O servidor não confirmou o recebimento; tente novamente com uma conexão estável.")));
+      xhr.addEventListener("abort", () => reject(new Error("O envio foi cancelado.")));
+      xhr.send(file);
+    });
+
+    let result = await send(token);
+    if (result.status === 401) {
+      const refreshed = await withTimeout(supabase.auth.refreshSession(), "A renovação da sessão ALMORA", 15000);
+      if (refreshed.error || !refreshed.data.session?.access_token) {
+        throw new Error("O servidor recusou a sessão ALMORA e não foi possível renová-la. Entre novamente na ALMORA.");
+      }
+      session = refreshed.data.session;
+      result = await send(refreshed.data.session.access_token);
+    }
+    if (result.status < 200 || result.status >= 300) {
+      throw new Error(result.data?.error || "Falha no envio do arquivo (HTTP " + result.status + ").");
+    }
+    if (!result.data?.file?.id) throw new Error("O servidor não confirmou o armazenamento do arquivo.");
+    return result.data;
+  }
   function sha256Hex(value) { return crypto.subtle.digest("SHA-256", value instanceof ArrayBuffer ? value : new TextEncoder().encode(String(value))).then(buffer => Array.from(new Uint8Array(buffer)).map(byte => byte.toString(16).padStart(2,"0")).join("")); }
   function blobDataUrl(blob) { return new Promise((resolve,reject) => { const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result)); reader.onerror=()=>reject(new Error("Não foi possível preparar a imagem.")); reader.readAsDataURL(blob); }); }
 
@@ -432,7 +475,9 @@
           let sourceFileId = existingOriginal?.id || null;
           if (!existingOriginal) {
             progress.textContent = "Preservando o arquivo original no armazenamento seguro…";
-            const uploadedSource = await api("/api/projects/"+card.dataset.project+"/files", { method:"POST", headers:{"Content-Type":file.type || "application/octet-stream","X-File-Name":encodeURIComponent(file.name)}, body:file });
+            const uploadedSource = await uploadFileToWorker("/api/projects/"+card.dataset.project+"/files", file, (loaded,total) => {
+              showProgress(progress,"Enviando arquivo original",total ? loaded / total * 100 : null,bytes(loaded)+" de "+bytes(total)+" enviados");
+            });
             sourceFileId = uploadedSource.file.id;
           }
           const priorPages = existingDetail.pages || [];
@@ -880,15 +925,12 @@
     const uploaded = [];
     try {
       for (const file of files) {
-        showProgress(list,"Enviando arquivo",null,file.name+" · "+bytes(file.size));
-        const result = await api("/api/projects/" + card.dataset.project + "/files", {
-          method: "POST",
-          headers: {
-            "Content-Type": file.type || "application/octet-stream",
-            "X-File-Name": encodeURIComponent(file.name)
-          },
-          body: file
+        showProgress(list,"Preparando envio",0,file.name+" · "+bytes(file.size));
+        const result = await uploadFileToWorker("/api/projects/" + card.dataset.project + "/files", file, (loaded,total) => {
+          const percent = total ? loaded / total * 100 : null;
+          showProgress(list,"Enviando arquivo",percent,file.name+" · "+bytes(loaded)+" de "+bytes(total)+" enviados");
         });
+        showProgress(list,"Arquivo recebido",100,file.name+" · "+bytes(result.file.size_bytes)+" armazenados com confirmação do servidor");
         uploaded.push(result.file.name + " (" + bytes(result.file.size_bytes) + ")");
       }
       list.innerHTML = uploaded.map(name => "✓ " + esc(name)).join("<br>");
