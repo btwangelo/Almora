@@ -26,6 +26,7 @@ test("batch page writes persist a deterministic idempotency key", () => {
 test("review submission requires translated pages and a review package", () => {
   assert.match(worker, /translation_incomplete/);
   assert.match(worker, /review_package_required/);
+  assert.match(worker, /status: "superseded"/);
   assert.match(worker, /action === "versions"/);
 });
 
