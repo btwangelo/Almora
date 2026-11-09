@@ -289,9 +289,15 @@
           const report=results.join("\n\n"+ "─".repeat(32)+"\n\n");
           const blob=new Blob([report],{type:"text/plain;charset=utf-8"});
           const url=URL.createObjectURL(blob);
-          output.innerHTML='<a class="download-result" download="'+esc(file.name.replace(/\.[^.]+$/,""))+'-traduzido.txt" href="'+url+'">Baixar OCR + traduções (.txt)</a><pre class="batch-report">'+esc(report)+'</pre>';
-          progress.textContent="Concluído · "+pages.length+" página(s) analisadas; as páginas já salvas foram preservadas sem duplicação. Revise OCR e traduções antes do lettering.";
-          notice("Lote concluído. O relatório foi gerado; nenhuma página original foi alterada.");
+          const reportMarkup='<a class="download-result" download="'+esc(file.name.replace(/\.[^.]+$/,""))+'-traduzido.txt" href="'+url+'">Baixar OCR + traduções (.txt)</a><pre class="batch-report">'+esc(report)+'</pre>';
+          const completionMessage="Concluído · "+pages.length+" página(s) analisadas; as páginas já salvas foram preservadas sem duplicação. Revise OCR e traduções antes do lettering.";
+          output.innerHTML=reportMarkup;
+          progress.textContent=completionMessage;
+          notice("Lote concluído. O relatório foi gerado e o arquivo original ficou preservado.");
+          const projectId=card.dataset.project;
+          await refresh();
+          const refreshedCard=document.querySelector('.project[data-project="'+projectId+'"]');
+          if(refreshedCard){ refreshedCard.querySelector("[data-batch-output]").innerHTML=reportMarkup; refreshedCard.querySelector(".batch-progress").textContent=completionMessage; }
         } catch(error) {
           progress.textContent="";
           output.textContent=error.message;
@@ -601,8 +607,9 @@
 
   async function createReviewPackage(button) {
     const card=button.closest(".project"), progress=card.querySelector(".package-progress");
-    const project=(window.__almoraProjects||[]).find(p=>p.id===card.dataset.project);
-    const pages=[...(project?.almora_translation_pages||[])].sort((a,b)=>Number(a.page_number)-Number(b.page_number));
+    const detail=await api("/api/projects/"+card.dataset.project);
+    const project=detail.project;
+    const pages=[...(detail.pages||[])].sort((a,b)=>Number(a.page_number)-Number(b.page_number));
     if(!pages.length)return notice("Processe pelo menos uma página antes de gerar o pacote.",true);
     if(!window.JSZip)return notice("A biblioteca ZIP não carregou. Atualize a página.",true);
     button.disabled=true;
