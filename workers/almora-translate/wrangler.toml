@@ -1,0 +1,17 @@
+name = "almora-translate"
+main = "src/index.js"
+compatibility_date = "2026-11-08"
+
+[ai]
+binding = "AI"
+
+[[r2_buckets]]
+binding = "ALMORA_BUCKET"
+bucket_name = "almora-obras"
+
+[vars]
+CORS_ORIGINS = "https://btwangelo.github.io,https://almoraverse.pages.dev,https://feature-almora-translate-fou.almoraverse.pages.dev"
+MAX_UPLOAD_BYTES = "52428800"
+
+TRANSLATION_MODEL = "@cf/zai-org/glm-4.7-flash"
+IMAGE_EDIT_MODEL = "@cf/black-forest-labs/flux-2-klein-4b"

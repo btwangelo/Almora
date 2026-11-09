@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17131f">
+  <title>ALMORA Translate</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="../">ALMORA<span> translate</span></a>
+    <nav><a href="../">Voltar à ALMORA</a><button id="refreshBtn" class="quiet">Atualizar</button></nav>
+  </header>
+
+  <main class="shell">
+    <section class="intro">
+      <div class="eyebrow">TRADUÇÃO DE QUADRINHOS COM CONTEXTO</div>
+      <h1>Uma história.<br><em>Uma nova língua.</em></h1>
+      <p>Tradução adaptativa para português brasileiro, preservando a voz dos personagens, o contexto e a arte original.</p>
+    </section>
+
+    <section id="notice" class="notice" aria-live="polite">Verificando sua sessão ALMORA…</section>
+    <section id="app" hidden>
+      <div class="section-head">
+        <div><div class="eyebrow">ESPAÇO DE TRABALHO</div><h2>Seus projetos</h2></div>
+        <span id="rolePill" class="role-pill"></span>
+      </div>
+
+      <section id="createPanel" class="panel">
+        <div class="panel-title"><div><h3>Novo projeto</h3><p>Envie uma obra independente ou prepare uma tradução para a biblioteca ALMORA.</p></div><span class="step">01</span></div>
+        <form id="projectForm">
+          <label for="title">Nome do projeto</label>
+          <input id="title" name="title" maxlength="240" required placeholder="Ex.: A história que vamos traduzir">
+          <div class="form-grid">
+            <div><label for="sourceLanguage">Idioma original</label><select id="sourceLanguage"><option value="en">Inglês</option><option value="ko">Coreano</option><option value="ja">Japonês</option><option value="zh">Chinês</option></select></div>
+            <div><label for="targetLanguage">Idioma final</label><input id="targetLanguage" value="Português brasileiro (pt-BR)" disabled></div>
+          </div>
+          <label for="context">Contexto da obra <small>(opcional)</small></label>
+          <textarea id="context" rows="3" maxlength="12000" placeholder="Resumo, nomes, relações, tom dos personagens, termos importantes…"></textarea>
+          <label class="check"><input id="rights" type="checkbox" required><span>Confirmo que tenho autorização para enviar, traduzir e utilizar estes arquivos.</span></label>
+          <button class="primary" type="submit">Criar projeto</button>
+        </form>
+      </section>
+
+      <section id="projects" class="projects"><div class="loading">Carregando projetos…</div></section>
+
+      <section class="footnote">
+        <strong>Preservação dos originais</strong>
+        <p>Os arquivos enviados são armazenados separadamente e criptografados. Nenhuma página original é substituída.</p>
+        <p class="muted">OCR e extração de páginas ZIP/CBZ/PDF são executados no navegador. A tradução em lote usa a cota gratuita diária da IA. A identificação automática de balões e o lettering continuam manuais; a revisão e publicação editorial ainda exigem implementação própria.</p>
+        <p class="muted">A reconstrução usa FLUX.2 Klein 4B para edição por referências. Não é inpainting nativo: a máscara é uma referência visual e a composição no navegador limita as mudanças às áreas pintadas.</p>
+        <p class="muted">A tradução depende da cota gratuita diária do Cloudflare Workers AI (10.000 Neurons). Ao atingir o limite, será necessário aguardar a renovação diária; nenhum plano pago será ativado automaticamente.</p>
+      </section>
+    </section>
+  </main>
+  <script src="./app.js"></script>
+</body>
+</html>
