@@ -39,12 +39,33 @@
   async function apiBlob(path) { return (await request(path)).blob(); }
   function sha256Hex(value) { return crypto.subtle.digest("SHA-256", value instanceof ArrayBuffer ? value : new TextEncoder().encode(String(value))).then(buffer => Array.from(new Uint8Array(buffer)).map(byte => byte.toString(16).padStart(2,"0")).join("")); }
   function blobDataUrl(blob) { return new Promise((resolve,reject) => { const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result)); reader.onerror=()=>reject(new Error("Não foi possível preparar a imagem.")); reader.readAsDataURL(blob); }); }
-  async function translateLongText(projectId, text, language, context, onProgress) {
-    const chunks=[]; let remaining=String(text||"").trim();
-    while(remaining.length){ let cut=Math.min(5600,remaining.length); if(cut<remaining.length){ const boundary=Math.max(remaining.lastIndexOf(String.fromCharCode(10),cut),remaining.lastIndexOf(". ",cut),remaining.lastIndexOf("! ",cut),remaining.lastIndexOf("? ",cut),remaining.lastIndexOf(" ",cut)); if(boundary>2800)cut=boundary+1; } chunks.push(remaining.slice(0,cut).trim()); remaining=remaining.slice(cut).trim(); }
-    const translated=[]; for(let i=0;i<chunks.length;i++){ if(onProgress)onProgress(i+1,chunks.length); const result=await api("/api/projects/"+projectId+"/translate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:chunks[i],source_language:language})}); translated.push(result.translation); }
+  async function translateLongText(projectId, text, language, _context, onProgress) {
+    const chunks = [];
+    let remaining = String(text || "").trim();
+    while (remaining.length) {
+      let cut = Math.min(5600, remaining.length);
+      if (cut < remaining.length) {
+        const newline = remaining.lastIndexOf(String.fromCharCode(10), cut);
+        const sentence = Math.max(remaining.lastIndexOf(". ", cut), remaining.lastIndexOf("! ", cut), remaining.lastIndexOf("? ", cut));
+        const boundary = Math.max(newline, sentence, remaining.lastIndexOf(" ", cut));
+        if (boundary > 2800) cut = boundary + 1;
+      }
+      chunks.push(remaining.slice(0, cut).trim());
+      remaining = remaining.slice(cut).trim();
+    }
+    const translated = [];
+    for (let i = 0; i < chunks.length; i++) {
+      if (onProgress) onProgress(i + 1, chunks.length);
+      const result = await api("/api/projects/" + projectId + "/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: chunks[i], source_language: language })
+      });
+      translated.push(result.translation);
+    }
     return translated.join(String.fromCharCode(10));
   }
+
   function notice(message, error = false) { const node=$("notice"); node.className=error?"notice error":"notice"; node.textContent=String(message??""); node.hidden=false; }
 
   async function refresh() {
