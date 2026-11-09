@@ -514,6 +514,9 @@ async function handle(request, env) {
             source_text: sourceText, translated_text: translatedText,
             original_name: originalName, mime_type: mime, ocr_engine: "tesseract.js",
             batch_key: input.batch_key ? String(input.batch_key).slice(0, 128) : null,
+            batch_file_hash: input.batch_file_hash ? String(input.batch_file_hash).slice(0, 64) : null,
+            batch_index: Number.isInteger(Number(input.batch_index)) ? Number(input.batch_index) : null,
+            batch_start_number: Number.isInteger(Number(input.batch_start_number)) ? Number(input.batch_start_number) : null,
             translation_model: input.translation_model ? String(input.translation_model).slice(0, 160) : null
           },
           updated_at: new Date().toISOString()
