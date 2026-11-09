@@ -424,8 +424,8 @@ async function handle(request, env) {
           if (!pageRows?.length || !readablePages.length || translatedPages.length !== readablePages.length) {
             return fail("Antes da revisão, processe as páginas e conclua a tradução de todo texto reconhecido.", 409, origin, env, "translation_incomplete");
           }
-          const versions = await db(env, "almora_translation_versions?project_id=eq." + projectId + "&select=id,status&order=version_number.desc&limit=1");
-          if (!versions?.length) return fail("Gere primeiro o pacote de revisão do projeto.", 409, origin, env, "review_package_required");
+          const versions = await db(env, "almora_translation_versions?project_id=eq." + projectId + "&status=eq.draft&select=id,status&order=version_number.desc&limit=1");
+          if (!versions?.length) return fail("Gere um novo pacote de revisão depois das últimas alterações.", 409, origin, env, "review_package_required");
           nextStatus = "editorial_review";
           reviewType = "translator";
           await db(env, "almora_translation_versions?id=eq." + versions[0].id, { method: "PATCH", headers: { "prefer": "return=minimal" }, body: JSON.stringify({ status: "editorial_review" }) });
@@ -450,10 +450,13 @@ async function handle(request, env) {
         });
         const patch = { status: nextStatus, updated_at: new Date().toISOString() };
         if (decision === "submitted") patch.submitted_at = new Date().toISOString();
-        if (decision === "approved") {
-          patch.approved_at = new Date().toISOString();
+        if (decision === "approved" || decision === "changes_requested") {
           const versions = await db(env, "almora_translation_versions?project_id=eq." + projectId + "&select=id,status&order=version_number.desc&limit=1");
-          if (versions?.[0]) await db(env, "almora_translation_versions?id=eq." + versions[0].id, { method: "PATCH", headers: { "prefer": "return=minimal" }, body: JSON.stringify({ status: "approved", approved_by: auth.user.id, approved_at: new Date().toISOString() }) });
+          if (versions?.[0]) await db(env, "almora_translation_versions?id=eq." + versions[0].id, {
+            method: "PATCH", headers: { "prefer": "return=minimal" },
+            body: JSON.stringify(decision === "approved" ? { status: "approved", approved_by: auth.user.id, approved_at: new Date().toISOString() } : { status: "superseded" })
+          });
+          if (decision === "approved") patch.approved_at = new Date().toISOString();
         }
         await db(env, "almora_translation_projects?id=eq." + projectId, {
           method: "PATCH",
@@ -481,6 +484,7 @@ async function handle(request, env) {
       }
 
       if (request.method === "POST" && action === "pages") {
+        if (["editorial_review", "approved", "published"].includes(project.status)) return fail("As páginas estão bloqueadas enquanto o projeto aguarda ou concluiu a revisão.", 409, origin, env, "project_locked");
         if (!isTranslator(auth) || (!isAdmin(auth) && project.created_by !== auth.user.id && project.assigned_translator_id !== auth.user.id)) {
           return fail("Somente o responsável pela tradução pode salvar páginas.", 403, origin, env);
         }
@@ -535,6 +539,7 @@ async function handle(request, env) {
           await env.ALMORA_BUCKET.delete(objectKey);
           throw error;
         }
+        await db(env, "almora_translation_versions?project_id=eq." + projectId + "&status=eq.draft", { method: "PATCH", headers: { "prefer": "return=minimal" }, body: JSON.stringify({ status: "superseded" }) });
         const allPages = await db(env, "almora_translation_pages?project_id=eq." + projectId + "&select=id,ocr_data");
         const completedPages = (allPages || []).filter(page => String(page.ocr_data?.translated_text || "").trim()).length;
         await db(env, "almora_translation_projects?id=eq." + projectId, {
@@ -586,6 +591,7 @@ async function handle(request, env) {
       }
 
       if (request.method === "POST" && action === "files") {
+        if (["editorial_review", "approved", "published"].includes(project.status)) return fail("O envio de arquivos está bloqueado durante ou após a revisão editorial.", 409, origin, env, "project_locked");
         if (!isAdmin(auth) && project.created_by !== auth.user.id && project.assigned_translator_id !== auth.user.id) {
           return fail("Somente o responsável pelo projeto pode enviar arquivos.", 403, origin, env);
         }
@@ -636,6 +642,7 @@ async function handle(request, env) {
           throw error;
         }
 
+        await db(env, "almora_translation_versions?project_id=eq." + projectId + "&status=eq.draft", { method: "PATCH", headers: { "prefer": "return=minimal" }, body: JSON.stringify({ status: "superseded" }) });
         const allFiles = await db(env, "almora_translation_files?project_id=eq." + projectId + "&select=id");
         await db(env, "almora_translation_projects?id=eq." + projectId, {
           method: "PATCH",
@@ -653,6 +660,7 @@ async function handle(request, env) {
       }
 
       if (request.method === "POST" && action === "versions") {
+        if (["editorial_review", "approved", "published"].includes(project.status)) return fail("Não é possível substituir o pacote durante ou após a revisão editorial.", 409, origin, env, "project_locked");
         if (!isTranslator(auth) || (!isAdmin(auth) && project.created_by !== auth.user.id && project.assigned_translator_id !== auth.user.id)) return fail("Somente o responsável pela tradução pode gerar um pacote.", 403, origin, env);
         const format = String(request.headers.get("x-output-format") || "zip").toLowerCase();
         if (format !== "zip") return fail("O pacote de revisão usa formato ZIP.", 400, origin, env);
