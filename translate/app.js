@@ -607,13 +607,13 @@
 
   async function createReviewPackage(button) {
     const card=button.closest(".project"), progress=card.querySelector(".package-progress");
-    const detail=await api("/api/projects/"+card.dataset.project);
-    const project=detail.project;
-    const pages=[...(detail.pages||[])].sort((a,b)=>Number(a.page_number)-Number(b.page_number));
-    if(!pages.length)return notice("Processe pelo menos uma página antes de gerar o pacote.",true);
-    if(!window.JSZip)return notice("A biblioteca ZIP não carregou. Atualize a página.",true);
     button.disabled=true;
     try {
+      const detail=await api("/api/projects/"+card.dataset.project);
+      const project=detail.project;
+      const pages=[...(detail.pages||[])].sort((a,b)=>Number(a.page_number)-Number(b.page_number));
+      if(!pages.length)throw new Error("Processe pelo menos uma página antes de gerar o pacote.");
+      if(!window.JSZip)throw new Error("A biblioteca ZIP não carregou. Atualize a página.");
       const zip=new JSZip(), manifest=["ALMORA TRANSLATE — PACOTE DE REVISÃO","Projeto: "+project.title,"Este pacote contém imagens originais e traduções separadas para revisão. Não é uma edição final pronta para publicação.",""];
       for(let i=0;i<pages.length;i++){
         const page=pages[i],o=page.ocr_data||{}; progress.textContent="Montando pacote · página "+(i+1)+"/"+pages.length;
