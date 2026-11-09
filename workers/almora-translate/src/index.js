@@ -248,8 +248,36 @@ async function translateWithAI(env, input) {
     temperature: 0.2,
     max_completion_tokens: Math.min(8192, Math.max(512, text.length * 2))
   });
-  const translated = String(result && (result.response || result.output_text || "")).trim();
-  if (!translated) throw new Error("O provedor não retornou uma tradução válida.");
+  const extractText = value => {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) {
+      return value.map(part => {
+        if (typeof part === "string") return part;
+        return part && typeof part.text === "string" ? part.text : "";
+      }).join("");
+    }
+    return "";
+  };
+  const candidates = [
+    result && result.response,
+    result && result.output_text,
+    result && result.choices && result.choices[0] &&
+      result.choices[0].message && result.choices[0].message.content,
+    result && result.choices && result.choices[0] && result.choices[0].text,
+    result && result.message && result.message.content
+  ];
+  const translated = candidates.map(extractText).find(value => value.trim())?.trim() || "";
+  if (!translated) {
+    const finishReason = result && result.choices && result.choices[0] &&
+      result.choices[0].finish_reason;
+    const error = new Error(
+      finishReason === "length"
+        ? "O modelo atingiu o limite de resposta antes de concluir a tradução. Tente dividir o texto."
+        : "O provedor de IA respondeu, mas não enviou texto de tradução. Tente novamente."
+    );
+    error.status = 502;
+    throw error;
+  }
   return { translation: translated, model, source_language: sourceLanguage, target_language: "pt-BR" };
 }
 
