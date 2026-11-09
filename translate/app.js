@@ -708,20 +708,27 @@
 
   let authListenerReady = false;
   let authRefreshRunning = false;
+  let hasConfirmedSession = false;
 
-  async function applySession(nextSession) {
-    session = nextSession || null;
-    if (!session) {
+  async function applySession(nextSession, explicitSignOut = false) {
+    if (!nextSession) {
+      // Uma leitura transitória vazia não pode desfazer uma sessão já confirmada.
+      if (hasConfirmedSession && !explicitSignOut) return;
+      session = null;
+      hasConfirmedSession = false;
       $("app").hidden = true;
       notice("Não foi encontrada uma sessão ativa da ALMORA neste navegador. Toque em “Verificar login” para consultar novamente.");
       return;
     }
-    $("notice").hidden = true;
+    session = nextSession;
+    hasConfirmedSession = true;
     $("app").hidden = false;
     if (!authRefreshRunning) {
       authRefreshRunning = true;
       try { await refresh(); } finally { authRefreshRunning = false; }
     }
+    // A confirmação de login deve permanecer visível; não a substitua pelo aviso de conexão.
+    notice("Você está conectado à ALMORA.");
   }
 
   async function init() {
@@ -729,14 +736,15 @@
       supabase.auth.onAuthStateChange((event, nextSession) => {
         // Ignora notificações nulas transitórias durante a hidratação do storage.
         if (!nextSession && event !== "SIGNED_OUT") return;
-        void applySession(nextSession);
+        void applySession(nextSession, event === "SIGNED_OUT");
       });
       authListenerReady = true;
     }
     try {
       const { data, error } = await supabase.auth.getSession();
       if (error) throw error;
-      await applySession(data.session);
+      if (data.session) await applySession(data.session);
+      else if (!hasConfirmedSession) await applySession(null);
     } catch (_) {
       notice("Não foi possível verificar sua sessão ALMORA. Confira sua conexão e tente atualizar a página.", true);
     }
@@ -751,10 +759,8 @@
       const { data, error } = await supabase.auth.getSession();
       if (error) throw error;
       const currentSession = data.session || null;
-      await applySession(currentSession);
       if (currentSession) {
-        // A sessão válida já foi aplicada; mantenha o aviso oculto.
-        $("notice").hidden = true;
+        await applySession(currentSession);
         button.textContent = "Conectado ✓";
       } else {
         notice("Você não está conectado neste navegador. Entre na ALMORA e volte a esta página.", true);
