@@ -1,0 +1,42 @@
+name: ALMORA Translate quality
+
+on:
+  push:
+    branches:
+      - feature/almora-translate-foundation
+    paths:
+      - "translate/**"
+      - "workers/almora-translate/**"
+      - ".github/workflows/almora-translate-quality.yml"
+  pull_request:
+    paths:
+      - "translate/**"
+      - "workers/almora-translate/**"
+      - ".github/workflows/almora-translate-quality.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: almora-translate-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check frontend syntax
+        run: node --check translate/app.js
+      - name: Check Worker module syntax
+        run: node --input-type=module --check < workers/almora-translate/src/index.js
+      - name: Run regression tests
+        run: node --test workers/almora-translate/tests/*.test.mjs
+      - name: Check whitespace errors
+        run: git diff --check
