@@ -5648,11 +5648,16 @@ window.almoraSavePrivacy = async function() {
         if (!item) return;
         try {
           if (item.kind === "files" && el instanceof HTMLInputElement && el.type === "file") {
+            // Never replay file-input change handlers during restoration.
+            // They may parse/upload files and rebuild the whole project UI.
+            if (el.files && el.files.length) { restored.add(el); return; }
             const transfer = new DataTransfer();
             (item.value || []).forEach(file => transfer.items.add(file));
             el.files = transfer.files;
             restored.add(el);
-            el.dispatchEvent(new Event("change", {bubbles:true}));
+            const panel = el.closest(".engine-panel");
+            const label = panel?.querySelector(".batch-file-name");
+            if (label) label.textContent = [...el.files].map(file => file.name).join(", ");
           } else if (item.kind === "value") {
             if (el instanceof HTMLInputElement && ["checkbox","radio"].includes(el.type)) {
               el.checked = !!item.value.checked;
