@@ -930,22 +930,37 @@
     notice("Você está conectado à ALMORA.");
   }
 
+  let authInitPromise = null;
   async function init() {
-    if (!authListenerReady) {
-      supabase.auth.onAuthStateChange((event, nextSession) => {
-        // Ignora notificações nulas transitórias durante a hidratação do storage.
-        if (!nextSession && event !== "SIGNED_OUT") return;
-        void applySession(nextSession, event === "SIGNED_OUT");
-      });
-      authListenerReady = true;
-    }
+    if (authInitPromise) return authInitPromise;
+    authInitPromise = (async () => {
+      if (!authListenerReady) {
+        supabase.auth.onAuthStateChange((event, nextSession) => {
+          // O callback roda sob o lock interno do Auth. Adie qualquer trabalho
+          // que possa chamar getSession/refresh para evitar deadlock.
+          if (event === "INITIAL_SESSION") return;
+          if (!nextSession && event !== "SIGNED_OUT") return;
+          window.setTimeout(() => {
+            void applySession(nextSession, event === "SIGNED_OUT").catch(error => {
+              notice("Falha ao atualizar a sessão ALMORA: " + (error.message || "erro desconhecido") + ".", true);
+            });
+          }, 0);
+        });
+        authListenerReady = true;
+      }
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        if (data.session) await applySession(data.session);
+        else if (!hasConfirmedSession) await applySession(null);
+      } catch (error) {
+        notice("Não foi possível verificar sua sessão ALMORA: " + (error.message || "erro desconhecido") + ". Confira sua conexão e tente atualizar a página.", true);
+      }
+    })();
     try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      if (data.session) await applySession(data.session);
-      else if (!hasConfirmedSession) await applySession(null);
-    } catch (_) {
-      notice("Não foi possível verificar sua sessão ALMORA. Confira sua conexão e tente atualizar a página.", true);
+      return await authInitPromise;
+    } finally {
+      authInitPromise = null;
     }
   }
 
