@@ -122,7 +122,7 @@
     const text = String(result?.data?.text || "").trim();
     const confidence = Number(result?.data?.confidence);
     const chars = [...text].filter(char => /[\p{L}\p{N}]/u.test(char)).length;
-    const symbols = [...text].filter(char => !/[\p{L}\p{N}\s.,!?;:'"“”‘’()\\[\\]{}…—–-]/u.test(char)).length;
+    const symbols = [...text].filter(char => !/[\p{L}\p{N}\s.,!?;:'"“”‘’()[\]{}…—–-]/u.test(char)).length;
     const meaningfulRatio = text.length ? chars / text.length : 0;
     const symbolRatio = text.length ? symbols / text.length : 0;
     const words = text.split(/\s+/).filter(word => /[\p{L}\p{N}]{2,}/u.test(word)).length;
