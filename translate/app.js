@@ -236,18 +236,6 @@
               (translatedText?"\n\nTRADUÇÃO:\n"+translatedText:"\n\nTRADUÇÃO: não gerada (sem texto reconhecido)."));
           }
           const report=results.join("\n\n"+ "─".repeat(32)+"\n\n");
-            progress.textContent="OCR · página "+(i+1)+"/"+pages.length;
-            const recognized=await worker.recognize(pages[i].blob);
-            const source=String(recognized.data.text||"").trim();
-            if(!source){results.push("PÁGINA "+(i+1)+" · Nenhum texto reconhecido.");continue;}
-            progress.textContent="Traduzindo · página "+(i+1)+"/"+pages.length;
-            const translated=await api("/api/projects/"+card.dataset.project+"/translate",{
-              method:"POST",headers:{"Content-Type":"application/json"},
-              body:JSON.stringify({text:source.slice(0,5800),source_language:project?.source_language||lang,context:project?.narrative_context||""})
-            });
-            results.push("PÁGINA "+(i+1)+" — "+pages[i].name+"\nTEXTO RECONHECIDO:\n"+source+"\n\nTRADUÇÃO:\n"+translated.translation);
-          }
-          const report=results.join("\n\n"+ "─".repeat(32)+"\n\n");
           const blob=new Blob([report],{type:"text/plain;charset=utf-8"});
           const url=URL.createObjectURL(blob);
           output.innerHTML='<a class="download-result" download="'+esc(file.name.replace(/\.[^.]+$/,""))+'-traduzido.txt" href="'+url+'">Baixar OCR + traduções (.txt)</a><pre class="batch-report">'+esc(report)+'</pre>';
