@@ -234,9 +234,11 @@
           const existingDetail = await api("/api/projects/"+card.dataset.project);
           const fileHash = await sha256Hex(await file.arrayBuffer());
           const existingOriginal = (existingDetail.files || []).find(item => item.checksum_sha256 === fileHash);
+          let sourceFileId = existingOriginal?.id || null;
           if (!existingOriginal) {
             progress.textContent = "Preservando o arquivo original no armazenamento seguro…";
-            await api("/api/projects/"+card.dataset.project+"/files", { method:"POST", headers:{"Content-Type":file.type || "application/octet-stream","X-File-Name":encodeURIComponent(file.name)}, body:file });
+            const uploadedSource = await api("/api/projects/"+card.dataset.project+"/files", { method:"POST", headers:{"Content-Type":file.type || "application/octet-stream","X-File-Name":encodeURIComponent(file.name)}, body:file });
+            sourceFileId = uploadedSource.file.id;
           }
           const priorPages = existingDetail.pages || [];
           const batchPages = priorPages.filter(p => p.ocr_data?.batch_file_hash === fileHash && Number.isInteger(Number(p.ocr_data?.batch_index)));
@@ -269,6 +271,7 @@
               method:"POST",headers:{"Content-Type":"application/json"},
               body:JSON.stringify({
                 page_number:batchStartNumber+i,
+                source_file_id:sourceFileId,
                 batch_key:batchKey,
                 batch_file_hash:fileHash,
                 batch_index:i,
