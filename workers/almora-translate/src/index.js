@@ -323,12 +323,16 @@ async function handle(request, env) {
     if (config.supabaseUrl && config.serviceKey) {
       try { await db(env, "staff_roles?select=user_id&limit=1"); database = true; } catch (_) {}
     }
-    const ready = Object.values(config).every(Boolean) && database;
+    let r2Access = false;
+    if (config.r2) {
+      try { await env.ALMORA_BUCKET.list({ limit: 1 }); r2Access = true; } catch (_) {}
+    }
+    const ready = Object.values(config).every(Boolean) && database && r2Access;
     return response({
       service: "ALMORA Translate",
       status: ready ? "ready" : "degraded",
       stage: "provider-prototype",
-      checks: { ...config, database },
+      checks: { ...config, database, r2Access },
       providers: {
         translation: { available: Boolean(env.AI), model: env.TRANSLATION_MODEL || "@cf/zai-org/glm-4.7-flash" },
         reconstruction: {
