@@ -2,7 +2,16 @@
   const SUPABASE_URL = "https://mcdinntggkanmsqubozn.supabase.co";
   const SUPABASE_KEY = "sb_publishable_dbymLTRkJyrohmyCjS6aPA_25sOAS61";
   const API_BASE = window.ALMORA_TRANSLATE_API || "https://almora-translate.kauansousa353.workers.dev";
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // Use the exact Supabase Auth storage key shared by the main ALMORA client.
+  // This keeps both clients on the same browser origin attached to one session.
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      storageKey: "sb-mcdinntggkanmsqubozn-auth-token",
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  });
   const $ = id => document.getElementById(id);
   let session = null;
   let roles = [];
@@ -717,8 +726,10 @@
 
   async function init() {
     if (!authListenerReady) {
-      supabase.auth.onAuthStateChange((_event, nextSession) => {
-        // Atualiza a interface quando o login termina ou a sessão é renovada.
+      supabase.auth.onAuthStateChange((event, nextSession) => {
+        // INITIAL_SESSION pode disparar durante a hidratação do armazenamento.
+        // getSession() abaixo é a leitura autoritativa da sessão persistida.
+        if (event === "INITIAL_SESSION" && !nextSession) return;
         void applySession(nextSession);
       });
       authListenerReady = true;
