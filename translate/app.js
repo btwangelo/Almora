@@ -51,12 +51,22 @@
       '</div>';
   }
 
+  function withTimeout(promise, label, ms = 10000) {
+    let timer;
+    return Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error(label + " demorou mais de " + Math.round(ms / 1000) + " segundos. Recarregue a página e tente novamente.")), ms);
+      })
+    ]).finally(() => window.clearTimeout(timer));
+  }
+
   async function request(path, options = {}) {
     if (API_BASE.includes("YOUR_SUBDOMAIN")) throw new Error("A API do Translate ainda não foi publicada. Falta configurar o endereço do Worker.");
 
     // Sempre buscar o token atual do armazenamento compartilhado; a variável
     // session pode conter um access token antigo mesmo com a conta conectada.
-    const current = await supabase.auth.getSession();
+    const current = await withTimeout(supabase.auth.getSession(), "A leitura da sessão ALMORA");
     if (current.error) throw new Error("Não foi possível recuperar sua sessão ALMORA: " + current.error.message);
     let accessToken = current.data.session?.access_token;
     if (!accessToken) throw new Error("Sua sessão ALMORA expirou. Entre novamente.");
@@ -917,17 +927,19 @@
     // Do not replace the project cards with a loading placeholder on those events.
     // Load the project list only once per authenticated user; explicit actions
     // such as upload/create/delete continue to call refresh() when needed.
+    // Confirma o login imediatamente. A consulta de projetos roda em segundo
+    // plano para que uma falha de API nunca deixe a tela presa na verificação.
+    notice("Você está conectado à ALMORA.");
     if (!authRefreshRunning && userId && projectsLoadedForUser !== userId) {
       authRefreshRunning = true;
-      try {
-        await refresh();
+      void refresh().then(() => {
         projectsLoadedForUser = userId;
-      } finally {
+      }).catch(error => {
+        $("projects").textContent = error.message || "Não foi possível carregar os projetos.";
+      }).finally(() => {
         authRefreshRunning = false;
-      }
+      });
     }
-    // A confirmação de login deve permanecer visível; não a substitua pelo aviso de conexão.
-    notice("Você está conectado à ALMORA.");
   }
 
   let authInitPromise = null;
@@ -949,7 +961,7 @@
         authListenerReady = true;
       }
       try {
-        const { data, error } = await supabase.auth.getSession();
+        const { data, error } = await withTimeout(supabase.auth.getSession(), "A verificação da sessão ALMORA");
         if (error) throw error;
         if (data.session) await applySession(data.session);
         else if (!hasConfirmedSession) await applySession(null);
@@ -968,27 +980,17 @@
     const button = $("refreshBtn");
     button.disabled = true;
     button.textContent = "Verificando…";
-    notice("Consultando sua sessão ALMORA…");
+    notice("Verificando sua sessão ALMORA…");
     try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      const currentSession = data.session || null;
-      if (currentSession) {
-        await applySession(currentSession);
-        button.textContent = "Conectado ✓";
-      } else {
-        notice("Você não está conectado neste navegador. Entre na ALMORA e volte a esta página.", true);
-      }
+      await withTimeout(init(), "A verificação da sessão ALMORA");
     } catch (error) {
-      notice("Não foi possível verificar o login: " + (error.message || "erro desconhecido") + ".", true);
+      notice(error.message || "Não foi possível verificar o login.", true);
     } finally {
       button.disabled = false;
       button.textContent = "Verificar login";
     }
   });
-  window.addEventListener("focus", init);
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden) init();
-  });
+  // Uma única inicialização ao abrir a página. Eventos de foco/visibilidade
+  // disparavam leituras concorrentes do Auth em navegadores móveis.
   init();
 })();
