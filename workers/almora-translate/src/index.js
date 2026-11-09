@@ -101,6 +101,11 @@ function isTranslator(auth) {
 function isEditor(auth) {
   return isAdmin(auth) || ["editor_bl", "editor_gl", "reviewer"].some(role => auth.roles.includes(role));
 }
+function canAccessTranslate(auth) {
+  // A ferramenta aceita somente a equipe de tradução/editorial e a administração.
+  // A autorização é validada no Worker, inclusive em acessos por URL direta.
+  return isTranslator(auth) || isEditor(auth);
+}
 function canCreate(auth) {
   return isTranslator(auth);
 }
@@ -355,7 +360,9 @@ async function handle(request, env) {
   catch (error) { return fail("Não foi possível validar a sessão.", 502, origin, env, "auth_unavailable"); }
   if (!auth) return fail("Entre na sua conta ALMORA para continuar.", 401, origin, env, "authentication_required");
 
-  if (!auth.roles.length) return fail("Sua conta não tem autorização para usar o ALMORA Translate.", 403, origin, env, "role_required");
+  if (!canAccessTranslate(auth)) {
+    return fail("O ALMORA Translate é restrito à equipe de tradução, edição, revisão e administração.", 403, origin, env, "role_required");
+  }
 
   try {
     if (request.method === "GET" && path === "/api/projects") {
