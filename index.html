@@ -1165,8 +1165,7 @@ function moveDraft(index,direction){
 async function pages(el){
   const files=[...el.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
   if(!files.length)return;
-  draft=[];
-  drawD();
+  // Keep the current project preview visible while the selected file is processed.
   setPageStatus('Carregando conteúdo...',true);
   try{
     const expanded=[];
@@ -1203,15 +1202,16 @@ async function pages(el){
     if(totalBytes>120*1024*1024)throw new Error('O capítulo ultrapassa o limite de 120 MB descompactados.');
 
     setPageStatus('Preparando pré-visualização de '+expanded.length+' páginas...',true);
-    draft=(await Promise.all(expanded.map(file=>comp(file,900)))).filter(Boolean);
-    if(!draft.length)throw new Error('Não foi possível encontrar imagens válidas nesses arquivos.');
+    const nextDraft=(await Promise.all(expanded.map(file=>comp(file,900)))).filter(Boolean);
+    if(!nextDraft.length)throw new Error('Não foi possível encontrar imagens válidas nesses arquivos.');
 
+    // Replace the preview only after the new file has been fully processed.
+    draft=nextDraft;
     drawD();
     setPageStatus(draft.length+' páginas carregadas. Revise, remova ou reorganize antes de publicar.');
     toast(draft.length+' páginas prontas para publicar.');
   }catch(e){
-    draft=[];
-    drawD();
+    // Preserve the previous project preview if the new file cannot be processed.
     setPageStatus('Erro ao carregar conteúdo: '+e.message);
     toast('Erro ao ler capítulo: '+e.message);
   }finally{
