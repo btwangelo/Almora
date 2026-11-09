@@ -46,7 +46,7 @@ The initial upload limit is a technical default of 50 MiB and is configurable. I
 
 ## Prototype status and limitations
 
-Text translation and experimental image reconstruction adapters are now present in this branch. The UI exposes a text test field, touch-painted image editing mask, and a manual multi-balloon lettering editor with PNG export. They are not deployed and have not yet been validated against real comic pages.
+Text translation and experimental image reconstruction adapters are now present in this branch. The UI exposes a text test field, touch-painted image editing mask, and a manual multi-balloon lettering editor with PNG export. These capabilities remain experimental and have not yet been validated against real comic pages.
 
 - Translation defaults to `@cf/zai-org/glm-4.7-flash`; Workers AI Free has 10,000 Neurons/day, after which requests fail until the daily reset.
 - Reconstruction defaults to `@cf/black-forest-labs/flux-2-klein-4b`. Model availability and pricing can change; verify the current Cloudflare Workers AI catalog before relying on it in production.
