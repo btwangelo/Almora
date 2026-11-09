@@ -498,6 +498,12 @@ async function handle(request, env) {
             !allowedMime[extension] || allowedMime[extension] !== mime) {
           return fail("Número, formato ou tipo de página inválido.", 400, origin, env);
         }
+        let sourceFileId = null;
+        if (input.source_file_id) {
+          const sourceFiles = await db(env, "almora_translation_files?id=eq." + encodeURIComponent(String(input.source_file_id)) + "&project_id=eq." + projectId + "&select=id&limit=1");
+          if (!sourceFiles?.length) return fail("O arquivo de origem não pertence a este projeto.", 400, origin, env);
+          sourceFileId = sourceFiles[0].id;
+        }
         const sourceText = String(input.ocr_text || "").slice(0, 24000);
         const translatedText = String(input.translated_text || "").slice(0, 24000);
         const imageBytes = decodeBase64(input.image_b64 || "");
@@ -515,7 +521,7 @@ async function handle(request, env) {
           customMetadata: { almoraTranslate: "encrypted-v1", pageId }
         });
         const row = {
-          id: pageId, project_id: projectId, page_number: pageNumber,
+          id: pageId, project_id: projectId, source_file_id: sourceFileId, page_number: pageNumber,
           original_object_key: objectKey, status: "needs_attention",
           detected_language: project.source_language,
           ocr_data: {
