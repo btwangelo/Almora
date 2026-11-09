@@ -603,7 +603,8 @@ async function handle(request, env) {
             batch_file_hash: input.batch_file_hash ? String(input.batch_file_hash).slice(0, 64) : null,
             batch_index: Number.isInteger(Number(input.batch_index)) ? Number(input.batch_index) : null,
             batch_start_number: Number.isInteger(Number(input.batch_start_number)) ? Number(input.batch_start_number) : null,
-            translation_model: input.translation_model ? String(input.translation_model).slice(0, 160) : null
+            translation_model: input.translation_model ? String(input.translation_model).slice(0, 160) : null,
+            lettering_layout: input.lettering_layout && typeof input.lettering_layout === "object" ? input.lettering_layout : null
           },
           updated_at: new Date().toISOString()
         };
@@ -772,6 +773,23 @@ async function handle(request, env) {
         return new Response(plain, { status: 200, headers: { ...cors, "content-type": "application/zip", "content-disposition": "attachment; filename=almora-revisao-v" + version.version_number + ".zip", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
       }
 
+      const pageLayoutMatch = action.match(/^pages\/([0-9a-f-]{36})\/layout$/i);
+      if (request.method === "POST" && pageLayoutMatch) {
+        if (!isTranslator(auth) || (!isAdmin(auth) && project.created_by !== auth.user.id && project.assigned_translator_id !== auth.user.id)) return fail("Somente o responsável pela tradução pode preparar o lettering.", 403, origin, env);
+        const pageId = pageLayoutMatch[1];
+        const rows = await db(env, "almora_translation_pages?id=eq." + pageId + "&project_id=eq." + projectId + "&select=*&limit=1");
+        const page = rows?.[0];
+        if (!page) return fail("Página não encontrada.", 404, origin, env);
+        const input = await request.json();
+        const width = Number(input.width), height = Number(input.height);
+        const raw = Array.isArray(input.lines) ? input.lines : [];
+        if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 1800 || height > 1800 || raw.length > 300) return fail("Dimensões ou quantidade de linhas OCR inválidas.", 400, origin, env);
+        const lines = raw.map(line => ({ text: String(line.text || "").slice(0, 500), x: Math.max(0, Math.min(width, Math.round(Number(line.x) || 0))), y: Math.max(0, Math.min(height, Math.round(Number(line.y) || 0))), width: Math.max(0, Math.min(width, Math.round(Number(line.width) || 0))), height: Math.max(0, Math.min(height, Math.round(Number(line.height) || 0))) })).filter(line => line.text.trim() && line.width > 0 && line.height > 0);
+        const ocrData = { ...(page.ocr_data || {}), lettering_layout: { width, height, lines, prepared_at: new Date().toISOString(), engine: "tesseract.js" } };
+        await db(env, "almora_translation_pages?id=eq." + pageId + "&project_id=eq." + projectId, { method: "PATCH", headers: { "prefer": "return=minimal" }, body: JSON.stringify({ ocr_data: ocrData, updated_at: new Date().toISOString() }) });
+        await addEvent(env, projectId, auth.user.id, "lettering_layout_prepared", { page_id: pageId, page_number: page.page_number, lines: lines.length });
+        return response({ success: true, page_id: pageId, page_number: page.page_number, lines: lines.length }, 200, origin, env);
+      }
       const pageImageMatch = action.match(/^pages\/([0-9a-f-]{36})\/image$/i);
       if (request.method === "GET" && pageImageMatch) {
         const pageId = pageImageMatch[1];
