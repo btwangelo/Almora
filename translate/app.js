@@ -349,7 +349,8 @@
               source_language: project.source_language,
             })
           });
-          showProgress(output,"Tradução concluída",100,"Motor: "+(result.model||"IA"));\n          output.insertAdjacentHTML("beforeend", '<div class="task-progress-detail">' + esc(result.translation) + '</div>');
+          showProgress(output,"Tradução concluída",100,"Motor: "+(result.model||"IA"));
+          output.insertAdjacentHTML("beforeend", '<div class="task-progress-detail">' + esc(result.translation) + '</div>');
           card._lastTranslation = result.translation;
           notice("Tradução concluída pelo motor " + esc(result.model) + ".");
         } catch (error) {
