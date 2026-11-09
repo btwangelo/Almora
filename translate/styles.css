@@ -20,3 +20,39 @@
 .letter-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-top:10px}
 .letter-actions label{flex:1 1 180px;margin:0}
 .letter-actions input[type=range]{padding:0;accent-color:var(--accent);border:0;background:transparent}
+
+/* ALMORA identity system */
+:root{color-scheme:dark;--bg:#121214;--panel:#1e1e22;--panel2:#2a2a30;--text:#f2eefc;--muted:#9d98b0;--line:#33333b;--accent:#b13df5;--accent2:#4b2bc4;font-family:Inter,system-ui,sans-serif}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font:15px/1.5 Inter,system-ui,sans-serif}
+.topbar{height:auto;min-height:68px;padding:10px max(14px,calc((100vw - 1000px)/2));display:flex;align-items:center;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);background:var(--bg);backdrop-filter:none;position:sticky;top:0;z-index:5}
+.brand{display:flex;align-items:center;gap:9px;color:var(--accent);text-decoration:none;letter-spacing:0}
+.brand-word{display:flex;align-items:center;font:700 26px Fredoka,sans-serif;letter-spacing:1px}
+.brand-mark{display:inline-flex;width:29px;height:27px;margin:0 1px}.brand-mark svg{width:100%;height:100%}
+.brand-section{font:700 10px Inter,sans-serif;letter-spacing:.16em;color:var(--muted);border-left:1px solid var(--line);padding:5px 0 5px 10px}
+.topbar nav.topnav{display:flex;align-items:center;gap:12px}
+.topnav a{color:var(--muted);font-size:13px;font-weight:600;text-decoration:none}.topnav a:hover{color:var(--text)}
+.quiet{border:1px solid var(--line);background:var(--panel2);color:var(--text);border-radius:99px;padding:8px 13px;font-weight:600}
+.shell{max-width:1000px;padding:34px 14px 70px}
+.intro{max-width:680px;margin-bottom:28px}.eyebrow{color:var(--accent);font-size:10px;letter-spacing:.16em}
+.intro h1{font:700 clamp(36px,6vw,58px)/1.04 Fredoka,sans-serif;letter-spacing:-.02em;margin:0}
+.intro h1 em{color:var(--accent);font-style:normal}.intro p{color:var(--muted);line-height:1.65}
+.notice{background:var(--panel);border:1px solid var(--line);border-radius:14px;color:var(--muted)}
+.section-head{margin:30px 0 16px}.section-head h2,.panel h3{font-family:Fredoka,sans-serif;font-weight:600;letter-spacing:0}
+.section-head h2{font-size:26px}.role-pill,.step{color:var(--accent);border-color:#b13df555;background:transparent}
+.panel,.project{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:none}
+.panel{padding:20px;margin-bottom:24px}.panel h3{font-size:22px}
+.panel-title p,.footnote p{color:var(--muted)}form label{color:var(--text)}
+input,select,textarea{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:10px}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none}
+.primary{background:var(--accent2);color:#fff;border:0;border-radius:10px;padding:10px 18px;font-weight:700}
+.primary:hover{filter:brightness(1.12)}
+.small-button{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:10px}
+.small-button:hover{border-color:var(--accent)}
+.status{background:var(--panel2);color:var(--muted);border:1px solid var(--line)}
+.engine-panel{background:var(--bg);border-color:var(--line)}.engine-panel h4{color:var(--accent)}
+.empty,.loading{border-color:var(--line);background:var(--panel);color:var(--muted)}
+.footnote{border-color:var(--line)}
+.project-actions{display:flex;justify-content:flex-end;margin-top:12px}
+.delete-project{border-color:#713044;color:#ff9aaa}.delete-project:hover{background:#3a2029;border-color:#a3243b}
+@media(max-width:620px){.topbar{padding:9px 12px;min-height:60px}.brand-word{font-size:23px}.brand-mark{width:25px;height:24px}.brand-section{font-size:9px}.topbar nav.topnav{gap:8px}.topnav a{font-size:11px}.quiet{font-size:11px;padding:7px 9px}.shell{padding:28px 12px 55px}.panel{padding:16px}}
