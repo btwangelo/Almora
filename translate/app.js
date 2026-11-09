@@ -78,7 +78,7 @@
         Number(project.completed_pages || 0) + ' concluídas · ' + Number(project.failed_pages || 0) + ' com falha</div>' +
         (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' +
           '<section class="engine-panel"><h4>Motor de tradução · teste</h4><textarea class="source-text" rows="3" maxlength="6000" placeholder="Cole uma fala ou trecho para testar a tradução…"></textarea><button class="small-button translate-text">Traduzir para PT-BR</button><div class="engine-output" data-translation-output></div></section>' +
-          '<section class="engine-panel review-panel"><h4>Revisão e entrega editorial</h4><p>Envie a tradução para avaliação ou registre a decisão editorial. A aprovação não publica automaticamente a obra.</p><textarea class="review-notes" rows="2" maxlength="4000" placeholder="Observações para a equipe (opcional)…"></textarea>' +
+          '<section class="engine-panel review-panel"><h4>Revisão e entrega editorial</h4><p>Gere um pacote ZIP com as imagens originais e as traduções em separado para avaliação.</p><button class="small-button package-review" type="button">Gerar pacote de revisão (.zip)</button><div class="package-progress" aria-live="polite"></div><div class="version-list">' + ((project.almora_translation_versions || []).map(v => '<div>Versão ' + Number(v.version_number) + ' · ' + esc(v.status) + ' <button class="small-button download-version" data-version="' + esc(v.id) + '" type="button">Baixar pacote</button></div>').join("")) + '</div><textarea class="review-notes" rows="2" maxlength="4000" placeholder="Observações para a equipe (opcional)…"></textarea>' +
           (["owner","admin","translator"].some(role => roles.includes(role)) && ["uploaded","translator_review","changes_requested"].includes(project.status) && (roles.includes("owner") || roles.includes("admin") || project.created_by === session.user.id || project.assigned_translator_id === session.user.id) ? '<button class="small-button submit-review" type="button">Enviar para revisão editorial</button>' : '') +
           (["owner","admin","editor_bl","editor_gl","reviewer"].some(role => roles.includes(role)) && project.status === "editorial_review" ? '<div class="review-actions"><button class="small-button approve-review" type="button">Aprovar tradução</button><button class="small-button request-changes" type="button">Solicitar ajustes</button></div>' : '') +
           '</section>' +
@@ -87,10 +87,16 @@
           '<section class="engine-panel"><h4>Aplicar tradução nos balões · lettering</h4><p>Envie a página limpa, digite uma fala e toque no local do balão para posicioná-la. Você pode adicionar vários textos à mesma página.</p><label>Página limpa <input class="letter-image" type="file" accept="image/png,image/jpeg,image/webp"></label><textarea class="letter-text" rows="2" maxlength="1500" placeholder="Digite ou cole a fala traduzida…"></textarea><button class="small-button use-translation" type="button">Usar tradução acima</button><div class="letter-stage" hidden><canvas class="letter-canvas"></canvas></div><div class="letter-actions"><label>Tamanho do texto <input class="letter-size" type="range" min="12" max="80" value="32"></label><button class="small-button clear-lettering" type="button">Limpar textos</button><button class="small-button export-lettering" type="button">Baixar página legendada</button></div><div class="engine-output" data-lettering-output></div></section>' : '') +
         '<div class="file-list" data-file-list>' +
         ((project.almora_translation_files || []).length
-          ? project.almora_translation_files.map(file => '✓ ' + esc(file.original_name) + ' · ' + bytes(Number(file.file_size_bytes || 0))).join('<br>')
+          ? project.almora_translation_files.map(file => '<div>✓ ' + esc(file.original_name) + ' · ' + bytes(Number(file.file_size_bytes || 0)) + ' <button class="small-button download-file" data-file="' + esc(file.id) + '" type="button">Baixar original</button></div>').join("")
           : 'Nenhum arquivo enviado ainda.') +
-        '</div></article>';
+        '</div>' +
+        '<section class="saved-pages"><h4>Páginas processadas</h4>' + (((project.almora_translation_pages || []).length) ? project.almora_translation_pages.map(page => { const o=page.ocr_data||{}; return '<details><summary>Página ' + Number(page.page_number) + ' · ' + esc(o.original_name || "imagem") + '</summary><p><strong>Texto reconhecido</strong></p><pre>' + esc(o.source_text || "Nenhum texto reconhecido.") + '</pre><p><strong>Tradução</strong></p><pre>' + esc(o.translated_text || "Ainda sem tradução.") + '</pre><button class="small-button download-page" data-page="' + esc(page.id) + '" type="button">Baixar imagem original</button></details>'; }).join("") : '<p>Nenhuma página processada ainda.</p>') + '</section></article>';
     }).join("");
+    document.querySelectorAll(".project .download-file").forEach(button => button.addEventListener("click", async () => { const card=button.closest(".project"); button.disabled=true; try { const blob=await apiBlob("/api/projects/"+card.dataset.project+"/files/"+button.dataset.file+"/download"); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="arquivo-almora"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),60000); } catch(e){notice(e.message,true);} finally{button.disabled=false;} }));
+    document.querySelectorAll(".project .download-page").forEach(button => button.addEventListener("click", async () => { const card=button.closest(".project"); button.disabled=true; try { const blob=await apiBlob("/api/projects/"+card.dataset.project+"/pages/"+button.dataset.page+"/image"); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="pagina-original.png"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),60000); } catch(e){notice(e.message,true);} finally{button.disabled=false;} }));
+    document.querySelectorAll(".project .download-version").forEach(button => button.addEventListener("click", async () => { const card=button.closest(".project"); button.disabled=true; try { const blob=await apiBlob("/api/projects/"+card.dataset.project+"/versions/"+button.dataset.version+"/download"); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="almora-revisao.zip"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),60000); } catch(e){notice(e.message,true);} finally{button.disabled=false;} }));
+    document.querySelectorAll(".project .package-review").forEach(button => button.addEventListener("click", () => createReviewPackage(button)));
+
     document.querySelectorAll(".project .upload").forEach(button => {
       button.addEventListener("click", () => uploadFiles(button.closest(".project")));
     });
@@ -556,6 +562,33 @@
       image.onerror = () => reject(new Error("Imagem inválida."));
       image.src = src;
     });
+  }
+
+  async function createReviewPackage(button) {
+    const card=button.closest(".project"), progress=card.querySelector(".package-progress");
+    const project=(window.__almoraProjects||[]).find(p=>p.id===card.dataset.project);
+    const pages=[...(project?.almora_translation_pages||[])].sort((a,b)=>Number(a.page_number)-Number(b.page_number));
+    if(!pages.length)return notice("Processe pelo menos uma página antes de gerar o pacote.",true);
+    if(!window.JSZip)return notice("A biblioteca ZIP não carregou. Atualize a página.",true);
+    button.disabled=true;
+    try {
+      const zip=new JSZip(), manifest=["ALMORA TRANSLATE — PACOTE DE REVISÃO","Projeto: "+project.title,"Este pacote contém imagens originais e traduções separadas para revisão. Não é uma edição final pronta para publicação.",""];
+      for(let i=0;i<pages.length;i++){
+        const page=pages[i],o=page.ocr_data||{}; progress.textContent="Montando pacote · página "+(i+1)+"/"+pages.length;
+        const blob=await apiBlob("/api/projects/"+card.dataset.project+"/pages/"+page.id+"/image");
+        const ext=({"image/png":"png","image/webp":"webp"})[o.mime_type]||"jpg", number=String(page.page_number).padStart(3,"0");
+        zip.file("paginas/"+number+"-original."+ext,blob);
+        zip.file("traducoes/"+number+".txt","PÁGINA "+page.page_number+"\n\nTEXTO ORIGINAL\n"+(o.source_text||"")+"\n\nTRADUÇÃO PT-BR\n"+(o.translated_text||"Sem tradução.")+"\n");
+        manifest.push("Página "+page.page_number+": "+(o.translated_text?"traduzida":"sem tradução"));
+      }
+      zip.file("LEIA-ME.txt",manifest.join(String.fromCharCode(10)));
+      progress.textContent="Compactando pacote…";
+      const archive=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
+      if(archive.size>50*1024*1024)throw new Error("O pacote ultrapassa 50 MiB. Divida a obra em lotes menores.");
+      const result=await api("/api/projects/"+card.dataset.project+"/versions",{method:"POST",headers:{"Content-Type":"application/zip","X-Output-Format":"zip"},body:archive});
+      progress.textContent="Pacote de revisão v"+result.version.version_number+" salvo com segurança.";
+      notice("Pacote de revisão criado. Os originais e as traduções estão em arquivos separados."); await refresh();
+    } catch(error){progress.textContent="";notice(error.message,true);} finally{button.disabled=false;}
   }
 
   async function uploadFiles(card) {
