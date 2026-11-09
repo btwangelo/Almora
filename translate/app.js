@@ -747,9 +747,24 @@
     const button = $("refreshBtn");
     button.disabled = true;
     button.textContent = "Verificando…";
-    notice("Verificando se você está conectado à sua conta ALMORA…");
-    try { await init(); }
-    finally { button.disabled = false; button.textContent = "Verificar login"; }
+    notice("Consultando sua sessão ALMORA…");
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      const currentSession = data.session || null;
+      await applySession(currentSession);
+      if (currentSession) {
+        const identity = currentSession.user?.email || currentSession.user?.phone || "conta autenticada";
+        notice("✓ Você está conectado à ALMORA como " + identity + ".");
+      } else {
+        notice("Você não está conectado neste navegador. Entre na ALMORA e volte a esta página.", true);
+      }
+    } catch (error) {
+      notice("Não foi possível verificar o login: " + (error.message || "erro desconhecido") + ".", true);
+    } finally {
+      button.disabled = false;
+      button.textContent = "Verificar login";
+    }
   });
   window.addEventListener("focus", init);
   document.addEventListener("visibilitychange", () => {
