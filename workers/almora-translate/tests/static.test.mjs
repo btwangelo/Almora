@@ -20,7 +20,7 @@ test("health reports degraded until critical bindings and database are available
 test("batch page writes persist a deterministic idempotency key", () => {
   assert.match(worker, /batch_key: input\.batch_key/);
   assert.match(frontend, /completedKeys\.has\(batchKey\)/);
-  assert.match(frontend, /page_number:nextPageNumber\+\+/);
+  assert.match(frontend, /page_number:batchStartNumber\+i/);
 });
 
 test("review submission requires translated pages and a review package", () => {
