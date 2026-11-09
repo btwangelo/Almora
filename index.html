@@ -5675,8 +5675,18 @@ window.almoraSavePrivacy = async function() {
   window.addEventListener("hashchange", () => { scheduleRestore(); });
   window.addEventListener("pageshow", scheduleRestore);
   window.addEventListener("focus", scheduleRestore);
+  const customKey = (name, customScope) => [owner(), route(), customScope || route(), "custom:" + name].join("|");
   window.ALMORADrafts = {
     saveNow: save,
+    saveData: async (name, value, customScope) => put({key:customKey(name,customScope),kind:"custom",value,savedAt:Date.now()}),
+    loadData: async (name, customScope) => {
+      const database = await db();
+      return new Promise((resolve,reject) => {
+        const tx=database.transaction(STORE,"readonly"), request=tx.objectStore(STORE).get(customKey(name,customScope));
+        request.onsuccess=()=>resolve(request.result?.value ?? null); request.onerror=()=>reject(request.error);
+      });
+    },
+    removeData: async (name, customScope) => remove(customKey(name,customScope)),
     clearCurrent: async () => {
       const database = await db();
       const records = await new Promise((resolve,reject) => {
