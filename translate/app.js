@@ -929,7 +929,7 @@
     // such as upload/create/delete continue to call refresh() when needed.
     // Confirma o login imediatamente. A consulta de projetos roda em segundo
     // plano para que uma falha de API nunca deixe a tela presa na verificação.
-    notice("");
+    notice("Você está conectado à ALMORA.");
     if (!authRefreshRunning && userId && projectsLoadedForUser !== userId) {
       authRefreshRunning = true;
       void refresh().then(() => {
@@ -980,7 +980,6 @@
     const button = $("refreshBtn");
     button.disabled = true;
     button.textContent = "Verificando…";
-    notice("Verificando sua sessão ALMORA…");
     try {
       await withTimeout(init(), "A verificação da sessão ALMORA");
     } catch (error) {
