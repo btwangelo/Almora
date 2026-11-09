@@ -5538,5 +5538,158 @@ window.almoraSavePrivacy = async function() {
 
 <script src="social-profiles.js?v=custom-color-picker1"></script>
 <script src="studio-dashboard.js?v=announcements1"></script>
+<script id="almora-draft-persistence">
+(() => {
+  "use strict";
+  const DB_NAME = "almora-work-drafts-v1";
+  const STORE = "fields";
+  const restored = new WeakSet();
+  const timers = new WeakMap();
+  let dbPromise;
+  const db = () => dbPromise ||= new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(STORE)) database.createObjectStore(STORE, {keyPath:"key"});
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const owner = () => {
+    try {
+      const raw = localStorage.getItem("sb-mcdinntggkanmsqubozn-auth-token");
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed?.user?.id || "local";
+    } catch (_) { return "local"; }
+  };
+  const route = () => {
+    if (location.pathname.includes("/translate")) return "translate";
+    const parts = (location.hash.slice(1) || "home").split("/");
+    return "almora:" + parts.slice(0, 2).join("/");
+  };
+  const scope = el => el.closest(".project")?.dataset.project || route();
+  const identity = el => {
+    if (el.id) return "id:" + el.id;
+    if (el.name) return "name:" + el.name;
+    const classes = [...el.classList].sort().join(".");
+    const siblings = [...document.querySelectorAll(el.tagName.toLowerCase() + (classes ? "." + classes.split(".").join(".") : ""))];
+    return el.tagName.toLowerCase() + ":" + classes + ":" + Math.max(0, siblings.indexOf(el));
+  };
+  const keyFor = el => [owner(), route(), scope(el), identity(el)].join("|");
+  const eligible = el => {
+    if (!(el instanceof HTMLElement) || el.matches("[data-draft-ignore],input[type=password],input[type=hidden],input[type=submit],input[type=button],input[type=reset],button")) return false;
+    if (el.matches("input,textarea,select")) {
+      const type = (el.getAttribute("type") || "").toLowerCase();
+      if (["password","hidden","submit","button","reset"].includes(type)) return false;
+      if (/pass(word)?|token|secret|authorization/i.test((el.name || "") + " " + (el.id || ""))) return false;
+      return true;
+    }
+    return el.isContentEditable;
+  };
+  const put = async record => {
+    const database = await db();
+    return new Promise((resolve, reject) => {
+      const tx = database.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(record);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  };
+  const remove = async key => {
+    const database = await db();
+    return new Promise((resolve, reject) => {
+      const tx = database.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(key);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  };
+  const save = el => {
+    if (!eligible(el)) return;
+    clearTimeout(timers.get(el));
+    timers.set(el, setTimeout(async () => {
+      try {
+        const key = keyFor(el);
+        if (el instanceof HTMLInputElement && el.type === "file") {
+          const files = [...(el.files || [])];
+          if (!files.length) return await remove(key);
+          await put({key, kind:"files", value:files, savedAt:Date.now()});
+        } else {
+          const value = el instanceof HTMLInputElement && ["checkbox","radio"].includes(el.type)
+            ? {checked:el.checked, value:el.value}
+            : el.value;
+          await put({key, kind:"value", value, savedAt:Date.now()});
+        }
+      } catch (error) {
+        console.warn("ALMORA: não foi possível guardar este rascunho localmente.", error);
+      }
+    }, 220));
+  };
+  const restore = async () => {
+    try {
+      const database = await db();
+      const records = await new Promise((resolve, reject) => {
+        const tx = database.transaction(STORE, "readonly");
+        const request = tx.objectStore(STORE).getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+      });
+      const prefix = owner() + "|" + route() + "|";
+      const map = new Map(records.filter(item => item.key.startsWith(prefix)).map(item => [item.key,item]));
+      document.querySelectorAll("input,textarea,select,[contenteditable=true]").forEach(async el => {
+        if (!eligible(el) || restored.has(el)) return;
+        const item = map.get(keyFor(el));
+        if (!item) return;
+        try {
+          if (item.kind === "files" && el instanceof HTMLInputElement && el.type === "file") {
+            const transfer = new DataTransfer();
+            (item.value || []).forEach(file => transfer.items.add(file));
+            el.files = transfer.files;
+            restored.add(el);
+            el.dispatchEvent(new Event("change", {bubbles:true}));
+          } else if (item.kind === "value") {
+            if (el instanceof HTMLInputElement && ["checkbox","radio"].includes(el.type)) {
+              el.checked = !!item.value.checked;
+            } else el.value = item.value;
+            restored.add(el);
+            el.dispatchEvent(new Event("input", {bubbles:true}));
+            el.dispatchEvent(new Event("change", {bubbles:true}));
+          }
+        } catch (error) {
+          console.warn("ALMORA: um rascunho não pôde ser restaurado.", error);
+        }
+      });
+    } catch (error) {
+      console.warn("ALMORA: armazenamento local de rascunhos indisponível.", error);
+    }
+  };
+  document.addEventListener("input", event => save(event.target), true);
+  document.addEventListener("change", event => save(event.target), true);
+  let restoreTimer;
+  const scheduleRestore = () => {
+    clearTimeout(restoreTimer);
+    restoreTimer = setTimeout(restore, 180);
+  };
+  const app = document.getElementById("app") || document.getElementById("projects");
+  if (app) new MutationObserver(scheduleRestore).observe(app, {childList:true,subtree:true});
+  window.addEventListener("hashchange", () => { scheduleRestore(); });
+  window.addEventListener("pageshow", scheduleRestore);
+  window.addEventListener("focus", scheduleRestore);
+  window.ALMORADrafts = {
+    saveNow: save,
+    clearCurrent: async () => {
+      const database = await db();
+      const records = await new Promise((resolve,reject) => {
+        const tx=database.transaction(STORE,"readonly"), request=tx.objectStore(STORE).getAll();
+        request.onsuccess=()=>resolve(request.result||[]); request.onerror=()=>reject(request.error);
+      });
+      const prefix=owner()+"|"+route()+"|";
+      const tx=database.transaction(STORE,"readwrite");
+      records.filter(item=>item.key.startsWith(prefix)).forEach(item=>tx.objectStore(STORE).delete(item.key));
+    }
+  };
+  scheduleRestore();
+})();
+</script>
 </body>
 </html>
