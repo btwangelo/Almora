@@ -19,7 +19,7 @@ function corsHeaders(origin, env) {
   const allowed = (env.CORS_ORIGINS || DEFAULT_ORIGINS.join(","))
     .split(",").map(x => x.trim()).filter(Boolean);
   const headers = {
-    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-methods": "GET,POST,DELETE,OPTIONS",
     "access-control-allow-headers": "Authorization,Content-Type,X-File-Name,X-Output-Format",
     "access-control-max-age": "86400",
     "vary": "Origin"
