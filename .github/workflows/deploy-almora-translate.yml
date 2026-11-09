@@ -1,6 +1,12 @@
 name: Deploy ALMORA Translate Worker
 
 on:
+  push:
+    branches:
+      - feature/almora-translate-foundation
+    paths:
+      - "workers/almora-translate/**"
+      - ".github/workflows/deploy-almora-translate.yml"
   workflow_dispatch:
 
 permissions:
