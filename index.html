@@ -151,7 +151,15 @@ const ALMORA_KEY = 'sb_publishable_dbymLTRkJyrohmyCjS6aPA_25sOAS61';
 
 const almoraDB = window.supabase.createClient(
   ALMORA_URL,
-  ALMORA_KEY
+  ALMORA_KEY,
+  {
+    auth: {
+      storageKey: "sb-mcdinntggkanmsqubozn-auth-token",
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true
+    }
+  }
 );
 window.almoraDB = almoraDB;
 </script>
