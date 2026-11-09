@@ -14,7 +14,7 @@ test("Worker normalizes Supabase REST/Auth suffixes before building endpoints", 
 
 test("health reports degraded until critical bindings and database are available", () => {
   assert.match(worker, /status: ready \? "ready" : "degraded"/);
-  assert.match(worker, /checks: \{ \.\.\.config, database \}/);
+  assert.ok(worker.includes("checks: { ...config, database, r2Access }"));
 });
 
 test("batch page writes persist a deterministic idempotency key", () => {
