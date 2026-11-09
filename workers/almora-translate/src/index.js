@@ -712,9 +712,9 @@ async function handle(request, env) {
         const format = String(request.headers.get("x-output-format") || "zip").toLowerCase();
         if (format !== "zip") return fail("O pacote de revisão usa formato ZIP.", 400, origin, env);
         const declared = Number(request.headers.get("content-length") || 0);
-        if (declared > 50 * 1024 * 1024) return fail("O pacote excede 50 MiB.", 413, origin, env);
+        if (declared > 80 * 1024 * 1024) return fail("O pacote excede 80 MiB.", 413, origin, env);
         const archive = await request.arrayBuffer();
-        if (!archive.byteLength || archive.byteLength > 50 * 1024 * 1024) return fail("Pacote vazio ou acima de 50 MiB.", 413, origin, env);
+        if (!archive.byteLength || archive.byteLength > 80 * 1024 * 1024) return fail("Pacote vazio ou acima de 80 MiB.", 413, origin, env);
         const pages = await db(env, "almora_translation_pages?project_id=eq." + projectId + "&select=id,ocr_data&page_number=gt.0&order=page_number.asc");
         const readable = (pages || []).filter(page => String(page.ocr_data?.source_text || "").trim());
         if (!pages?.length || !readable.length || readable.some(page => !String(page.ocr_data?.translated_text || "").trim())) return fail("O pacote exige todas as páginas com texto reconhecido traduzido.", 409, origin, env);
