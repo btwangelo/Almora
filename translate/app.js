@@ -127,11 +127,13 @@
     $("projects").innerHTML = projects.map(project => {
       const mayUpload = ["owner","admin","translator"].some(role => roles.includes(role)) &&
         (roles.includes("owner") || roles.includes("admin") || project.created_by === session.user.id || project.assigned_translator_id === session.user.id);
+      const mayDelete = roles.includes("owner") || roles.includes("admin") || project.created_by === session.user.id;
       return '<article class="project" data-project="' + esc(project.id) + '" data-source-language="' + esc(project.source_language) + '">' +
         '<div class="project-top"><div><h3>' + esc(project.title) + '</h3><div class="meta">' +
         esc(({en:"Inglês",ko:"Coreano",ja:"Japonês",zh:"Chinês"})[project.source_language] || project.source_language) +
         ' → Português brasileiro · Criado em ' + esc(date(project.created_at)) + '</div></div>' +
         '<span class="status">' + esc(labels[project.status] || project.status) + '</span></div>' +
+        (mayDelete ? '<div class="project-actions"><button class="small-button delete-project" type="button">Apagar projeto</button></div>' : '') +
         '<div class="meta" style="margin-top:10px">' + Number(project.total_pages || 0) + ' páginas · ' +
         Number(project.completed_pages || 0) + ' concluídas · ' + Number(project.failed_pages || 0) + ' com falha</div>' +
         (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' +
@@ -157,6 +159,29 @@
     document.querySelectorAll(".project .download-page").forEach(button => button.addEventListener("click", async () => { const card=button.closest(".project"); button.disabled=true; try { const blob=await apiBlob("/api/projects/"+card.dataset.project+"/pages/"+button.dataset.page+"/image"); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="pagina-original.png"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),60000); } catch(e){notice(e.message,true);} finally{button.disabled=false;} }));
     document.querySelectorAll(".project .download-version").forEach(button => button.addEventListener("click", async () => { const card=button.closest(".project"); button.disabled=true; try { const blob=await apiBlob("/api/projects/"+card.dataset.project+"/versions/"+button.dataset.version+"/download"); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="almora-revisao.zip"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),60000); } catch(e){notice(e.message,true);} finally{button.disabled=false;} }));
     document.querySelectorAll(".project .package-review").forEach(button => button.addEventListener("click", () => createReviewPackage(button)));
+
+    document.querySelectorAll(".project .delete-project").forEach(button => {
+      button.addEventListener("click", async () => {
+        const card = button.closest(".project");
+        const project = projects.find(item => item.id === card.dataset.project);
+        if (!project) return notice("Não foi possível localizar este projeto.", true);
+        const confirmed = window.confirm(
+          'Apagar permanentemente "' + project.title + '"? Todos os arquivos, páginas, versões e registros deste projeto serão excluídos. Esta ação não pode ser desfeita.'
+        );
+        if (!confirmed) return;
+        button.disabled = true;
+        button.textContent = "Apagando…";
+        try {
+          await request("/api/projects/" + card.dataset.project, { method: "DELETE" });
+          notice("Projeto apagado permanentemente.");
+          await refresh();
+        } catch (error) {
+          notice(error.message, true);
+          button.disabled = false;
+          button.textContent = "Apagar projeto";
+        }
+      });
+    });
 
     document.querySelectorAll(".project .upload").forEach(button => {
       button.addEventListener("click", () => uploadFiles(button.closest(".project")));
