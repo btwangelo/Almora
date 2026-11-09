@@ -646,7 +646,7 @@ async function handle(request, env) {
         const extension = (name.split(".").pop() || "").toLowerCase();
         const allowed = ["zip", "cbz", "pdf", "png", "jpg", "jpeg", "webp"];
         if (!allowed.includes(extension)) return fail("Formato não permitido.", 415, origin, env);
-        const maxBytes = Number(env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024);
+        const maxBytes = Number(env.MAX_UPLOAD_BYTES || 80 * 1024 * 1024);
         const declared = Number(request.headers.get("content-length") || 0);
         if (declared > maxBytes) return fail("Arquivo excede o limite técnico configurado.", 413, origin, env);
         const original = await request.arrayBuffer();
