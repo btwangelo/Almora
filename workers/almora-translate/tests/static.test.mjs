@@ -19,6 +19,9 @@ test("health reports degraded until critical bindings and database are available
 
 test("batch page writes persist a deterministic idempotency key", () => {
   assert.match(worker, /batch_key: input\.batch_key/);
+  assert.match(worker, /source_file_id: sourceFileId/);
+  assert.match(frontend, /sourceFileId = uploadedSource\.file\.id/);
+  assert.match(worker, /max_completion_tokens/);
   assert.match(frontend, /completedKeys\.has\(batchKey\)/);
   assert.match(frontend, /page_number:batchStartNumber\+i/);
 });
