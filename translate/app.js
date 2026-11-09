@@ -28,25 +28,24 @@
   };
   const date = value => new Date(value).toLocaleString("pt-BR");
 
-  async function api(path, options = {}) {
+  async function request(path, options = {}) {
+    if (!session?.access_token) throw new Error("Sua sessão ALMORA expirou. Entre novamente.");
     if (API_BASE.includes("YOUR_SUBDOMAIN")) throw new Error("A API do Translate ainda não foi publicada. Falta configurar o endereço do Worker.");
-    const res = await fetch(API_BASE.replace(/\/$/,"") + path, {
-      ...options,
-      headers: {
-        "Authorization": "Bearer " + session.access_token,
-        ...(options.headers || {})
-      }
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "Falha na comunicação com o servidor.");
-    return data;
+    const res = await fetch(API_BASE.replace(/\/$/,"") + path, { ...options, headers: { "Authorization": "Bearer " + session.access_token, ...(options.headers || {}) } });
+    if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.error || "Falha na comunicação com o servidor (HTTP " + res.status + ")."); }
+    return res;
   }
-
-  function notice(message, error = false) {
-    $("notice").className = error ? "notice error" : "notice";
-    $("notice").innerHTML = message;
-    $("notice").hidden = false;
+  async function api(path, options = {}) { return (await request(path, options)).json().catch(() => ({})); }
+  async function apiBlob(path) { return (await request(path)).blob(); }
+  function sha256Hex(value) { return crypto.subtle.digest("SHA-256", value instanceof ArrayBuffer ? value : new TextEncoder().encode(String(value))).then(buffer => Array.from(new Uint8Array(buffer)).map(byte => byte.toString(16).padStart(2,"0")).join("")); }
+  function blobDataUrl(blob) { return new Promise((resolve,reject) => { const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result)); reader.onerror=()=>reject(new Error("Não foi possível preparar a imagem.")); reader.readAsDataURL(blob); }); }
+  async function translateLongText(projectId, text, language, context, onProgress) {
+    const chunks=[]; let remaining=String(text||"").trim();
+    while(remaining.length){ let cut=Math.min(5600,remaining.length); if(cut<remaining.length){ const boundary=Math.max(remaining.lastIndexOf("\\n",cut),remaining.lastIndexOf(". ",cut),remaining.lastIndexOf("! ",cut),remaining.lastIndexOf("? ",cut),remaining.lastIndexOf(" ",cut)); if(boundary>2800)cut=boundary+1; } chunks.push(remaining.slice(0,cut).trim()); remaining=remaining.slice(cut).trim(); }
+    const translated=[]; for(let i=0;i<chunks.length;i++){ if(onProgress)onProgress(i+1,chunks.length); const result=await api("/api/projects/"+projectId+"/translate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:chunks[i],source_language:language,context})}); translated.push(result.translation); }
+    return translated.join("\\n");
   }
+  function notice(message, error = false) { const node=$("notice"); node.className=error?"notice error":"notice"; node.textContent=String(message??""); node.hidden=false; }
 
   async function refresh() {
     $("projects").innerHTML = '<div class="loading">Carregando projetos…</div>';
@@ -57,7 +56,7 @@
       $("createPanel").hidden = !roles.some(role => ["owner","admin","translator"].includes(role));
       renderProjects(data.projects || []);
     } catch (error) {
-      $("projects").innerHTML = '<div class="empty">' + esc(error.message) + '</div>';
+      $("projects").textContent = error.message;
     }
   }
 
@@ -615,7 +614,9 @@
     session = nextSession || null;
     if (!session) {
       $("app").hidden = true;
-      notice('Entre na sua conta ALMORA para continuar. <a href="../#conta">Abrir login da ALMORA</a> e depois volte a esta página.');
+      notice("Entre na sua conta ALMORA para continuar. ");
+      const link = document.createElement("a"); link.href = "../#conta"; link.textContent = "Abrir login da ALMORA"; $("notice").append(link);
+      $("notice").append(document.createTextNode(" e depois volte a esta página."));
       return;
     }
     $("notice").hidden = true;
