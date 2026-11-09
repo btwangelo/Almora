@@ -56,3 +56,5 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none}
 .project-actions{display:flex;justify-content:flex-end;margin-top:12px}
 .delete-project{border-color:#713044;color:#ff9aaa}.delete-project:hover{background:#3a2029;border-color:#a3243b}
 @media(max-width:620px){.topbar{padding:9px 12px;min-height:60px}.brand-word{font-size:23px}.brand-mark{width:25px;height:24px}.brand-section{font-size:9px}.topbar nav.topnav{gap:8px}.topnav a{font-size:11px}.quiet{font-size:11px;padding:7px 9px}.shell{padding:28px 12px 55px}.panel{padding:16px}}
+
+.batch-file-name{margin:8px 0 12px;padding:10px 12px;border:1px dashed var(--line);border-radius:9px;color:var(--muted);font-size:12px;overflow-wrap:anywhere;background:var(--panel)}
