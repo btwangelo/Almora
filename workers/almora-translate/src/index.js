@@ -355,7 +355,7 @@ async function handle(request, env) {
 
   try {
     if (request.method === "GET" && path === "/api/projects") {
-      let query = "almora_translation_projects?select=*,almora_translation_files(*)&order=created_at.desc&almora_translation_files.order=created_at.asc";
+      let query = "almora_translation_projects?select=*,almora_translation_files(*),almora_translation_pages(*),almora_translation_versions(*)&order=created_at.desc&almora_translation_files.order=created_at.asc&almora_translation_pages.order=page_number.asc&almora_translation_versions.order=version_number.desc";
       if (!isAdmin(auth)) {
         const filters = ["created_by.eq." + auth.user.id, "assigned_translator_id.eq." + auth.user.id];
         if (isEditor(auth)) filters.push("status.in.(editorial_review,changes_requested,approved,published)");
