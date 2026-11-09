@@ -79,6 +79,10 @@
         Number(project.completed_pages || 0) + ' concluídas · ' + Number(project.failed_pages || 0) + ' com falha</div>' +
         (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' +
           '<section class="engine-panel"><h4>Motor de tradução · teste</h4><textarea class="source-text" rows="3" maxlength="6000" placeholder="Cole uma fala ou trecho para testar a tradução…"></textarea><button class="small-button translate-text">Traduzir para PT-BR</button><div class="engine-output" data-translation-output></div></section>' +
+          '<section class="engine-panel review-panel"><h4>Revisão e entrega editorial</h4><p>Envie a tradução para avaliação ou registre a decisão editorial. A aprovação não publica automaticamente a obra.</p><textarea class="review-notes" rows="2" maxlength="4000" placeholder="Observações para a equipe (opcional)…"></textarea>' +
+          (["owner","admin","translator"].some(role => roles.includes(role)) && ["uploaded","translator_review","changes_requested"].includes(project.status) && (roles.includes("owner") || roles.includes("admin") || project.created_by === session.user.id || project.assigned_translator_id === session.user.id) ? '<button class="small-button submit-review" type="button">Enviar para revisão editorial</button>' : '') +
+          (["owner","admin","editor_bl","editor_gl","reviewer"].some(role => roles.includes(role)) && project.status === "editorial_review" ? '<div class="review-actions"><button class="small-button approve-review" type="button">Aprovar tradução</button><button class="small-button request-changes" type="button">Solicitar ajustes</button></div>' : '') +
+          '</section>' +
           '<section class="engine-panel"><h4>Obra completa · OCR + tradução em lote</h4><p>Processe páginas de imagens, ZIP/CBZ ou PDF. O reconhecimento acontece no seu navegador; a tradução usa a IA do ALMORA.</p><label>Arquivo da obra <input class="batch-source" type="file" accept=".zip,.cbz,.pdf,image/png,image/jpeg,image/webp"></label><button class="small-button batch-process" type="button">Extrair, reconhecer e traduzir</button><div class="batch-progress" aria-live="polite"></div><div class="engine-output" data-batch-output></div></section>' +
           '<section class="engine-panel"><h4>Reconstrução de imagem · teste</h4><p>Envie uma página e pinte diretamente sobre as áreas com texto. O pincel marca em vermelho o que deve ser reconstruído.</p><label>Página original <input class="rebuild-image" type="file" accept="image/png,image/jpeg,image/webp"></label><div class="mask-editor" hidden><div class="mask-stage"><canvas class="mask-preview"></canvas><canvas class="mask-overlay"></canvas></div><label>Pincel <input class="brush-size" type="range" min="8" max="120" value="36"></label><button class="small-button clear-mask" type="button">Limpar marcação</button></div><button class="small-button reconstruct-image">Reconstruir área marcada</button><div class="engine-output" data-reconstruction-output></div></section>' +
           '<section class="engine-panel"><h4>Aplicar tradução nos balões · lettering</h4><p>Envie a página limpa, digite uma fala e toque no local do balão para posicioná-la. Você pode adicionar vários textos à mesma página.</p><label>Página limpa <input class="letter-image" type="file" accept="image/png,image/jpeg,image/webp"></label><textarea class="letter-text" rows="2" maxlength="1500" placeholder="Digite ou cole a fala traduzida…"></textarea><button class="small-button use-translation" type="button">Usar tradução acima</button><div class="letter-stage" hidden><canvas class="letter-canvas"></canvas></div><div class="letter-actions"><label>Tamanho do texto <input class="letter-size" type="range" min="12" max="80" value="32"></label><button class="small-button clear-lettering" type="button">Limpar textos</button><button class="small-button export-lettering" type="button">Baixar página legendada</button></div><div class="engine-output" data-lettering-output></div></section>' : '') +
@@ -90,6 +94,30 @@
     }).join("");
     document.querySelectorAll(".project .upload").forEach(button => {
       button.addEventListener("click", () => uploadFiles(button.closest(".project")));
+    });
+
+    document.querySelectorAll(".project .submit-review, .project .approve-review, .project .request-changes").forEach(button => {
+      button.addEventListener("click", async () => {
+        const card = button.closest(".project");
+        const decision = button.classList.contains("submit-review") ? "submitted" :
+          button.classList.contains("approve-review") ? "approved" : "changes_requested";
+        const notes = card.querySelector(".review-notes")?.value || "";
+        button.disabled = true;
+        try {
+          const result = await api("/api/projects/" + card.dataset.project + "/review", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ decision, notes })
+          });
+          notice(decision === "submitted" ? "Projeto enviado para revisão editorial." :
+            decision === "approved" ? "Tradução aprovada. A publicação ainda depende do fluxo editorial da obra." :
+            "Ajustes solicitados ao responsável pela tradução.");
+          await refresh();
+        } catch(error) {
+          notice(error.message, true);
+          button.disabled = false;
+        }
+      });
     });
 
     document.querySelectorAll(".project .translate-text").forEach(button => {
