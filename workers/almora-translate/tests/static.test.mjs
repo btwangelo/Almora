@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const worker = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
-const frontend = await readFile(new URL("../../../../translate/app.js", import.meta.url), "utf8");
+const frontend = await readFile(new URL("../../../translate/app.js", import.meta.url), "utf8");
 
 test("Worker normalizes Supabase REST/Auth suffixes before building endpoints", () => {
   assert.match(worker, /function supabaseBase\(env\)/);
