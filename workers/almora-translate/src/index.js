@@ -440,6 +440,72 @@ async function handle(request, env) {
         return response(result, 200, origin, env);
       }
 
+      if (request.method === "POST" && action === "pages") {
+        if (!isTranslator(auth) || (!isAdmin(auth) && project.created_by !== auth.user.id && project.assigned_translator_id !== auth.user.id)) {
+          return fail("Somente o responsável pela tradução pode salvar páginas.", 403, origin, env);
+        }
+        const input = await request.json();
+        const pageNumber = Number(input.page_number);
+        const originalName = safeName(input.original_name || ("pagina-" + pageNumber + ".jpg"));
+        const extension = (originalName.split(".").pop() || "").toLowerCase();
+        const mime = String(input.mime_type || "image/jpeg").toLowerCase();
+        const allowedMime = { png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" };
+        if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > 10000 ||
+            !allowedMime[extension] || allowedMime[extension] !== mime) {
+          return fail("Número, formato ou tipo de página inválido.", 400, origin, env);
+        }
+        const sourceText = String(input.ocr_text || "").slice(0, 24000);
+        const translatedText = String(input.translated_text || "").slice(0, 24000);
+        const imageBytes = decodeBase64(input.image_b64 || "");
+        if (!imageBytes.byteLength || imageBytes.byteLength > 8 * 1024 * 1024 ||
+            !validFileSignature(extension, imageBytes)) {
+          return fail("A imagem da página é inválida ou excede 8 MiB.", 413, origin, env);
+        }
+        const existing = await db(env, "almora_translation_pages?project_id=eq." + projectId +
+          "&page_number=eq." + pageNumber + "&select=id,original_object_key&limit=1");
+        const pageId = existing?.[0]?.id || crypto.randomUUID();
+        const objectKey = "translate/" + projectId + "/pages/" + pageId + "/original." + extension;
+        const encrypted = await encrypt(imageBytes, env);
+        await env.ALMORA_BUCKET.put(objectKey, encrypted, {
+          httpMetadata: { contentType: "application/octet-stream", cacheControl: "private, no-store" },
+          customMetadata: { almoraTranslate: "encrypted-v1", pageId }
+        });
+        const row = {
+          id: pageId, project_id: projectId, page_number: pageNumber,
+          original_object_key: objectKey, status: "needs_attention",
+          detected_language: project.source_language,
+          ocr_data: {
+            source_text: sourceText, translated_text: translatedText,
+            original_name: originalName, mime_type: mime, ocr_engine: "tesseract.js",
+            translation_model: input.translation_model ? String(input.translation_model).slice(0, 160) : null
+          },
+          updated_at: new Date().toISOString()
+        };
+        try {
+          await db(env, "almora_translation_pages?on_conflict=project_id,page_number", {
+            method: "POST",
+            headers: { "prefer": "resolution=merge-duplicates,return=minimal" },
+            body: JSON.stringify(row)
+          });
+        } catch (error) {
+          await env.ALMORA_BUCKET.delete(objectKey);
+          throw error;
+        }
+        const allPages = await db(env, "almora_translation_pages?project_id=eq." + projectId + "&select=id");
+        await db(env, "almora_translation_projects?id=eq." + projectId, {
+          method: "PATCH", headers: { "prefer": "return=minimal" },
+          body: JSON.stringify({ total_pages: (allPages || []).length, updated_at: new Date().toISOString() })
+        });
+        if (existing?.[0]?.original_object_key && existing[0].original_object_key !== objectKey) {
+          await env.ALMORA_BUCKET.delete(existing[0].original_object_key);
+        }
+        await addEvent(env, projectId, auth.user.id, "page_ocr_saved", {
+          page_id: pageId, page_number: pageNumber, image_bytes: imageBytes.byteLength,
+          source_characters: sourceText.length, translated_characters: translatedText.length
+        });
+        return response({ success: true, page_id: pageId, page_number: pageNumber, status: "needs_attention" }, 201, origin, env);
+      }
+
       if (request.method === "POST" && action === "reconstruct") {
         if (!isTranslator(auth)) return fail("Apenas tradutores autorizados e administradores podem reconstruir imagens.", 403, origin, env);
         const declared = Number(request.headers.get("content-length") || 0);
@@ -539,6 +605,23 @@ async function handle(request, env) {
           file_id: fileId, extension, size_bytes: original.byteLength, checksum_sha256: checksum
         });
         return response({ file: { id: fileId, name, size_bytes: original.byteLength, status: "uploaded" } }, 201, origin, env);
+      }
+
+      const pageImageMatch = action.match(/^pages\/([0-9a-f-]{36})\/image$/i);
+      if (request.method === "GET" && pageImageMatch) {
+        const pageId = pageImageMatch[1];
+        const rows = await db(env, "almora_translation_pages?id=eq." + pageId +
+          "&project_id=eq." + projectId + "&select=*&limit=1");
+        const page = rows && rows[0];
+        if (!page) return fail("Página não encontrada.", 404, origin, env);
+        const object = await env.ALMORA_BUCKET.get(page.original_object_key);
+        if (!object) return fail("Imagem da página não encontrada no armazenamento.", 404, origin, env);
+        const plain = await decrypt(await object.arrayBuffer(), env);
+        const mime = page.ocr_data?.mime_type || "application/octet-stream";
+        return new Response(plain, { status: 200, headers: {
+          ...cors, "content-type": mime, "cache-control": "private, no-store",
+          "content-length": String(plain.byteLength), "x-content-type-options": "nosniff"
+        }});
       }
 
       const downloadMatch = action.match(/^files\/([0-9a-f-]{36})\/download$/i);
