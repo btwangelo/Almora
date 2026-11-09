@@ -604,6 +604,9 @@ async function handle(request, env) {
             batch_index: Number.isInteger(Number(input.batch_index)) ? Number(input.batch_index) : null,
             batch_start_number: Number.isInteger(Number(input.batch_start_number)) ? Number(input.batch_start_number) : null,
             translation_model: input.translation_model ? String(input.translation_model).slice(0, 160) : null,
+            translation_candidate: input.translation_candidate ? String(input.translation_candidate).slice(0, 24000) : null,
+            translation_warning: input.translation_warning ? String(input.translation_warning).slice(0, 500) : null,
+            ocr_quality: input.ocr_quality && typeof input.ocr_quality === "object" ? input.ocr_quality : null,
             lettering_layout: input.lettering_layout && typeof input.lettering_layout === "object" ? input.lettering_layout : null
           },
           updated_at: new Date().toISOString()
