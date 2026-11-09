@@ -1172,6 +1172,7 @@ async function pages(el){
     const expanded=[];
     for(let fileIndex=0;fileIndex<files.length;fileIndex++){
       const file=files[fileIndex];
+      if(file.size > 80 * 1024 * 1024) throw new Error('O arquivo '+file.name+' ultrapassa 80 MiB.');
       setPageStatus('Lendo '+file.name+' ('+(fileIndex+1)+' de '+files.length+')...',true);
       const ext=file.name.split('.').pop().toLowerCase();
 
@@ -1218,6 +1219,7 @@ async function pages(el){
    }
   }
   async function almoraUploadToR2(file) {
+  if(file && file.size > 80 * 1024 * 1024) throw new Error("Cada arquivo deve ter no máximo 80 MiB.");
   const { data: { session }, error } = await almoraDB.auth.getSession();
 
   if (error) throw error;
@@ -1862,6 +1864,7 @@ async function almoraPrepareBatch(input) {
 
   for(const file of files) {
     try {
+      if(file.size > 80 * 1024 * 1024) throw new Error('Cada arquivo deve ter no máximo 80 MiB.');
       if(!/\.(cbz|zip)$/i.test(file.name)) throw new Error('Use arquivos CBZ ou ZIP.');
       const parsed=almoraParseChapterFilename(file.name);
       const archive=await JSZip.loadAsync(file);
@@ -2738,7 +2741,7 @@ a:active {
         >
 
         <small style="color:var(--mu)">
-          Escolha uma imagem da galeria. Máximo: 5 MB.
+          Escolha uma imagem da galeria. Máximo: 50 MB.
         </small>
 
         <label>Nome de exibição</label>
@@ -2797,9 +2800,9 @@ window.almoraPreviewAvatar = function(input) {
     return toast('Selecione um arquivo de imagem.');
   }
 
-  if (file.size > 5 * 1024 * 1024) {
+  if (file.size > 50000000) {
     input.value = '';
-    return toast('A imagem deve ter no máximo 5 MB.');
+    return toast('A imagem deve ter no máximo 50 MB.');
   }
 
   const preview = $('#profile_avatar_preview');
@@ -2843,8 +2846,8 @@ window.almoraSaveProfile = async function() {
 
   try {
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        return toast('A imagem deve ter no máximo 5 MB.');
+      if (file.size > 50000000) {
+        return toast('A imagem deve ter no máximo 50 MB.');
       }
 
       const extensions = {
@@ -5387,7 +5390,7 @@ window.almoraSavePrivacy = async function() {
         '<label for="almora-announcement-body">Mensagem</label><textarea id="almora-announcement-body" maxlength="12000" rows="6" required placeholder="Escreva o comunicado para os leitores..."></textarea>'+
         '<label for="almora-announcement-image">Imagem (opcional)</label><input id="almora-announcement-image" type="file" accept="image/*"><div id="almora-announcement-image-preview"></div>'+
         '<label for="almora-announcement-link">Link (opcional)</label><input id="almora-announcement-link" type="url" placeholder="https://...">'+
-        '<div class="act"><button type="submit">Publicar anúncio</button><button type="button" class="g" id="almora-announcement-cancel" hidden>Cancelar edição</button></div><small style="color:var(--mu)">Imagens de até 5 MB. A publicação ficará visível para todos imediatamente.</small></form>'+
+        '<div class="act"><button type="submit">Publicar anúncio</button><button type="button" class="g" id="almora-announcement-cancel" hidden>Cancelar edição</button></div><small style="color:var(--mu)">Imagens de até 50 MB. A publicação ficará visível para todos imediatamente.</small></form>'+
         '<h3>Anúncios publicados</h3><div id="almora-announcement-list">'+(list||'<div class="empty">Nenhum anúncio publicado ainda.</div>')+'</div>';
       const form=mount.querySelector('#almora-announcement-form'),titleInput=mount.querySelector('#almora-announcement-title'),bodyInput=mount.querySelector('#almora-announcement-body'),imageInput=mount.querySelector('#almora-announcement-image'),linkInput=mount.querySelector('#almora-announcement-link'),preview=mount.querySelector('#almora-announcement-image-preview'),cancel=mount.querySelector('#almora-announcement-cancel');
       let editing=null,currentImage=null;
@@ -5407,14 +5410,14 @@ window.almoraSavePrivacy = async function() {
       }));
       imageInput.addEventListener('change',()=>{
         const file=imageInput.files?.[0];if(!file){preview.innerHTML=currentImage?'<img src="'+safe(currentImage)+'" alt="Imagem atual" style="max-width:100%;max-height:180px;border-radius:8px">':'';return;}
-        if(!file.type.startsWith('image/')||file.size>5*1024*1024){imageInput.value='';return toast('Escolha uma imagem de até 5 MB.');}
+        if(!file.type.startsWith('image/')||file.size>50000000){imageInput.value='';return toast('Escolha uma imagem de até 50 MB.');}
         preview.innerHTML='<img src="'+URL.createObjectURL(file)+'" alt="Prévia da imagem" style="max-width:100%;max-height:180px;border-radius:8px">';
       });
       form.addEventListener('submit',async event=>{
         event.preventDefault();const title=titleInput.value.trim(),body=bodyInput.value.trim(),link=linkInput.value.trim();
         if(!title||!body)return toast('Preencha o título e a mensagem.');
         if(link&&!announcementUrl(link))return toast('Informe um link válido começando com http:// ou https://.');
-        const file=imageInput.files?.[0];if(file&&(!file.type.startsWith('image/')||file.size>5*1024*1024))return toast('Escolha uma imagem de até 5 MB.');
+        const file=imageInput.files?.[0];if(file&&(!file.type.startsWith('image/')||file.size>50000000))return toast('Escolha uma imagem de até 50 MB.');
         const submit=form.querySelector('button[type="submit"]');submit.disabled=true;submit.textContent='Publicando...';
         try{
           let imageUrl=currentImage;
