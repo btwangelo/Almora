@@ -39,6 +39,18 @@
   };
   const date = value => new Date(value).toLocaleString("pt-BR");
 
+  function showProgress(container, label, percent = null, detail = "") {
+    if (!container) return;
+    const known = Number.isFinite(percent);
+    const value = known ? Math.max(0, Math.min(100, percent)) : 0;
+    container.innerHTML = '<div class="task-progress" role="status" aria-live="polite">' +
+      '<div class="task-progress-heading"><span>' + esc(label) + '</span><strong>' + (known ? Math.round(value) + "%" : "Em andamento") + '</strong></div>' +
+      '<div class="task-progress-track' + (known ? "" : " is-indeterminate") + '" role="progressbar" aria-label="' + esc(label) + '"' +
+      (known ? ' aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(value) + '"' : ' aria-valuetext="Em andamento"') + '><span style="width:' + (known ? value : 38) + '%"></span></div>' +
+      (detail ? '<div class="task-progress-detail">' + esc(detail) + '</div>' : '') +
+      '</div>';
+  }
+
   async function request(path, options = {}) {
     if (API_BASE.includes("YOUR_SUBDOMAIN")) throw new Error("A API do Translate ainda não foi publicada. Falta configurar o endereço do Worker.");
 
@@ -215,11 +227,11 @@
         if(!pages.length) throw new Error("Ainda não há páginas salvas neste projeto.");
         if(!window.Tesseract) throw new Error("O OCR não carregou. Atualize a página.");
         const lang=({en:"eng",ko:"kor",ja:"jpn",zh:"chi_sim"})[detail.project?.source_language]||"eng";
-        worker=await Tesseract.createWorker(lang,1,{logger:m=>{if(m.status==="recognizing text")progress.textContent="Mapeando balões · "+Math.round((m.progress||0)*100)+"%";}});
+        worker=await Tesseract.createWorker(lang,1,{logger:m=>{if(m.status==="recognizing text")showProgress(progress,"Analisando página "+(Math.min(pages.length,prepared+skipped+1))+"/"+pages.length,((prepared+skipped+(m.progress||0))/pages.length)*100,"Reconhecimento de texto e coordenadas");}});
         let prepared=0, skipped=0;
         for(let i=0;i<pages.length;i++){
           const page=pages[i]; if(page.ocr_data?.lettering_layout?.lines?.length){skipped++;continue;}
-          progress.textContent="Mapeando balões · página "+page.page_number+"/"+pages.length;
+          showProgress(progress,"Preparando mapa de texto",((prepared+skipped)/pages.length)*100,"Página "+page.page_number+" de "+pages.length);
           const blob=await apiBlob("/api/projects/"+card.dataset.project+"/pages/"+page.id+"/image"), img=await loadImageFile(blob);
           const scale=Math.min(1,1800/Math.max(img.width,img.height)), width=Math.max(1,Math.round(img.width*scale)), height=Math.max(1,Math.round(img.height*scale));
           const canvas=document.createElement("canvas"); canvas.width=width; canvas.height=height; canvas.getContext("2d").drawImage(img,0,0,width,height);
@@ -351,7 +363,7 @@
             pageCount = pdf.numPages;
             getPage = async index => {
               const n = index + 1;
-              progress.textContent = "Preparando PDF · página "+n+"/"+pageCount;
+              showProgress(progress,"Preparando PDF",((index)/pageCount)*100,"Página "+n+" de "+pageCount);
               const page = await pdf.getPage(n);
               const baseViewport = page.getViewport({scale:1});
               const pdfScale = Math.min(1.5,1800/Math.max(baseViewport.width,baseViewport.height));
@@ -373,7 +385,7 @@
           const lang = ({en:"eng",ko:"kor",ja:"jpn",zh:"chi_sim"})[card.dataset.sourceLanguage] || "eng";
           progress.textContent = "Iniciando OCR ("+lang+")…";
           worker = await Tesseract.createWorker(lang, 1, {logger:m => {
-            if(m.status==="recognizing text") progress.textContent="Reconhecendo texto · "+Math.round((m.progress||0)*100)+"%";
+            if(m.status==="recognizing text") showProgress(progress,"Reconhecendo texto",((window.__almoraBatchPage||0)+(m.progress||0)*0.4)/Math.max(1,window.__almoraBatchTotal||1)*100,"OCR · página "+((window.__almoraBatchPage||0)+1)+" de "+(window.__almoraBatchTotal||pageCount));
           }});
           const project = (window.__almoraProjects || []).find(p=>p.id===card.dataset.project);
           const results=[];
@@ -391,18 +403,20 @@
           const maxPageNumber = priorPages.reduce((max,p)=>Math.max(max,Number(p.page_number)||0),0);
           const batchStartNumber = batchPages.length ? Math.min(...batchPages.map(p => Number(p.page_number)-Number(p.ocr_data.batch_index))) : maxPageNumber + 1;
           const completedKeys = new Set(priorPages.map(p => p.ocr_data?.batch_key).filter(Boolean));
+          window.__almoraBatchTotal=pageCount;
           for(let i=0;i<pageCount;i++){
+            window.__almoraBatchPage=i;
             const currentPage = await getPage(i);
             const batchKey = await sha256Hex(fileHash + "|" + i + "|" + currentPage.name);
-            if (completedKeys.has(batchKey)) { progress.textContent = "Página " + (i+1) + "/" + pageCount + " já salva; pulando para evitar duplicação…"; continue; }
-            progress.textContent="OCR · página "+(i+1)+"/"+pageCount;
+            if (completedKeys.has(batchKey)) { showProgress(progress,"Página já processada",((i+1)/pageCount)*100,"Página "+(i+1)+" de "+pageCount+" — preservada, sem duplicação"); continue; }
+            showProgress(progress,"Reconhecendo texto",((i)/pageCount)*100,"OCR · página "+(i+1)+" de "+pageCount);
             const ocr = await recognizePageWithRetry(worker, currentPage.blob);
             const source = ocr.text;
             let translatedCandidate = "";
             let translatedText = "";
             let translationWarning = "";
             if (source && ocr.reliable) {
-              translatedCandidate = await translateLongText(card.dataset.project, source.slice(0,24000), project?.source_language || "en", "", (part,total) => { progress.textContent = "Traduzindo · página " + (i+1) + "/" + pageCount + " · trecho " + part + "/" + total; });
+              translatedCandidate = await translateLongText(card.dataset.project, source.slice(0,24000), project?.source_language || "en", "", (part,total) => { showProgress(progress,"Traduzindo página "+(i+1)+"/"+pageCount,((i+0.4+0.35*(part/total))/pageCount)*100,"Trecho "+part+" de "+total); });
               if (normalizeForComparison(translatedCandidate) === normalizeForComparison(source)) {
                 translationWarning = "A IA devolveu o texto sem traduzir; precisa de revisão.";
               } else translatedText = translatedCandidate;
@@ -411,7 +425,7 @@
             } else {
               translationWarning = "Nenhum texto foi reconhecido; página precisa de revisão.";
             }
-            progress.textContent="Salvando página "+(i+1)+"/"+pageCount+"…";
+            showProgress(progress,"Salvando página "+(i+1)+"/"+pageCount,((i+0.82)/pageCount)*100,"Enviando imagem original e dados da tradução");
             const pageImage=await loadImage(await readDataUrl(currentPage.blob));
             const scale=Math.min(1,1800/Math.max(pageImage.width,pageImage.height));
             const pageCanvas=document.createElement("canvas");
@@ -455,12 +469,12 @@
           const reportMarkup='<a class="download-result" download="'+esc(file.name.replace(/\.[^.]+$/,""))+'-traduzido.txt" href="'+url+'">Baixar OCR + traduções (.txt)</a><pre class="batch-report">'+esc(report)+'</pre>';
           const completionMessage="Concluído · "+pageCount+" página(s) analisadas; as páginas já salvas foram preservadas sem duplicação. Revise OCR e traduções antes do lettering.";
           output.innerHTML=reportMarkup;
-          progress.textContent=completionMessage;
+          showProgress(progress,"Lote concluído",100,pageCount+" página(s) analisadas. Páginas existentes preservadas sem duplicação.");
           notice("Lote concluído. O relatório foi gerado e o arquivo original ficou preservado.");
           const projectId=card.dataset.project;
           await refresh();
           const refreshedCard=document.querySelector('.project[data-project="'+projectId+'"]');
-          if(refreshedCard){ refreshedCard.querySelector("[data-batch-output]").innerHTML=reportMarkup; refreshedCard.querySelector(".batch-progress").textContent=completionMessage; }
+          if(refreshedCard){ refreshedCard.querySelector("[data-batch-output]").innerHTML=reportMarkup; showProgress(refreshedCard.querySelector(".batch-progress"),"Lote concluído",100,pageCount+" página(s) analisadas. Páginas existentes preservadas sem duplicação."); }
         } catch(error) {
           progress.textContent="";
           output.textContent=error.message;
@@ -648,7 +662,7 @@
         if (!original || !maskCanvas) return notice("Envie uma página e marque pelo menos uma área para reconstrução.", true);
         if (original.size > 80 * 1024 * 1024) return notice("A página deve ter no máximo 80 MiB.", true);
         button.disabled = true;
-        output.textContent = "Reconstruindo…";
+        showProgress(output,"Preparando reconstrução",null,"A IA está processando a imagem. O servidor não fornece porcentagem real nesta etapa.");
         try {
           if (API_BASE.includes("YOUR_SUBDOMAIN")) throw new Error("A API do Translate ainda não foi publicada.");
           const image = await loadImageFile(original);
@@ -666,6 +680,7 @@
           const maskBlob = await new Promise(resolve => refMask.toBlob(resolve, "image/png"));
           if (!maskBlob) throw new Error("Não foi possível preparar a máscara PNG.");
           const mask = Array.from(new Uint8Array(await maskBlob.arrayBuffer()));
+          showProgress(output,"Enviando imagem para a IA",null,"Aguarde a geração do resultado.");
           const result = await fetch(API_BASE.replace(/\/$/, "") + "/api/projects/" + card.dataset.project + "/reconstruct", {
             method: "POST",
             headers: { "Authorization": "Bearer " + session.access_token, "Content-Type": "application/json" },
@@ -675,6 +690,7 @@
             const error = await result.json().catch(() => ({}));
             throw new Error(error.error || "Falha na edição da imagem.");
           }
+          showProgress(output,"Recebendo e montando resultado",92,"Compondo a edição sobre a imagem original.");
           const generated = await loadImage(URL.createObjectURL(await result.blob()));
           const finalCanvas = document.createElement("canvas");
           finalCanvas.width = image.width; finalCanvas.height = image.height;
@@ -800,7 +816,7 @@
       if(!window.JSZip)throw new Error("A biblioteca ZIP não carregou. Atualize a página.");
       const zip=new JSZip(), manifest=["ALMORA TRANSLATE — PACOTE DE REVISÃO","Projeto: "+project.title,"Este pacote contém imagens originais e traduções separadas para revisão. Não é uma edição final pronta para publicação.",""];
       for(let i=0;i<pages.length;i++){
-        const page=pages[i],o=page.ocr_data||{}; progress.textContent="Montando pacote · página "+(i+1)+"/"+pageCount;
+        const page=pages[i],o=page.ocr_data||{}; showProgress(progress,"Montando pacote de revisão",((i)/pages.length)*85,"Página "+(i+1)+" de "+pages.length);
         const blob=await apiBlob("/api/projects/"+card.dataset.project+"/pages/"+page.id+"/image");
         const ext=({"image/png":"png","image/webp":"webp"})[o.mime_type]||"jpg", number=String(page.page_number).padStart(3,"0");
         zip.file("paginas/"+number+"-original."+ext,blob);
@@ -808,8 +824,8 @@
         manifest.push("Página "+page.page_number+": "+(o.translated_text?"traduzida":"sem tradução"));
       }
       zip.file("LEIA-ME.txt",manifest.join(String.fromCharCode(10)));
-      progress.textContent="Compactando pacote…";
-      const archive=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
+      showProgress(progress,"Compactando pacote",88,"Preparando o arquivo ZIP");
+      const archive=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}},meta=>showProgress(progress,"Compactando pacote",88+(meta.percent||0)*0.10,"Compactação do arquivo"));
       if(archive.size>80*1024*1024)throw new Error("O pacote ultrapassa 80 MiB. Divida a obra em lotes menores.");
       const result=await api("/api/projects/"+card.dataset.project+"/versions",{method:"POST",headers:{"Content-Type":"application/zip","X-Output-Format":"zip"},body:archive});
       progress.textContent="Pacote de revisão v"+result.version.version_number+" salvo com segurança.";
@@ -827,7 +843,7 @@
     const uploaded = [];
     try {
       for (const file of files) {
-        list.textContent = "Enviando " + file.name + "…";
+        showProgress(list,"Enviando arquivo",null,file.name+" · "+bytes(file.size));
         const result = await api("/api/projects/" + card.dataset.project + "/files", {
           method: "POST",
           headers: {
