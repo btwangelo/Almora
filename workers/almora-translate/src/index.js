@@ -246,7 +246,10 @@ async function translateWithAI(env, input) {
       { role: "user", content: user }
     ],
     temperature: 0.2,
-    max_completion_tokens: Math.min(8192, Math.max(512, text.length * 2))
+    // Tradução não precisa de raciocínio longo; desativar thinking
+    // reserva os tokens de saída para o texto traduzido.
+    chat_template_kwargs: { enable_thinking: false },
+    max_completion_tokens: Math.min(8192, Math.max(1024, text.length * 3))
   });
   const extractText = value => {
     if (typeof value === "string") return value;
