@@ -33,7 +33,11 @@ Set `CORS_ORIGINS` to the exact production origins. The existing app currently u
 - `GET /api/projects` — list projects, source files, saved pages and review-package versions visible to the signed-in staff member.
 - `POST /api/projects` — create a project; requires translator/admin/owner and an explicit rights confirmation.
 - `GET /api/projects/:id` — project details and its files/jobs/pages/reviews/events.
-- `POST /api/projects/:id/files` — upload ZIP, CBZ, PDF, PNG, JPG/JPEG or WebP as encrypted R2 objects.\n- `POST /api/projects/:id/pages` — save OCR text, translation and an encrypted page image; batch keys make retries idempotent.\n- `GET /api/projects/:id/pages/:pageId/image` — authorized page-image download.\n- `POST /api/projects/:id/versions` — store an encrypted ZIP review bundle.\n- `GET /api/projects/:id/versions/:versionId/download` — authorized review-bundle download.
+- `POST /api/projects/:id/files` — upload ZIP, CBZ, PDF, PNG, JPG/JPEG or WebP as encrypted R2 objects.
+- `POST /api/projects/:id/pages` — save OCR text, translation and an encrypted page image; batch keys make retries idempotent.
+- `GET /api/projects/:id/pages/:pageId/image` — authorized page-image download.
+- `POST /api/projects/:id/versions` — store an encrypted ZIP review bundle.
+- `GET /api/projects/:id/versions/:versionId/download` — authorized review-bundle download.
 - `GET /api/projects/:id/files/:fileId/download` — authorized download and decryption.
 - `POST /api/projects/:id/translate` — contextual text translation with Workers AI; translator/admin only.
 - `POST /api/projects/:id/reconstruct` — experimental image image editing using an uploaded page and a mask painted in the browser; translator/admin only.
@@ -46,7 +50,9 @@ Text translation and experimental image reconstruction adapters are now present 
 
 - Translation defaults to `@cf/zai-org/glm-4.7-flash`; Workers AI Free has 10,000 Neurons/day, after which requests fail until the daily reset.
 - Reconstruction defaults to `@cf/black-forest-labs/flux-2-klein-4b`. Model availability and pricing can change; verify the current Cloudflare Workers AI catalog before relying on it in production.
-- OCR (Tesseract.js), ZIP/CBZ and PDF extraction, per-page translation, resumable batch saves, saved-page restoration, original-file/page downloads, and encrypted review ZIP bundles are implemented in the browser/Worker flow.\n- Automatic speech-bubble detection, automatic lettering, visual QA, asynchronous queue consumption/retries, production CBZ output with lettered pages, and automatic publication into the ALMORA library remain unimplemented.\n- The review ZIP is an editorial handoff bundle containing original page images and separate source/translation text files. It is not a finished, lettered comic ready for publication.
+- OCR (Tesseract.js), ZIP/CBZ and PDF extraction, per-page translation, resumable batch saves, saved-page restoration, original-file/page downloads, and encrypted review ZIP bundles are implemented in the browser/Worker flow.
+- Automatic speech-bubble detection, automatic lettering, visual QA, asynchronous queue consumption/retries, production CBZ output with lettered pages, and automatic publication into the ALMORA library remain unimplemented.
+- The review ZIP is an editorial handoff bundle containing original page images and separate source/translation text files. It is not a finished, lettered comic ready for publication.
 - The reconstruction test lets the translator paint the image editing mask directly over the page; marked pixels are converted to a same-size mask before sending.
 
 Do not present a project as translated just because its source files uploaded. Do not publish generated pages without editorial review.
