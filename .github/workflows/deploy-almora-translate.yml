@@ -3,6 +3,7 @@ name: Deploy ALMORA Translate Worker
 on:
   push:
     branches:
+      - main
       - feature/almora-translate-foundation
     paths:
       - "workers/almora-translate/**"
