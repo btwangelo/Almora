@@ -73,12 +73,22 @@ async function authenticate(request, env) {
   const header = request.headers.get("authorization") || "";
   const token = header.match(/^Bearer\s+(.+)$/i);
   if (!token) return null;
-  const res = await fetch(supabaseBase(env) + "/auth/v1/user", {
-    headers: {
-      "apikey": env.SUPABASE_PUBLISHABLE_KEY,
-      "authorization": "Bearer " + token[1]
-    }
+  const authUrl = supabaseBase(env) + "/auth/v1/user";
+  const headers = { "authorization": "Bearer " + token[1] };
+
+  // Primeiro usa a chave pública configurada. Se ela estiver divergente das
+  // chaves do projeto, tenta a chave secreta do próprio Worker (nunca exposta
+  // ao navegador) para validar o mesmo token de usuário.
+  let res = await fetch(authUrl, {
+    headers: { ...headers, "apikey": env.SUPABASE_PUBLISHABLE_KEY }
   });
+  if ((res.status === 401 || res.status === 403) &&
+      env.SUPABASE_SERVICE_ROLE_KEY &&
+      env.SUPABASE_SERVICE_ROLE_KEY !== env.SUPABASE_PUBLISHABLE_KEY) {
+    res = await fetch(authUrl, {
+      headers: { ...headers, "apikey": env.SUPABASE_SERVICE_ROLE_KEY }
+    });
+  }
   if (res.status === 401 || res.status === 403) return null;
   if (!res.ok) throw new Error("Supabase Auth respondeu HTTP " + res.status + ".");
   const user = await res.json();
