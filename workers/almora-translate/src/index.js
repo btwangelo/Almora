@@ -40,8 +40,19 @@ function safeName(name) {
     .replace(/[^a-zA-Z0-9._() -]/g, "_").replace(/\s+/g, "_").slice(0, 140) || "upload";
 }
 
+function supabaseBase(env) {
+  const raw = String(env.SUPABASE_URL || "").trim();
+  if (!raw) throw new Error("SUPABASE_URL não configurada.");
+  const parsed = new URL(raw);
+  if (parsed.protocol !== "https:") throw new Error("SUPABASE_URL precisa usar HTTPS.");
+  parsed.pathname = parsed.pathname.replace(/\/(?:rest|auth)\/v1\/?$/i, "").replace(/\/+$/, "");
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.origin + parsed.pathname;
+}
+
 async function db(env, path, options) {
-  const url = env.SUPABASE_URL.replace(/\/$/, "") + "/rest/v1/" + path;
+  const url = supabaseBase(env) + "/rest/v1/" + path;
   const headers = new Headers(options && options.headers || {});
   headers.set("apikey", env.SUPABASE_SERVICE_ROLE_KEY);
   headers.set("authorization", "Bearer " + env.SUPABASE_SERVICE_ROLE_KEY);
@@ -62,13 +73,14 @@ async function authenticate(request, env) {
   const header = request.headers.get("authorization") || "";
   const token = header.match(/^Bearer\s+(.+)$/i);
   if (!token) return null;
-  const res = await fetch(env.SUPABASE_URL.replace(/\/$/, "") + "/auth/v1/user", {
+  const res = await fetch(supabaseBase(env) + "/auth/v1/user", {
     headers: {
       "apikey": env.SUPABASE_PUBLISHABLE_KEY,
       "authorization": "Bearer " + token[1]
     }
   });
-  if (!res.ok) return null;
+  if (res.status === 401 || res.status === 403) return null;
+  if (!res.ok) throw new Error("Supabase Auth respondeu HTTP " + res.status + ".");
   const user = await res.json();
   const roles = await db(env,
     "staff_roles?user_id=eq." + encodeURIComponent(user.id) + "&select=role_key"
@@ -302,10 +314,21 @@ async function handle(request, env) {
   const path = url.pathname.replace(/\/+$/, "") || "/";
 
   if (request.method === "GET" && path === "/api/health") {
+    const config = {
+      supabaseUrl: Boolean(env.SUPABASE_URL), publishableKey: Boolean(env.SUPABASE_PUBLISHABLE_KEY),
+      serviceKey: Boolean(env.SUPABASE_SERVICE_ROLE_KEY), r2: Boolean(env.ALMORA_BUCKET),
+      ai: Boolean(env.AI), encryptionKey: Boolean(env.ALMORA_TRANSLATE_ENCRYPTION_KEY && env.ALMORA_TRANSLATE_ENCRYPTION_KEY.length >= 32)
+    };
+    let database = false;
+    if (config.supabaseUrl && config.serviceKey) {
+      try { await db(env, "staff_roles?select=user_id&limit=1"); database = true; } catch (_) {}
+    }
+    const ready = Object.values(config).every(Boolean) && database;
     return response({
       service: "ALMORA Translate",
-      status: "online",
+      status: ready ? "ready" : "degraded",
       stage: "provider-prototype",
+      checks: { ...config, database },
       providers: {
         translation: { available: Boolean(env.AI), model: env.TRANSLATION_MODEL || "@cf/zai-org/glm-4.7-flash" },
         reconstruction: {
@@ -316,10 +339,10 @@ async function handle(request, env) {
           notice: "Edição por imagem de referência; a máscara é enviada como guia visual e a composição final limita a alteração às áreas pintadas."
         }
       }
-    }, 200, origin, env);
+    }, ready ? 200 : 503, origin, env);
   }
 
-  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY || !env.SUPABASE_SERVICE_ROLE_KEY || !env.ALMORA_BUCKET) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_PUBLISHABLE_KEY || !env.SUPABASE_SERVICE_ROLE_KEY || !env.ALMORA_BUCKET || !env.ALMORA_TRANSLATE_ENCRYPTION_KEY) {
     return fail("O servidor ainda não foi configurado. Verifique as variáveis e o vínculo R2.", 503, origin, env, "server_not_configured");
   }
 
@@ -391,8 +414,17 @@ async function handle(request, env) {
           if (!["uploaded", "translator_review", "changes_requested"].includes(project.status)) {
             return fail("Este projeto ainda não está pronto para revisão do tradutor.", 409, origin, env);
           }
+          const pageRows = await db(env, "almora_translation_pages?project_id=eq." + projectId + "&select=id,ocr_data");
+          const readablePages = (pageRows || []).filter(page => String(page.ocr_data?.source_text || "").trim());
+          const translatedPages = readablePages.filter(page => String(page.ocr_data?.translated_text || "").trim());
+          if (!pageRows?.length || !readablePages.length || translatedPages.length !== readablePages.length) {
+            return fail("Antes da revisão, processe as páginas e conclua a tradução de todo texto reconhecido.", 409, origin, env, "translation_incomplete");
+          }
+          const versions = await db(env, "almora_translation_versions?project_id=eq." + projectId + "&select=id,status&order=version_number.desc&limit=1");
+          if (!versions?.length) return fail("Gere primeiro o pacote de revisão do projeto.", 409, origin, env, "review_package_required");
           nextStatus = "editorial_review";
           reviewType = "translator";
+          await db(env, "almora_translation_versions?id=eq." + versions[0].id, { method: "PATCH", headers: { "prefer": "return=minimal" }, body: JSON.stringify({ status: "editorial_review" }) });
         } else if (decision === "approved" || decision === "changes_requested") {
           if (!isEditor(auth)) return fail("Somente a equipe editorial pode avaliar este projeto.", 403, origin, env);
           if (project.status !== "editorial_review") return fail("O projeto não está aguardando revisão editorial.", 409, origin, env);
@@ -414,7 +446,11 @@ async function handle(request, env) {
         });
         const patch = { status: nextStatus, updated_at: new Date().toISOString() };
         if (decision === "submitted") patch.submitted_at = new Date().toISOString();
-        if (decision === "approved") patch.approved_at = new Date().toISOString();
+        if (decision === "approved") {
+          patch.approved_at = new Date().toISOString();
+          const versions = await db(env, "almora_translation_versions?project_id=eq." + projectId + "&select=id,status&order=version_number.desc&limit=1");
+          if (versions?.[0]) await db(env, "almora_translation_versions?id=eq." + versions[0].id, { method: "PATCH", headers: { "prefer": "return=minimal" }, body: JSON.stringify({ status: "approved", approved_by: auth.user.id, approved_at: new Date().toISOString() }) });
+        }
         await db(env, "almora_translation_projects?id=eq." + projectId, {
           method: "PATCH",
           headers: { "prefer": "return=minimal" },
@@ -477,6 +513,7 @@ async function handle(request, env) {
           ocr_data: {
             source_text: sourceText, translated_text: translatedText,
             original_name: originalName, mime_type: mime, ocr_engine: "tesseract.js",
+            batch_key: input.batch_key ? String(input.batch_key).slice(0, 128) : null,
             translation_model: input.translation_model ? String(input.translation_model).slice(0, 160) : null
           },
           updated_at: new Date().toISOString()
@@ -491,10 +528,11 @@ async function handle(request, env) {
           await env.ALMORA_BUCKET.delete(objectKey);
           throw error;
         }
-        const allPages = await db(env, "almora_translation_pages?project_id=eq." + projectId + "&select=id");
+        const allPages = await db(env, "almora_translation_pages?project_id=eq." + projectId + "&select=id,ocr_data");
+        const completedPages = (allPages || []).filter(page => String(page.ocr_data?.translated_text || "").trim()).length;
         await db(env, "almora_translation_projects?id=eq." + projectId, {
           method: "PATCH", headers: { "prefer": "return=minimal" },
-          body: JSON.stringify({ total_pages: (allPages || []).length, updated_at: new Date().toISOString() })
+          body: JSON.stringify({ total_pages: (allPages || []).length, completed_pages: completedPages, updated_at: new Date().toISOString() })
         });
         if (existing?.[0]?.original_object_key && existing[0].original_object_key !== objectKey) {
           await env.ALMORA_BUCKET.delete(existing[0].original_object_key);
@@ -563,7 +601,7 @@ async function handle(request, env) {
           customMetadata: { almoraTranslate: "encrypted-v1", fileId }
         });
 
-        const mime = request.headers.get("content-type") || "application/octet-stream";
+        const mime = ({ zip: "application/zip", cbz: "application/vnd.comicbook+zip", pdf: "application/pdf", png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp" })[extension] || "application/octet-stream";
         const kind = ["zip", "cbz"].includes(extension) ? "archive" : extension === "pdf" ? "pdf" : "image";
         const checksum = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", original)))
           .map(byte => byte.toString(16).padStart(2, "0")).join("");
@@ -605,6 +643,40 @@ async function handle(request, env) {
           file_id: fileId, extension, size_bytes: original.byteLength, checksum_sha256: checksum
         });
         return response({ file: { id: fileId, name, size_bytes: original.byteLength, status: "uploaded" } }, 201, origin, env);
+      }
+
+      if (request.method === "POST" && action === "versions") {
+        if (!isTranslator(auth) || (!isAdmin(auth) && project.created_by !== auth.user.id && project.assigned_translator_id !== auth.user.id)) return fail("Somente o responsável pela tradução pode gerar um pacote.", 403, origin, env);
+        const format = String(request.headers.get("x-output-format") || "zip").toLowerCase();
+        if (format !== "zip") return fail("O pacote de revisão usa formato ZIP.", 400, origin, env);
+        const declared = Number(request.headers.get("content-length") || 0);
+        if (declared > 50 * 1024 * 1024) return fail("O pacote excede 50 MiB.", 413, origin, env);
+        const archive = await request.arrayBuffer();
+        if (!archive.byteLength || archive.byteLength > 50 * 1024 * 1024) return fail("Pacote vazio ou acima de 50 MiB.", 413, origin, env);
+        const pages = await db(env, "almora_translation_pages?project_id=eq." + projectId + "&select=id,ocr_data&page_number=gt.0&order=page_number.asc");
+        const readable = (pages || []).filter(page => String(page.ocr_data?.source_text || "").trim());
+        if (!pages?.length || !readable.length || readable.some(page => !String(page.ocr_data?.translated_text || "").trim())) return fail("O pacote exige todas as páginas com texto reconhecido traduzido.", 409, origin, env);
+        const latest = await db(env, "almora_translation_versions?project_id=eq." + projectId + "&select=version_number&order=version_number.desc&limit=1");
+        const versionNumber = Number(latest?.[0]?.version_number || 0) + 1;
+        const objectKey = "translate/" + projectId + "/versions/v" + versionNumber + "/" + crypto.randomUUID() + ".zip";
+        const encrypted = await encrypt(archive, env);
+        await env.ALMORA_BUCKET.put(objectKey, encrypted, { httpMetadata: { contentType: "application/octet-stream", cacheControl: "private, no-store" }, customMetadata: { almoraTranslate: "encrypted-v1", projectId, versionNumber: String(versionNumber) } });
+        try {
+          const created = await db(env, "almora_translation_versions", { method: "POST", headers: { "prefer": "return=representation" }, body: JSON.stringify({ project_id: projectId, version_number: versionNumber, output_format: "zip", object_prefix: objectKey, status: "draft", created_by: auth.user.id, report: { pages: pages.length, translated_pages: readable.length, package_type: "review_bundle" } }) });
+          await addEvent(env, projectId, auth.user.id, "review_package_created", { version_number: versionNumber, pages: pages.length });
+          return response({ success: true, version: created?.[0] || { version_number: versionNumber, status: "draft" } }, 201, origin, env);
+        } catch (error) { await env.ALMORA_BUCKET.delete(objectKey); throw error; }
+      }
+
+      const versionDownloadMatch = action.match(/^versions\/([0-9a-f-]{36})\/download$/i);
+      if (request.method === "GET" && versionDownloadMatch) {
+        const rows = await db(env, "almora_translation_versions?id=eq." + versionDownloadMatch[1] + "&project_id=eq." + projectId + "&select=*&limit=1");
+        const version = rows?.[0];
+        if (!version) return fail("Versão não encontrada.", 404, origin, env);
+        const object = await env.ALMORA_BUCKET.get(version.object_prefix);
+        if (!object) return fail("Pacote não encontrado no armazenamento.", 404, origin, env);
+        const plain = await decrypt(await object.arrayBuffer(), env);
+        return new Response(plain, { status: 200, headers: { ...cors, "content-type": "application/zip", "content-disposition": "attachment; filename=almora-revisao-v" + version.version_number + ".zip", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
       }
 
       const pageImageMatch = action.match(/^pages\/([0-9a-f-]{36})\/image$/i);
