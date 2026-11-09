@@ -783,6 +783,7 @@
   let authListenerReady = false;
   let authRefreshRunning = false;
   let hasConfirmedSession = false;
+  let projectsLoadedForUser = null;
 
   async function applySession(nextSession, explicitSignOut = false) {
     if (!nextSession) {
@@ -790,6 +791,7 @@
       if (hasConfirmedSession && !explicitSignOut) return;
       session = null;
       hasConfirmedSession = false;
+      projectsLoadedForUser = null;
       $("app").hidden = true;
       notice("Não foi encontrada uma sessão ativa da ALMORA neste navegador. Toque em “Verificar login” para consultar novamente.");
       return;
@@ -797,9 +799,19 @@
     session = nextSession;
     hasConfirmedSession = true;
     $("app").hidden = false;
-    if (!authRefreshRunning) {
+    const userId = nextSession.user?.id || null;
+    // Returning from the native file picker fires focus/visibility events.
+    // Do not replace the project cards with a loading placeholder on those events.
+    // Load the project list only once per authenticated user; explicit actions
+    // such as upload/create/delete continue to call refresh() when needed.
+    if (!authRefreshRunning && userId && projectsLoadedForUser !== userId) {
       authRefreshRunning = true;
-      try { await refresh(); } finally { authRefreshRunning = false; }
+      try {
+        await refresh();
+        projectsLoadedForUser = userId;
+      } finally {
+        authRefreshRunning = false;
+      }
     }
     // A confirmação de login deve permanecer visível; não a substitua pelo aviso de conexão.
     notice("Você está conectado à ALMORA.");
