@@ -464,7 +464,7 @@ async function handle(request, env) {
         const existing = await db(env, "almora_translation_pages?project_id=eq." + projectId +
           "&page_number=eq." + pageNumber + "&select=id,original_object_key&limit=1");
         const pageId = existing?.[0]?.id || crypto.randomUUID();
-        const objectKey = "translate/" + projectId + "/pages/" + pageId + "/original." + extension;
+        const objectKey = "translate/" + projectId + "/pages/" + pageId + "/original-" + crypto.randomUUID() + "." + extension;
         const encrypted = await encrypt(imageBytes, env);
         await env.ALMORA_BUCKET.put(objectKey, encrypted, {
           httpMetadata: { contentType: "application/octet-stream", cacheControl: "private, no-store" },
