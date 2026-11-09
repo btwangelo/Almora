@@ -5544,7 +5544,7 @@ window.almoraSavePrivacy = async function() {
 <script id="almora-draft-persistence">
 (() => {
   "use strict";
-  navigator.storage?.persist?.().catch(() => {});
+  Promise.resolve(navigator.storage?.persist?.()).catch(() => {});
   const DB_NAME = "almora-work-drafts-v1";
   const STORE = "fields";
   const restored = new WeakSet();
@@ -5674,14 +5674,14 @@ window.almoraSavePrivacy = async function() {
     clearTimeout(restoreTimer);
     restoreTimer = setTimeout(restore, 180);
   };
-  const app = document.getElementById("app") || document.getElementById("projects");
-  if (app) new MutationObserver(scheduleRestore).observe(app, {childList:true,subtree:true});
+  if (document.body) new MutationObserver(scheduleRestore).observe(document.body, {childList:true,subtree:true});
   window.addEventListener("hashchange", () => { scheduleRestore(); });
   window.addEventListener("pageshow", scheduleRestore);
   window.addEventListener("focus", scheduleRestore);
   const customKey = (name, customScope) => [owner(), route(), customScope || route(), "custom:" + name].join("|");
   window.ALMORADrafts = {
     saveNow: save,
+    clearField: async el => remove(keyFor(el)),
     saveData: async (name, value, customScope) => put({key:customKey(name,customScope),kind:"custom",value,savedAt:Date.now()}),
     loadData: async (name, customScope) => {
       const database = await db();
