@@ -12,7 +12,7 @@ O binding `AI` está declarado em `wrangler.toml`. Os modelos podem ser alterado
 
 ## Modelo de imagem escolhido
 
-FLUX.2 Klein 4B substitui o antigo Stable Diffusion 1.5 Inpainting, que tem descontinuação programada. A versão 4B aceita edição por referências de imagem e custa menos que a versão 9B. O modelo upstream 4B é publicado sob Apache-2.0.
+FLUX.2 Klein 4B é usado como adaptador experimental de edição por referências. Verifique a disponibilidade, os termos e o preço atuais no catálogo oficial da Cloudflare antes de depender dele em produção.
 
 **Limitação importante:** FLUX.2 Klein 4B não recebe uma máscara de inpainting nativa. O Worker envia a página e a máscara preto/branco como duas referências visuais. O modelo gera uma versão editada; depois, o navegador usa a máscara original para compor o resultado somente nas áreas pintadas. Isso protege pixels fora da seleção, mas não garante que a reconstrução dentro da seleção fique fiel ao desenho original. A saída precisa de revisão humana.
 
@@ -20,7 +20,7 @@ As imagens de referência são reduzidas no navegador para no máximo 511 px no 
 
 ## Cota e custo
 
-Workers AI Free oferece 10.000 Neurons por dia. A tabela atual de preço do FLUX.2 Klein 4B indica 5,37 Neurons por tile de entrada 512×512 e 26,05 Neurons por tile de saída 512×512. O consumo depende do tamanho efetivo das imagens. Ao exceder a cota diária, novas inferências falham até o reset. Não habilite plano pago nem créditos sem autorização explícita.
+A cota e o consumo variam conforme o plano, o modelo e as dimensões efetivas das imagens. Consulte os limites e preços atuais da Cloudflare antes de executar lotes grandes. Nenhum plano pago ou crédito deve ser ativado sem autorização explícita.
 
 ## Rotas autenticadas
 
@@ -35,11 +35,11 @@ Workers AI Free oferece 10.000 Neurons por dia. A tabela atual de preço do FLUX
   - Dimensões entre 256 e 1.920 px por lado; a imagem de referência e a máscara são reduzidas a no máximo 511 px no lado maior.
   - Retorna PNG. Exige tradutor ou administrador.
 
-A interface permite traduzir texto, pintar as regiões da página e aplicar manualmente falas com posicionamento por toque/clique e exportação PNG.
+A interface permite traduzir texto, executar OCR local com Tesseract.js, extrair imagens de ZIP/CBZ e PDF, retomar lotes sem duplicar páginas, revisar o OCR e as traduções salvas, pintar regiões para reconstrução, aplicar manualmente falas e exportar páginas PNG. O fluxo também gera pacotes ZIP criptografados de revisão com imagens originais e textos traduzidos separados.
 
 ## O que ainda não está implementado
 
-Este protótipo ainda não faz OCR automático, extração segura de ZIP/CBZ/PDF, detecção de balões, processamento em lote, lettering automático, fila/retry, QA visual, exportação CBZ/ZIP ou publicação editorial. Os arquivos originais continuam preservados; a saída editada é baixada separadamente.
+Ainda não há detecção automática de balões, lettering automático, fila assíncrona/retry, QA visual, CBZ final com lettering ou publicação automática na biblioteca. O ZIP gerado é um pacote de revisão editorial, não uma edição final pronta para publicação. Os arquivos originais continuam preservados.
 
 ## Segurança e deploy
 
