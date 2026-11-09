@@ -381,14 +381,14 @@
         const file = input.files[0];
         const editor = card.querySelector(".mask-editor");
         if (!file) { editor.hidden = true; card._maskCanvas = null; return; }
-        if (file.size > 5 * 1024 * 1024) {
-          notice("A página deve ter no máximo 5 MiB.", true);
+        if (file.size > 80 * 1024 * 1024) {
+          notice("A página deve ter no máximo 80 MiB.", true);
           input.value = "";
           editor.hidden = true;
           return;
         }
         try {
-          const image = await loadImage(await readDataUrl(file));
+          const image = await loadImageFile(file);
           if (image.width > 1920 || image.height > 1920 || image.width < 256 || image.height < 256) {
             throw new Error("Use uma página entre 256 e 1.920 pixels por lado.");
           }
@@ -460,8 +460,8 @@
         const file = input.files[0];
         const stage = card.querySelector(".letter-stage");
         if (!file) { stage.hidden = true; card._letterBase = null; return; }
-        if (file.size > 5 * 1024 * 1024) {
-          notice("A página para lettering deve ter no máximo 5 MiB.", true);
+        if (file.size > 80 * 1024 * 1024) {
+          notice("A página para lettering deve ter no máximo 80 MiB.", true);
           input.value = "";
           return;
         }
@@ -531,13 +531,12 @@
         const maskCanvas = card._maskCanvas;
         const output = card.querySelector("[data-reconstruction-output]");
         if (!original || !maskCanvas) return notice("Envie uma página e marque pelo menos uma área para reconstrução.", true);
-        if (original.size > 5 * 1024 * 1024) return notice("A página deve ter no máximo 5 MiB.", true);
+        if (original.size > 80 * 1024 * 1024) return notice("A página deve ter no máximo 80 MiB.", true);
         button.disabled = true;
         output.textContent = "Reconstruindo…";
         try {
           if (API_BASE.includes("YOUR_SUBDOMAIN")) throw new Error("A API do Translate ainda não foi publicada.");
-          const dataUrl = await readDataUrl(original);
-          const image = await loadImage(dataUrl);
+          const image = await loadImageFile(original);
           if (image.width !== maskCanvas.width || image.height !== maskCanvas.height) throw new Error("A máscara não corresponde à página selecionada.");
           if (image.width > 1920 || image.height > 1920) throw new Error("Para este motor, a página deve ter até 1.920 pixels por lado.");
           const scale = Math.min(1, 511 / Math.max(image.width, image.height));
@@ -654,6 +653,10 @@
     }
   }
 
+  function loadImageFile(file) {
+    const url = URL.createObjectURL(file);
+    return loadImage(url).finally(() => URL.revokeObjectURL(url));
+  }
   function readDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -692,7 +695,7 @@
       zip.file("LEIA-ME.txt",manifest.join(String.fromCharCode(10)));
       progress.textContent="Compactando pacote…";
       const archive=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}});
-      if(archive.size>50*1024*1024)throw new Error("O pacote ultrapassa 50 MiB. Divida a obra em lotes menores.");
+      if(archive.size>80*1024*1024)throw new Error("O pacote ultrapassa 80 MiB. Divida a obra em lotes menores.");
       const result=await api("/api/projects/"+card.dataset.project+"/versions",{method:"POST",headers:{"Content-Type":"application/zip","X-Output-Format":"zip"},body:archive});
       progress.textContent="Pacote de revisão v"+result.version.version_number+" salvo com segurança.";
       notice("Pacote de revisão criado. Os originais e as traduções estão em arquivos separados."); await refresh();
