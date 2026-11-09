@@ -196,7 +196,46 @@
           }});
           const project = (window.__almoraProjects || []).find(p=>p.id===card.dataset.project);
           const results=[];
+          const existingDetail = await api("/api/projects/"+card.dataset.project);
+          const firstPageNumber = (existingDetail.pages || []).reduce((max,p)=>Math.max(max,Number(p.page_number)||0),0)+1;
           for(let i=0;i<pages.length;i++){
+            progress.textContent="OCR · página "+(i+1)+"/"+pages.length;
+            const recognized=await worker.recognize(pages[i].blob);
+            const source=String(recognized.data.text||"").trim();
+            let translatedText="";
+            if(source){
+              progress.textContent="Traduzindo · página "+(i+1)+"/"+pages.length;
+              const translated=await api("/api/projects/"+card.dataset.project+"/translate",{
+                method:"POST",headers:{"Content-Type":"application/json"},
+                body:JSON.stringify({text:source.slice(0,5800),source_language:project?.source_language||"en",context:project?.narrative_context||""})
+              });
+              translatedText=translated.translation;
+            }
+            progress.textContent="Salvando página "+(i+1)+"/"+pages.length+"…";
+            const pageImage=await loadImage(await readDataUrl(pages[i].blob));
+            const scale=Math.min(1,1800/Math.max(pageImage.width,pageImage.height));
+            const pageCanvas=document.createElement("canvas");
+            pageCanvas.width=Math.max(1,Math.round(pageImage.width*scale));
+            pageCanvas.height=Math.max(1,Math.round(pageImage.height*scale));
+            pageCanvas.getContext("2d").drawImage(pageImage,0,0,pageCanvas.width,pageCanvas.height);
+            let imageData=pageCanvas.toDataURL("image/jpeg",0.84);
+            if(imageData.length>10*1024*1024) imageData=pageCanvas.toDataURL("image/jpeg",0.68);
+            if(imageData.length>11*1024*1024) throw new Error("A página "+(i+1)+" ficou grande demais para armazenamento.");
+            const saved=await api("/api/projects/"+card.dataset.project+"/pages",{
+              method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({
+                page_number:firstPageNumber+i,
+                original_name:pages[i].name.replace(/\.[^.]+$/,"")+".jpg",
+                mime_type:"image/jpeg", image_b64:imageData,
+                ocr_text:source, translated_text:translatedText,
+                translation_model:translatedText ? "Cloudflare Workers AI" : ""
+              })
+            });
+            results.push("PÁGINA "+(i+1)+" — "+pages[i].name+" · guardada como página "+saved.page_number+
+              "\nTEXTO RECONHECIDO:\n"+(source||"Nenhum texto reconhecido.")+
+              (translatedText?"\n\nTRADUÇÃO:\n"+translatedText:"\n\nTRADUÇÃO: não gerada (sem texto reconhecido)."));
+          }
+          const report=results.join("\n\n"+ "─".repeat(32)+"\n\n");
             progress.textContent="OCR · página "+(i+1)+"/"+pages.length;
             const recognized=await worker.recognize(pages[i].blob);
             const source=String(recognized.data.text||"").trim();
