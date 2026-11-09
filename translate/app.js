@@ -1,7 +1,7 @@
 (() => {
   const SUPABASE_URL = "https://mcdinntggkanmsqubozn.supabase.co";
   const SUPABASE_KEY = "sb_publishable_dbymLTRkJyrohmyCjS6aPA_25sOAS61";
-  const API_BASE = window.ALMORA_TRANSLATE_API || "https://almora-translate.YOUR_SUBDOMAIN.workers.dev";
+  const API_BASE = window.ALMORA_TRANSLATE_API || "https://almora-translate.kauansousa353.workers.dev";
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   const $ = id => document.getElementById(id);
   let session = null;
