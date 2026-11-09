@@ -40,10 +40,36 @@
   const date = value => new Date(value).toLocaleString("pt-BR");
 
   async function request(path, options = {}) {
-    if (!session?.access_token) throw new Error("Sua sessão ALMORA expirou. Entre novamente.");
     if (API_BASE.includes("YOUR_SUBDOMAIN")) throw new Error("A API do Translate ainda não foi publicada. Falta configurar o endereço do Worker.");
-    const res = await fetch(API_BASE.replace(/\/$/,"") + path, { ...options, headers: { "Authorization": "Bearer " + session.access_token, ...(options.headers || {}) } });
-    if (!res.ok) { const data = await res.json().catch(() => ({})); throw new Error(data.error || "Falha na comunicação com o servidor (HTTP " + res.status + ")."); }
+
+    // Sempre buscar o token atual do armazenamento compartilhado; a variável
+    // session pode conter um access token antigo mesmo com a conta conectada.
+    const current = await supabase.auth.getSession();
+    if (current.error) throw new Error("Não foi possível recuperar sua sessão ALMORA: " + current.error.message);
+    let accessToken = current.data.session?.access_token;
+    if (!accessToken) throw new Error("Sua sessão ALMORA expirou. Entre novamente.");
+
+    const send = token => fetch(API_BASE.replace(/\/$/,"") + path, {
+      ...options,
+      headers: { ...(options.headers || {}), "Authorization": "Bearer " + token }
+    });
+
+    let res = await send(accessToken);
+    if (res.status === 401) {
+      // Se o access token expirou, renovar usando o refresh token da sessão
+      // existente e repetir a mesma requisição uma única vez.
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.error || !refreshed.data.session?.access_token) {
+        throw new Error("O servidor recusou a sessão ALMORA e não foi possível renová-la. Entre novamente na ALMORA.");
+      }
+      session = refreshed.data.session;
+      accessToken = session.access_token;
+      res = await send(accessToken);
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.error || "Falha na comunicação com o servidor (HTTP " + res.status + ").");
+    }
     return res;
   }
   async function api(path, options = {}) { return (await request(path, options)).json().catch(() => ({})); }
