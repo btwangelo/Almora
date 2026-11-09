@@ -1,4 +1,13 @@
 (() => {
+  if (!window.supabase?.createClient) {
+    const noticeNode = document.getElementById("notice");
+    const projectsNode = document.getElementById("projects");
+    const appNode = document.getElementById("app");
+    if (appNode) appNode.hidden = false;
+    if (noticeNode) { noticeNode.className = "notice error"; noticeNode.textContent = "O módulo de conexão da ALMORA não carregou. Atualize a página; se persistir, verifique a conexão e o bloqueio de scripts externos."; }
+    if (projectsNode) projectsNode.textContent = "Não foi possível iniciar o espaço de projetos porque a biblioteca de conexão não carregou.";
+    return;
+  }
   const SUPABASE_URL = "https://mcdinntggkanmsqubozn.supabase.co";
   const SUPABASE_KEY = "sb_publishable_dbymLTRkJyrohmyCjS6aPA_25sOAS61";
   const API_BASE = window.ALMORA_TRANSLATE_API || "https://almora-translate.kauansousa353.workers.dev";
@@ -76,17 +85,17 @@
       headers: { ...(options.headers || {}), "Authorization": "Bearer " + token }
     });
 
-    let res = await send(accessToken);
+    let res = await withTimeout(send(accessToken), "A comunicação com o servidor ALMORA Translate", 20000);
     if (res.status === 401) {
       // Se o access token expirou, renovar usando o refresh token da sessão
       // existente e repetir a mesma requisição uma única vez.
-      const refreshed = await supabase.auth.refreshSession();
+      const refreshed = await withTimeout(supabase.auth.refreshSession(), "A renovação da sessão ALMORA", 15000);
       if (refreshed.error || !refreshed.data.session?.access_token) {
         throw new Error("O servidor recusou a sessão ALMORA e não foi possível renová-la. Entre novamente na ALMORA.");
       }
       session = refreshed.data.session;
       accessToken = session.access_token;
-      res = await send(accessToken);
+      res = await withTimeout(send(accessToken), "A repetição da comunicação com o servidor ALMORA Translate", 20000);
     }
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
@@ -94,7 +103,17 @@
     }
     return res;
   }
-  async function api(path, options = {}) { return (await request(path, options)).json().catch(() => ({})); }
+  async function api(path, options = {}) {
+    const res = await request(path, options);
+    const raw = await res.text();
+    let data;
+    try { data = raw ? JSON.parse(raw) : {}; }
+    catch (_) { throw new Error("O servidor respondeu em um formato inválido ao carregar " + path + "."); }
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("O servidor retornou dados inválidos ao carregar " + path + ".");
+    }
+    return data;
+  }
   async function apiBlob(path) { return (await request(path)).blob(); }
   function sha256Hex(value) { return crypto.subtle.digest("SHA-256", value instanceof ArrayBuffer ? value : new TextEncoder().encode(String(value))).then(buffer => Array.from(new Uint8Array(buffer)).map(byte => byte.toString(16).padStart(2,"0")).join("")); }
   function blobDataUrl(blob) { return new Promise((resolve,reject) => { const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result)); reader.onerror=()=>reject(new Error("Não foi possível preparar a imagem.")); reader.readAsDataURL(blob); }); }
@@ -102,11 +121,11 @@
   function scoreOcrResult(result) {
     const text = String(result?.data?.text || "").trim();
     const confidence = Number(result?.data?.confidence);
-    const chars = [...text].filter(char => /[\\p{L}\\p{N}]/u.test(char)).length;
-    const symbols = [...text].filter(char => !/[\\p{L}\\p{N}\\s.,!?;:'"“”‘’()\\[\\]{}…—–-]/u.test(char)).length;
+    const chars = [...text].filter(char => /[\p{L}\p{N}]/u.test(char)).length;
+    const symbols = [...text].filter(char => !/[\p{L}\p{N}\s.,!?;:'"“”‘’()\\[\\]{}…—–-]/u.test(char)).length;
     const meaningfulRatio = text.length ? chars / text.length : 0;
     const symbolRatio = text.length ? symbols / text.length : 0;
-    const words = text.split(/\\s+/).filter(word => /[\\p{L}\\p{N}]{2,}/u.test(word)).length;
+    const words = text.split(/\s+/).filter(word => /[\p{L}\p{N}]{2,}/u.test(word)).length;
     let score = Number.isFinite(confidence) ? confidence : 0;
     if (text.length < 8) score -= 30;
     if (text.length >= 18 && meaningfulRatio < 0.48) score -= 35;
@@ -143,7 +162,7 @@
 
   function normalizeForComparison(value) {
     return String(value || "").normalize("NFKC").toLocaleLowerCase()
-      .replace(/[\\p{P}\\p{S}\\s]+/gu, "");
+      .replace(/[\p{P}\p{S}\s]+/gu, "");
   }
 
   async function translateLongText(projectId, text, language, _context, onProgress) {
@@ -176,19 +195,26 @@
   function notice(message, error = false) { const node=$("notice"); node.className=error?"notice error":"notice"; node.textContent=String(message??""); node.hidden=false; }
 
   async function refresh() {
-    $("projects").innerHTML = '<div class="loading">Carregando projetos…</div>';
+    const projectsNode = $("projects");
+    projectsNode.innerHTML = '<div class="loading">Carregando projetos…</div>';
     try {
       const data = await api("/api/projects");
-      roles = data.roles || [];
+      if (!Array.isArray(data.projects) || !Array.isArray(data.roles)) {
+        throw new Error("O servidor não enviou a lista de projetos corretamente. Toque em “Verificar login” para tentar novamente.");
+      }
+      roles = data.roles;
       $("rolePill").textContent = roles.map(role => roleLabels[role] || role).join(" · ");
       $("createPanel").hidden = !roles.some(role => ["owner","admin","translator"].includes(role));
-      renderProjects(data.projects || []);
+      renderProjects(data.projects);
+      return true;
     } catch (error) {
-      $("projects").textContent = error.message;
+      projectsNode.textContent = "Não foi possível carregar os projetos: " + (error.message || "erro desconhecido");
+      return false;
     }
   }
 
   function renderProjects(projects) {
+    window.__almoraProjects = Array.isArray(projects) ? projects : [];
     if (!projects.length) {
       $("projects").innerHTML = '<div class="empty">Nenhum projeto disponível. Crie seu primeiro projeto acima.</div>';
       return;
@@ -904,9 +930,30 @@
   });
 
   let authListenerReady = false;
-  let authRefreshRunning = false;
   let hasConfirmedSession = false;
   let projectsLoadedForUser = null;
+  let projectsRefreshPromise = null;
+
+  async function loadProjects(force = false) {
+    const userId = session?.user?.id || null;
+    if (!userId) return false;
+    if (projectsRefreshPromise) {
+      const inFlight = projectsRefreshPromise;
+      const completed = await inFlight;
+      if (!force) return completed;
+    }
+    if (!force && projectsLoadedForUser === userId) return true;
+
+    const task = refresh();
+    projectsRefreshPromise = task;
+    try {
+      const loaded = await task;
+      projectsLoadedForUser = loaded ? userId : null;
+      return loaded;
+    } finally {
+      if (projectsRefreshPromise === task) projectsRefreshPromise = null;
+    }
+  }
 
   async function applySession(nextSession, explicitSignOut = false) {
     if (!nextSession) {
@@ -916,30 +963,24 @@
       hasConfirmedSession = false;
       projectsLoadedForUser = null;
       $("app").hidden = false;
+      $("createPanel").hidden = true;
+      $("rolePill").textContent = "";
+      $("projects").innerHTML = '<div class="empty">Entre na ALMORA e toque em “Verificar login” para carregar seus projetos.</div>';
       notice("Entre na ALMORA e toque em “Verificar login” para carregar seus projetos.");
       return;
     }
+
     session = nextSession;
     hasConfirmedSession = true;
     $("app").hidden = false;
-    const userId = nextSession.user?.id || null;
-    // Returning from the native file picker fires focus/visibility events.
-    // Do not replace the project cards with a loading placeholder on those events.
-    // Load the project list only once per authenticated user; explicit actions
-    // such as upload/create/delete continue to call refresh() when needed.
-    // Confirma o login imediatamente. A consulta de projetos roda em segundo
-    // plano para que uma falha de API nunca deixe a tela presa na verificação.
     notice("Você está conectado à ALMORA.");
-    if (!authRefreshRunning && userId && projectsLoadedForUser !== userId) {
-      authRefreshRunning = true;
-      void refresh().then(() => {
-        projectsLoadedForUser = userId;
-      }).catch(error => {
-        $("projects").textContent = error.message || "Não foi possível carregar os projetos.";
-      }).finally(() => {
-        authRefreshRunning = false;
-      });
-    }
+
+    // A lista é carregada em segundo plano, mas uma falha não é marcada como
+    // sucesso: o botão “Verificar login” poderá tentar novamente.
+    void loadProjects(false).catch(error => {
+      projectsLoadedForUser = null;
+      $("projects").textContent = "Não foi possível carregar os projetos: " + (error.message || "erro desconhecido");
+    });
   }
 
   let authInitPromise = null;
@@ -966,7 +1007,8 @@
         if (data.session) await applySession(data.session);
         else if (!hasConfirmedSession) await applySession(null);
       } catch (error) {
-        notice("Não foi possível verificar sua sessão ALMORA: " + (error.message || "erro desconhecido") + ". Confira sua conexão e tente atualizar a página.", true);
+        $("projects").textContent = "Não foi possível verificar o login. Toque em “Verificar login” para tentar novamente.";
+        notice("Não foi possível verificar sua sessão ALMORA: " + (error.message || "erro desconhecido") + ". Confira sua conexão e tente novamente.", true);
       }
     })();
     try {
@@ -981,8 +1023,13 @@
     button.disabled = true;
     try {
       await withTimeout(init(), "A verificação da sessão ALMORA");
+      if (session?.user?.id) {
+        const loaded = await withTimeout(loadProjects(true), "O carregamento dos projetos", 25000);
+        if (loaded) notice("Você está conectado à ALMORA.");
+        else notice("Login confirmado, mas não foi possível carregar os projetos. Confira a mensagem na lista e tente novamente.", true);
+      }
     } catch (error) {
-      notice(error.message || "Não foi possível verificar o login.", true);
+      notice(error.message || "Não foi possível verificar o login e carregar os projetos.", true);
     } finally {
       button.disabled = false;
       button.textContent = "Verificar login";
