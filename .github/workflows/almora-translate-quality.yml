@@ -3,6 +3,7 @@ name: ALMORA Translate quality
 on:
   push:
     branches:
+      - main
       - feature/almora-translate-foundation
     paths:
       - "translate/**"
