@@ -498,7 +498,7 @@
               (translatedText?"\n\nTRADUÇÃO:\n"+translatedText:
                 "\n\nTRADUÇÃO: NÃO VALIDADA\n"+(translatedCandidate||"Não gerada.")+
                 (translationWarning?"\nAVISO: "+translationWarning:""))+
-              "\nOCR: "+(ocr.reliable?"confiável":"revisão necessária")+" · confiança "+(ocr.confidence===null?"indisponível":ocr.confidence+"%")+" · "+ocr.attempts+" tentativa(s));
+              "\nOCR: "+(ocr.reliable?"confiável":"revisão necessária")+" · confiança "+(ocr.confidence===null?"indisponível":ocr.confidence+"%")+" · "+ocr.attempts+" tentativa(s)");
           }
           const report=results.join("\n\n"+ "─".repeat(32)+"\n\n");
           const blob=new Blob([report],{type:"text/plain;charset=utf-8"});
