@@ -238,7 +238,7 @@
           const result=await worker.recognize(canvas), lines=(result.data.lines||[]).slice(0,300).map(line=>({text:String(line.text||"").trim(),x:Math.round((Number(line.bbox?.x0)||0)*scale),y:Math.round((Number(line.bbox?.y0)||0)*scale),width:Math.max(0,Math.round(((Number(line.bbox?.x1)||0)-(Number(line.bbox?.x0)||0))*scale)),height:Math.max(0,Math.round(((Number(line.bbox?.y1)||0)-(Number(line.bbox?.y0)||0))*scale))})).filter(line=>line.text&&line.width>0&&line.height>0);
           await api("/api/projects/"+card.dataset.project+"/pages/"+page.id+"/layout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({width,height,lines})}); prepared++;
         }
-        progress.textContent="Mapeamento concluído: "+prepared+" página(s) preparadas; "+skipped+" já tinham mapa OCR. Nenhuma tradução foi refeita.";
+        showProgress(progress,"Mapeamento concluído",100,prepared+" página(s) preparadas; "+skipped+" já tinham mapa OCR. Nenhuma tradução foi refeita.");
         notice("Mapas de texto salvos. Imagens originais e traduções preservadas."); await refresh();
       } catch(e){progress.textContent="";notice(e.message,true);} finally{if(worker)await worker.terminate().catch(()=>{});button.disabled=false;}
     }));
@@ -302,7 +302,7 @@
         const project = projects.find(item => item.id === card.dataset.project);
         if (!input.value.trim()) return notice("Cole o texto que deseja traduzir.", true);
         button.disabled = true;
-        output.textContent = "Traduzindo…";
+        showProgress(output,"Traduzindo texto",null,"Aguardando a resposta do motor de tradução.");
         card._lastTranslation = "";
         try {
           const result = await api("/api/projects/" + card.dataset.project + "/translate", {
@@ -313,7 +313,7 @@
               source_language: project.source_language,
             })
           });
-          output.textContent = result.translation;
+          showProgress(output,"Tradução concluída",100,"Motor: "+(result.model||"IA"));\n          output.insertAdjacentHTML("beforeend", '<div class="task-progress-detail">' + esc(result.translation) + '</div>');
           card._lastTranslation = result.translation;
           notice("Tradução concluída pelo motor " + esc(result.model) + ".");
         } catch (error) {
@@ -828,7 +828,7 @@
       const archive=await zip.generateAsync({type:"blob",compression:"DEFLATE",compressionOptions:{level:6}},meta=>showProgress(progress,"Compactando pacote",88+(meta.percent||0)*0.10,"Compactação do arquivo"));
       if(archive.size>80*1024*1024)throw new Error("O pacote ultrapassa 80 MiB. Divida a obra em lotes menores.");
       const result=await api("/api/projects/"+card.dataset.project+"/versions",{method:"POST",headers:{"Content-Type":"application/zip","X-Output-Format":"zip"},body:archive});
-      progress.textContent="Pacote de revisão v"+result.version.version_number+" salvo com segurança.";
+      showProgress(progress,"Pacote de revisão salvo",100,"Versão "+result.version.version_number+" armazenada com segurança.");
       notice("Pacote de revisão criado. Os originais e as traduções estão em arquivos separados."); await refresh();
     } catch(error){progress.textContent="";notice(error.message,true);} finally{button.disabled=false;}
   }
