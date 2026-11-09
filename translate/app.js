@@ -670,7 +670,7 @@
 
   $("projectForm").addEventListener("submit", async event => {
     event.preventDefault();
-    const button = event.submitter;
+    const button = event.submitter || $("projectForm").querySelector('button[type="submit"]');
     button.disabled = true;
     try {
       const data = await api("/api/projects", {
@@ -723,9 +723,13 @@
       });
       authListenerReady = true;
     }
-    const { data, error } = await supabase.auth.getSession();
-    if (error) return notice("Não foi possível verificar sua sessão ALMORA.", true);
-    await applySession(data.session);
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      await applySession(data.session);
+    } catch (_) {
+      notice("Não foi possível verificar sua sessão ALMORA. Confira sua conexão e tente atualizar a página.", true);
+    }
   }
 
   $("refreshBtn").addEventListener("click", init);
