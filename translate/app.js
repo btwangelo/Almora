@@ -713,11 +713,7 @@
     session = nextSession || null;
     if (!session) {
       $("app").hidden = true;
-      notice("O ALMORA Translate utiliza automaticamente a sessão da ALMORA. Abra esta ferramenta pelo ALMORA Studio, na área administrativa.");
-      const link = document.createElement("a");
-      link.href = "../#studio";
-      link.textContent = "Abrir ALMORA Studio";
-      $("notice").append(link);
+      notice("Não foi encontrada uma sessão ativa da ALMORA neste navegador. Toque em “Verificar login” para consultar novamente.");
       return;
     }
     $("notice").hidden = true;
@@ -747,7 +743,14 @@
     }
   }
 
-  $("refreshBtn").addEventListener("click", init);
+  $("refreshBtn").addEventListener("click", async () => {
+    const button = $("refreshBtn");
+    button.disabled = true;
+    button.textContent = "Verificando…";
+    notice("Verificando se você está conectado à sua conta ALMORA…");
+    try { await init(); }
+    finally { button.disabled = false; button.textContent = "Verificar login"; }
+  });
   window.addEventListener("focus", init);
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) init();
