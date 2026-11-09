@@ -723,6 +723,8 @@ async function handle(request, env) {
   }
 }
 
+export { supabaseBase };
+
 export default {
   fetch(request, env) {
     return handle(request, env);
