@@ -96,7 +96,9 @@
     if (el.id) return "id:" + el.id;
     if (el.name) return "name:" + el.name;
     const classes = [...el.classList].sort().join(".");
-    const siblings = [...document.querySelectorAll(el.tagName.toLowerCase() + (classes ? "." + classes.split(".").join(".") : ""))];
+    const selector = el.tagName.toLowerCase() + (classes ? "." + classes.split(".").join(".") : "");
+    const container = el.closest(".project") || el.closest("form") || document.getElementById("app") || document.getElementById("projects") || document.body;
+    const siblings = [...container.querySelectorAll(selector)];
     return el.tagName.toLowerCase() + ":" + classes + ":" + Math.max(0, siblings.indexOf(el));
   };
   const keyFor = el => [owner(), route(), scope(el), identity(el)].join("|");
