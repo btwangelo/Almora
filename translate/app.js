@@ -753,8 +753,9 @@
       const currentSession = data.session || null;
       await applySession(currentSession);
       if (currentSession) {
-        const identity = currentSession.user?.email || currentSession.user?.phone || "conta autenticada";
-        notice("✓ Você está conectado à ALMORA como " + identity + ".");
+        // A sessão válida já foi aplicada; mantenha o aviso oculto.
+        $("notice").hidden = true;
+        button.textContent = "Conectado ✓";
       } else {
         notice("Você não está conectado neste navegador. Entre na ALMORA e volte a esta página.", true);
       }
