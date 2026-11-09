@@ -64,6 +64,7 @@
 <script id="almora-draft-persistence">
 (() => {
   "use strict";
+  navigator.storage?.persist?.().catch(() => {});
   const DB_NAME = "almora-work-drafts-v1";
   const STORE = "fields";
   const restored = new WeakSet();
@@ -146,7 +147,7 @@
       } catch (error) {
         console.warn("ALMORA: não foi possível guardar este rascunho localmente.", error);
       }
-    }, 220));
+    }, 120));
   };
   const restore = async () => {
     try {
