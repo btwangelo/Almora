@@ -608,20 +608,41 @@
     }
   });
 
-  async function init() {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) return notice("Não foi possível verificar sua sessão ALMORA.", true);
-    session = data.session;
+  let authListenerReady = false;
+  let authRefreshRunning = false;
+
+  async function applySession(nextSession) {
+    session = nextSession || null;
     if (!session) {
-      notice('Você precisa entrar na sua conta ALMORA primeiro. <a href="../#conta">Abrir login da ALMORA</a> e depois voltar a esta página.');
       $("app").hidden = true;
+      notice('Entre na sua conta ALMORA para continuar. <a href="../#conta">Abrir login da ALMORA</a> e depois volte a esta página.');
       return;
     }
     $("notice").hidden = true;
     $("app").hidden = false;
-    await refresh();
+    if (!authRefreshRunning) {
+      authRefreshRunning = true;
+      try { await refresh(); } finally { authRefreshRunning = false; }
+    }
   }
 
-  $("refreshBtn").addEventListener("click", refresh);
+  async function init() {
+    if (!authListenerReady) {
+      supabase.auth.onAuthStateChange((_event, nextSession) => {
+        // Atualiza a interface quando o login termina ou a sessão é renovada.
+        void applySession(nextSession);
+      });
+      authListenerReady = true;
+    }
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return notice("Não foi possível verificar sua sessão ALMORA.", true);
+    await applySession(data.session);
+  }
+
+  $("refreshBtn").addEventListener("click", init);
+  window.addEventListener("focus", init);
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) init();
+  });
   init();
 })();
