@@ -422,6 +422,30 @@ async function handle(request, env) {
       if (!canReadProject(auth, project)) return fail("Projeto não encontrado ou sem permissão.", 404, origin, env);
 
 
+      if (request.method === "DELETE" && !action) {
+        if (!isAdmin(auth) && project.created_by !== auth.user.id) {
+          return fail("Somente quem criou o projeto ou a administração pode apagá-lo.", 403, origin, env);
+        }
+
+        // Remove primeiro todos os objetos privados associados ao projeto.
+        // A chave do projeto é isolada pelo prefixo, sem tocar em outras obras.
+        const prefix = "translate/" + projectId + "/";
+        let cursor;
+        do {
+          const listed = await env.ALMORA_BUCKET.list({ prefix, cursor, limit: 1000 });
+          const keys = (listed.objects || []).map(object => object.key);
+          if (keys.length) await env.ALMORA_BUCKET.delete(keys);
+          cursor = listed.truncated ? listed.cursor : undefined;
+        } while (cursor);
+
+        // As relações filhas usam ON DELETE CASCADE no banco.
+        await db(env, "almora_translation_projects?id=eq." + projectId, {
+          method: "DELETE",
+          headers: { "prefer": "return=minimal" }
+        });
+        return response({ success: true, deleted: true }, 200, origin, env);
+      }
+
       if (request.method === "POST" && action === "review") {
         const input = await request.json().catch(() => ({}));
         const decision = String(input.decision || "");
