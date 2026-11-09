@@ -231,7 +231,7 @@ async function translateWithAI(env, input) {
       { role: "user", content: user }
     ],
     temperature: 0.2,
-    max_tokens: Math.min(2048, Math.max(256, text.length * 2))
+    max_completion_tokens: Math.min(8192, Math.max(512, text.length * 2))
   });
   const translated = String(result && (result.response || result.output_text || "")).trim();
   if (!translated) throw new Error("O provedor não retornou uma tradução válida.");
