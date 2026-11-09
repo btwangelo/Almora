@@ -170,7 +170,13 @@
             const entries = Object.values(zip.files).filter(x => !x.dir && /\.(png|jpe?g|webp)$/i.test(x.name)).sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true}));
             if (!entries.length) throw new Error("O arquivo não contém páginas PNG, JPG ou WEBP.");
             if (entries.length > 20) throw new Error("Por segurança, processe no máximo 20 páginas por lote.");
-            for (const entry of entries) pages.push({name:entry.name, blob:await entry.async("blob")});
+            let expandedBytes = 0;
+            for (const entry of entries) {
+              const size = Number(entry._data?.uncompressedSize || 0);
+              expandedBytes += size;
+              if (size > 20 * 1024 * 1024 || expandedBytes > 150 * 1024 * 1024) throw new Error("O ZIP excede o limite seguro de extração (20 MiB por página e 150 MiB no total).");
+              pages.push({name:entry.name, blob:await entry.async("blob")});
+            }
           } else if (ext === "pdf") {
             if (!window.pdfjsLib) throw new Error("O leitor de PDF não carregou. Atualize a página e tente novamente.");
             pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
@@ -178,7 +184,10 @@
             if (pdf.numPages > 20) throw new Error("Por segurança, processe no máximo 20 páginas por lote.");
             for (let n=1;n<=pdf.numPages;n++) {
               progress.textContent = "Preparando PDF · página "+n+"/"+pdf.numPages;
-              const page=await pdf.getPage(n), viewport=page.getViewport({scale:1.5});
+              const page=await pdf.getPage(n);
+              const baseViewport=page.getViewport({scale:1});
+              const pdfScale=Math.min(1.5,1800/Math.max(baseViewport.width,baseViewport.height));
+              const viewport=page.getViewport({scale:pdfScale});
               const canvas=document.createElement("canvas");
               canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
               await page.render({canvasContext:canvas.getContext("2d"),viewport}).promise;
@@ -196,19 +205,18 @@
           const project = (window.__almoraProjects || []).find(p=>p.id===card.dataset.project);
           const results=[];
           const existingDetail = await api("/api/projects/"+card.dataset.project);
-          const firstPageNumber = (existingDetail.pages || []).reduce((max,p)=>Math.max(max,Number(p.page_number)||0),0)+1;
+          let nextPageNumber = (existingDetail.pages || []).reduce((max,p)=>Math.max(max,Number(p.page_number)||0),0)+1;
+          const fileHash = await sha256Hex(await file.arrayBuffer());
+          const completedKeys = new Set((existingDetail.pages || []).map(p => p.ocr_data?.batch_key).filter(Boolean));
           for(let i=0;i<pages.length;i++){
+            const batchKey = await sha256Hex(fileHash + "|" + i + "|" + pages[i].name);
+            if (completedKeys.has(batchKey)) { progress.textContent = "Página " + (i+1) + "/" + pages.length + " já salva; pulando para evitar duplicação…"; continue; }
             progress.textContent="OCR · página "+(i+1)+"/"+pages.length;
             const recognized=await worker.recognize(pages[i].blob);
             const source=String(recognized.data.text||"").trim();
             let translatedText="";
             if(source){
-              progress.textContent="Traduzindo · página "+(i+1)+"/"+pages.length;
-              const translated=await api("/api/projects/"+card.dataset.project+"/translate",{
-                method:"POST",headers:{"Content-Type":"application/json"},
-                body:JSON.stringify({text:source.slice(0,5800),source_language:project?.source_language||"en",context:project?.narrative_context||""})
-              });
-              translatedText=translated.translation;
+              translatedText = await translateLongText(card.dataset.project, source.slice(0,24000), project?.source_language || "en", project?.narrative_context || "", (part,total) => { progress.textContent = "Traduzindo · página " + (i+1) + "/" + pages.length + " · trecho " + part + "/" + total; });
             }
             progress.textContent="Salvando página "+(i+1)+"/"+pages.length+"…";
             const pageImage=await loadImage(await readDataUrl(pages[i].blob));
@@ -217,13 +225,16 @@
             pageCanvas.width=Math.max(1,Math.round(pageImage.width*scale));
             pageCanvas.height=Math.max(1,Math.round(pageImage.height*scale));
             pageCanvas.getContext("2d").drawImage(pageImage,0,0,pageCanvas.width,pageCanvas.height);
-            let imageData=pageCanvas.toDataURL("image/jpeg",0.84);
-            if(imageData.length>10*1024*1024) imageData=pageCanvas.toDataURL("image/jpeg",0.68);
-            if(imageData.length>11*1024*1024) throw new Error("A página "+(i+1)+" ficou grande demais para armazenamento.");
+            let imageBlob = await new Promise(resolve => pageCanvas.toBlob(resolve, "image/jpeg", 0.84));
+            if (!imageBlob) throw new Error("Não foi possível preparar a página " + (i+1) + ".");
+            if (imageBlob.size > 7 * 1024 * 1024) imageBlob = await new Promise(resolve => pageCanvas.toBlob(resolve, "image/jpeg", 0.62));
+            if (!imageBlob || imageBlob.size > 8 * 1024 * 1024) throw new Error("A página " + (i+1) + " excede o limite de armazenamento.");
+            const imageData = await blobDataUrl(imageBlob);
             const saved=await api("/api/projects/"+card.dataset.project+"/pages",{
               method:"POST",headers:{"Content-Type":"application/json"},
               body:JSON.stringify({
-                page_number:firstPageNumber+i,
+                page_number:nextPageNumber++,
+                batch_key:batchKey,
                 original_name:pages[i].name.replace(/\.[^.]+$/,"")+".jpg",
                 mime_type:"image/jpeg", image_b64:imageData,
                 ocr_text:source, translated_text:translatedText,
@@ -238,7 +249,7 @@
           const blob=new Blob([report],{type:"text/plain;charset=utf-8"});
           const url=URL.createObjectURL(blob);
           output.innerHTML='<a class="download-result" download="'+esc(file.name.replace(/\.[^.]+$/,""))+'-traduzido.txt" href="'+url+'">Baixar OCR + traduções (.txt)</a><pre class="batch-report">'+esc(report)+'</pre>';
-          progress.textContent="Concluído · "+pages.length+" página(s). Revise o OCR e as traduções antes de aplicar o lettering.";
+          progress.textContent="Concluído · "+pages.length+" página(s) analisadas; as páginas já salvas foram preservadas sem duplicação. Revise OCR e traduções antes do lettering.";
           notice("Lote concluído. O relatório foi gerado; nenhuma página original foi alterada.");
         } catch(error) {
           progress.textContent="";
