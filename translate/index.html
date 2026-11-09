@@ -9,6 +9,9 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./styles.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
   <header class="topbar">
@@ -51,7 +54,7 @@
       <section class="footnote">
         <strong>Preservação dos originais</strong>
         <p>Os arquivos enviados são armazenados separadamente e criptografados. Nenhuma página original é substituída.</p>
-        <p class="muted">Protótipo: tradução textual por IA e reconstrução experimental com máscara manual. OCR automático, extração de arquivos, processamento em lote, lettering, revisão editorial e publicação ainda não estão ativos.</p>
+        <p class="muted">OCR e extração de páginas ZIP/CBZ/PDF são executados no navegador. A tradução em lote usa a cota gratuita diária da IA. A identificação automática de balões e o lettering continuam manuais; a revisão e publicação editorial ainda exigem implementação própria.</p>
         <p class="muted">A reconstrução usa FLUX.2 Klein 4B para edição por referências. Não é inpainting nativo: a máscara é uma referência visual e a composição no navegador limita as mudanças às áreas pintadas.</p>
         <p class="muted">A tradução depende da cota gratuita diária do Cloudflare Workers AI (10.000 Neurons). Ao atingir o limite, será necessário aguardar a renovação diária; nenhum plano pago será ativado automaticamente.</p>
       </section>
