@@ -915,8 +915,8 @@
       session = null;
       hasConfirmedSession = false;
       projectsLoadedForUser = null;
-      $("app").hidden = true;
-      notice("Não foi encontrada uma sessão ativa da ALMORA neste navegador. Toque em “Verificar login” para consultar novamente.");
+      $("app").hidden = false;
+      notice("Entre na ALMORA e toque em “Verificar login” para carregar seus projetos.");
       return;
     }
     session = nextSession;
@@ -979,7 +979,6 @@
   $("refreshBtn").addEventListener("click", async () => {
     const button = $("refreshBtn");
     button.disabled = true;
-    button.textContent = "Verificando…";
     try {
       await withTimeout(init(), "A verificação da sessão ALMORA");
     } catch (error) {
