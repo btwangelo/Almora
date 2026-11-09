@@ -140,6 +140,7 @@
           '<section class="engine-panel"><h4>Motor de tradução · teste</h4><textarea class="source-text" rows="3" maxlength="6000" placeholder="Cole uma fala ou trecho para testar a tradução…"></textarea><button class="small-button translate-text">Traduzir para PT-BR</button><div class="engine-output" data-translation-output></div></section>' +
           '<section class="engine-panel review-panel"><h4>Revisão e entrega editorial</h4><p>Gere um pacote ZIP com as imagens originais e as traduções em separado para avaliação.</p>' +
           (["editorial_review","approved","published"].includes(project.status) ? "" : '<button class="small-button package-review" type="button">Gerar pacote de revisão (.zip)</button>') +
+          (["owner","admin","translator"].some(role => roles.includes(role)) && !["editorial_review","approved","published"].includes(project.status) ? '<button class="small-button prepare-lettering" type="button">Preparar balões das páginas salvas</button>' : '') +
           '<div class="package-progress" aria-live="polite"></div><div class="version-list">' + ((project.almora_translation_versions || []).map(v => '<div>Versão ' + Number(v.version_number) + ' · ' + esc(v.status) + ' <button class="small-button download-version" data-version="' + esc(v.id) + '" type="button">Baixar pacote</button></div>').join("")) + '</div><textarea class="review-notes" rows="2" maxlength="4000" placeholder="Observações para a equipe (opcional)…"></textarea>' +
           (["owner","admin","translator"].some(role => roles.includes(role)) && ["uploaded","translator_review","changes_requested"].includes(project.status) && (roles.includes("owner") || roles.includes("admin") || project.created_by === session.user.id || project.assigned_translator_id === session.user.id) ? '<button class="small-button submit-review" type="button">Enviar para revisão editorial</button>' : '') +
           (["owner","admin","editor_bl","editor_gl","reviewer"].some(role => roles.includes(role)) && project.status === "editorial_review" ? '<div class="review-actions"><button class="small-button approve-review" type="button">Aprovar tradução</button><button class="small-button request-changes" type="button">Solicitar ajustes</button></div>' : '') +
@@ -159,6 +160,28 @@
     document.querySelectorAll(".project .download-page").forEach(button => button.addEventListener("click", async () => { const card=button.closest(".project"); button.disabled=true; try { const blob=await apiBlob("/api/projects/"+card.dataset.project+"/pages/"+button.dataset.page+"/image"); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="pagina-original.png"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),60000); } catch(e){notice(e.message,true);} finally{button.disabled=false;} }));
     document.querySelectorAll(".project .download-version").forEach(button => button.addEventListener("click", async () => { const card=button.closest(".project"); button.disabled=true; try { const blob=await apiBlob("/api/projects/"+card.dataset.project+"/versions/"+button.dataset.version+"/download"); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download="almora-revisao.zip"; a.click(); setTimeout(()=>URL.revokeObjectURL(url),60000); } catch(e){notice(e.message,true);} finally{button.disabled=false;} }));
     document.querySelectorAll(".project .package-review").forEach(button => button.addEventListener("click", () => createReviewPackage(button)));
+    document.querySelectorAll(".project .prepare-lettering").forEach(button => button.addEventListener("click", async () => {
+      const card=button.closest(".project"), progress=card.querySelector(".package-progress"); button.disabled=true; let worker=null;
+      try {
+        const detail=await api("/api/projects/"+card.dataset.project), pages=[...(detail.pages||[])].sort((x,y)=>Number(x.page_number)-Number(y.page_number));
+        if(!pages.length) throw new Error("Ainda não há páginas salvas neste projeto.");
+        if(!window.Tesseract) throw new Error("O OCR não carregou. Atualize a página.");
+        const lang=({en:"eng",ko:"kor",ja:"jpn",zh:"chi_sim"})[detail.project?.source_language]||"eng";
+        worker=await Tesseract.createWorker(lang,1,{logger:m=>{if(m.status==="recognizing text")progress.textContent="Mapeando balões · "+Math.round((m.progress||0)*100)+"%";}});
+        let prepared=0, skipped=0;
+        for(let i=0;i<pages.length;i++){
+          const page=pages[i]; if(page.ocr_data?.lettering_layout?.lines?.length){skipped++;continue;}
+          progress.textContent="Mapeando balões · página "+page.page_number+"/"+pages.length;
+          const blob=await apiBlob("/api/projects/"+card.dataset.project+"/pages/"+page.id+"/image"), img=await loadImageFile(blob);
+          const scale=Math.min(1,1800/Math.max(img.width,img.height)), width=Math.max(1,Math.round(img.width*scale)), height=Math.max(1,Math.round(img.height*scale));
+          const canvas=document.createElement("canvas"); canvas.width=width; canvas.height=height; canvas.getContext("2d").drawImage(img,0,0,width,height);
+          const result=await worker.recognize(canvas), lines=(result.data.lines||[]).slice(0,300).map(line=>({text:String(line.text||"").trim(),x:Math.round((Number(line.bbox?.x0)||0)*scale),y:Math.round((Number(line.bbox?.y0)||0)*scale),width:Math.max(0,Math.round(((Number(line.bbox?.x1)||0)-(Number(line.bbox?.x0)||0))*scale)),height:Math.max(0,Math.round(((Number(line.bbox?.y1)||0)-(Number(line.bbox?.y0)||0))*scale))})).filter(line=>line.text&&line.width>0&&line.height>0);
+          await api("/api/projects/"+card.dataset.project+"/pages/"+page.id+"/layout",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({width,height,lines})}); prepared++;
+        }
+        progress.textContent="Mapeamento concluído: "+prepared+" página(s) preparadas; "+skipped+" já tinham mapa OCR. Nenhuma tradução foi refeita.";
+        notice("Mapas de texto salvos. Imagens originais e traduções preservadas."); await refresh();
+      } catch(e){progress.textContent="";notice(e.message,true);} finally{if(worker)await worker.terminate().catch(()=>{});button.disabled=false;}
+    }));
 
     document.querySelectorAll(".project .delete-project").forEach(button => {
       button.addEventListener("click", async () => {
