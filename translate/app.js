@@ -320,15 +320,16 @@
           const maxPageNumber = priorPages.reduce((max,p)=>Math.max(max,Number(p.page_number)||0),0);
           const batchStartNumber = batchPages.length ? Math.min(...batchPages.map(p => Number(p.page_number)-Number(p.ocr_data.batch_index))) : maxPageNumber + 1;
           const completedKeys = new Set(priorPages.map(p => p.ocr_data?.batch_key).filter(Boolean));
-          for(let i=0;i<pages.length;i++){
+          for(let i=0;i<pageCount;i++){
+            const currentPage = await getPage(i);
             const batchKey = await sha256Hex(fileHash + "|" + i + "|" + currentPage.name);
-            if (completedKeys.has(batchKey)) { progress.textContent = "Página " + (i+1) + "/" + pages.length + " já salva; pulando para evitar duplicação…"; continue; }
+            if (completedKeys.has(batchKey)) { progress.textContent = "Página " + (i+1) + "/" + pageCount + " já salva; pulando para evitar duplicação…"; continue; }
             progress.textContent="OCR · página "+(i+1)+"/"+pageCount;
             const recognized=await worker.recognize(currentPage.blob);
             const source=String(recognized.data.text||"").trim();
             let translatedText="";
             if(source){
-              translatedText = await translateLongText(card.dataset.project, source.slice(0,24000), project?.source_language || "en", "", (part,total) => { progress.textContent = "Traduzindo · página " + (i+1) + "/" + pages.length + " · trecho " + part + "/" + total; });
+              translatedText = await translateLongText(card.dataset.project, source.slice(0,24000), project?.source_language || "en", "", (part,total) => { progress.textContent = "Traduzindo · página " + (i+1) + "/" + pageCount + " · trecho " + part + "/" + total; });
             }
             progress.textContent="Salvando página "+(i+1)+"/"+pageCount+"…";
             const pageImage=await loadImage(await readDataUrl(currentPage.blob));
@@ -340,6 +341,7 @@
             let imageBlob = await new Promise(resolve => pageCanvas.toBlob(resolve, "image/jpeg", 0.84));
             if (!imageBlob) throw new Error("Não foi possível preparar a página " + (i+1) + ".");
             if (imageBlob.size > 7 * 1024 * 1024) imageBlob = await new Promise(resolve => pageCanvas.toBlob(resolve, "image/jpeg", 0.62));
+            pageCanvas.width=0; pageCanvas.height=0;
             if (!imageBlob || imageBlob.size > 8 * 1024 * 1024) throw new Error("A página " + (i+1) + " excede o limite de armazenamento.");
             const imageData = await blobDataUrl(imageBlob);
             const saved=await api("/api/projects/"+card.dataset.project+"/pages",{
