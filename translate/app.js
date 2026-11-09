@@ -401,7 +401,19 @@
           maskContext.fillStyle = "#000";
           maskContext.fillRect(0, 0, image.width, image.height);
           card._maskCanvas = maskCanvas;
+          const savedMask = await window.ALMORADrafts?.loadData("mask", card.dataset.project);
+          if (savedMask) {
+            const savedImage = await loadImage(savedMask);
+            maskContext.drawImage(savedImage, 0, 0, maskCanvas.width, maskCanvas.height);
+          }
           const overlayContext = overlay.getContext("2d");
+          if (savedMask) {
+            overlayContext.drawImage(maskCanvas, 0, 0);
+            overlayContext.globalCompositeOperation = "source-in";
+            overlayContext.fillStyle = "rgba(255,55,105,.58)";
+            overlayContext.fillRect(0, 0, overlay.width, overlay.height);
+            overlayContext.globalCompositeOperation = "source-over";
+          }
           let drawing = false;
           let previous = null;
           const point = event => {
@@ -438,11 +450,15 @@
             stroke(overlayContext, previous, next, radius, "rgba(255,55,105,.58)");
             previous = next;
           };
-          overlay.onpointerup = overlay.onpointercancel = () => { drawing = false; previous = null; };
+          overlay.onpointerup = overlay.onpointercancel = () => {
+            drawing = false; previous = null;
+            window.ALMORADrafts?.saveData("mask", maskCanvas.toDataURL("image/png"), card.dataset.project);
+          };
           card.querySelector(".clear-mask").onclick = () => {
             maskContext.fillStyle = "#000";
             maskContext.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
             overlayContext.clearRect(0, 0, overlay.width, overlay.height);
+            window.ALMORADrafts?.removeData("mask", card.dataset.project);
           };
           editor.hidden = false;
         } catch (error) {
@@ -466,13 +482,13 @@
           return;
         }
         try {
-          const image = await loadImage(await readDataUrl(file));
+          const image = await loadImageFile(file);
           if (image.width > 4096 || image.height > 4096) throw new Error("A página deve ter até 4.096 pixels por lado.");
           const canvas = card.querySelector(".letter-canvas");
           canvas.width = image.width;
           canvas.height = image.height;
           card._letterBase = image;
-          card._letterBlocks = [];
+          card._letterBlocks = await window.ALMORADrafts?.loadData("letter-blocks", card.dataset.project) || [];
           canvas.onclick = event => {
             const text = card.querySelector(".letter-text").value.trim();
             if (!text) return notice("Digite a fala antes de tocar no balão.", true);
@@ -480,6 +496,7 @@
             const x = (event.clientX - rect.left) * canvas.width / rect.width;
             const y = (event.clientY - rect.top) * canvas.height / rect.height;
             card._letterBlocks.push({ text, x, y });
+            window.ALMORADrafts?.saveData("letter-blocks", card._letterBlocks, card.dataset.project);
             drawLettering(card);
           };
           stage.hidden = false;
@@ -503,6 +520,7 @@
       button.addEventListener("click", () => {
         const card = button.closest(".project");
         card._letterBlocks = [];
+        window.ALMORADrafts?.removeData("letter-blocks", card.dataset.project);
         drawLettering(card);
       });
     });
