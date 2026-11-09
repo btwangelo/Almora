@@ -727,9 +727,8 @@
   async function init() {
     if (!authListenerReady) {
       supabase.auth.onAuthStateChange((event, nextSession) => {
-        // INITIAL_SESSION pode disparar durante a hidratação do armazenamento.
-        // getSession() abaixo é a leitura autoritativa da sessão persistida.
-        if (event === "INITIAL_SESSION" && !nextSession) return;
+        // Ignora notificações nulas transitórias durante a hidratação do storage.
+        if (!nextSession && event !== "SIGNED_OUT") return;
         void applySession(nextSession);
       });
       authListenerReady = true;
