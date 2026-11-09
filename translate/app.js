@@ -66,10 +66,11 @@
       $("projects").innerHTML = '<div class="empty">Nenhum projeto disponível. Crie seu primeiro projeto acima.</div>';
       return;
     }
+    window.__almoraProjects = projects;
     $("projects").innerHTML = projects.map(project => {
       const mayUpload = ["owner","admin","translator"].some(role => roles.includes(role)) &&
         (roles.includes("owner") || roles.includes("admin") || project.created_by === session.user.id || project.assigned_translator_id === session.user.id);
-      return '<article class="project" data-project="' + esc(project.id) + '">' +
+      return '<article class="project" data-project="' + esc(project.id) + '" data-source-language="' + esc(project.source_language) + '">' +
         '<div class="project-top"><div><h3>' + esc(project.title) + '</h3><div class="meta">' +
         esc(({en:"Inglês",ko:"Coreano",ja:"Japonês",zh:"Chinês"})[project.source_language] || project.source_language) +
         ' → Português brasileiro · Criado em ' + esc(date(project.created_at)) + '</div></div>' +
@@ -78,6 +79,7 @@
         Number(project.completed_pages || 0) + ' concluídas · ' + Number(project.failed_pages || 0) + ' com falha</div>' +
         (mayUpload ? '<div class="file-row"><input type="file" class="files" multiple accept=".zip,.cbz,.pdf,.png,.jpg,.jpeg,.webp"><button class="small-button upload">Enviar arquivos</button></div>' +
           '<section class="engine-panel"><h4>Motor de tradução · teste</h4><textarea class="source-text" rows="3" maxlength="6000" placeholder="Cole uma fala ou trecho para testar a tradução…"></textarea><button class="small-button translate-text">Traduzir para PT-BR</button><div class="engine-output" data-translation-output></div></section>' +
+          '<section class="engine-panel"><h4>Obra completa · OCR + tradução em lote</h4><p>Processe páginas de imagens, ZIP/CBZ ou PDF. O reconhecimento acontece no seu navegador; a tradução usa a IA do ALMORA.</p><label>Arquivo da obra <input class="batch-source" type="file" accept=".zip,.cbz,.pdf,image/png,image/jpeg,image/webp"></label><button class="small-button batch-process" type="button">Extrair, reconhecer e traduzir</button><div class="batch-progress" aria-live="polite"></div><div class="engine-output" data-batch-output></div></section>' +
           '<section class="engine-panel"><h4>Reconstrução de imagem · teste</h4><p>Envie uma página e pinte diretamente sobre as áreas com texto. O pincel marca em vermelho o que deve ser reconstruído.</p><label>Página original <input class="rebuild-image" type="file" accept="image/png,image/jpeg,image/webp"></label><div class="mask-editor" hidden><div class="mask-stage"><canvas class="mask-preview"></canvas><canvas class="mask-overlay"></canvas></div><label>Pincel <input class="brush-size" type="range" min="8" max="120" value="36"></label><button class="small-button clear-mask" type="button">Limpar marcação</button></div><button class="small-button reconstruct-image">Reconstruir área marcada</button><div class="engine-output" data-reconstruction-output></div></section>' +
           '<section class="engine-panel"><h4>Aplicar tradução nos balões · lettering</h4><p>Envie a página limpa, digite uma fala e toque no local do balão para posicioná-la. Você pode adicionar vários textos à mesma página.</p><label>Página limpa <input class="letter-image" type="file" accept="image/png,image/jpeg,image/webp"></label><textarea class="letter-text" rows="2" maxlength="1500" placeholder="Digite ou cole a fala traduzida…"></textarea><button class="small-button use-translation" type="button">Usar tradução acima</button><div class="letter-stage" hidden><canvas class="letter-canvas"></canvas></div><div class="letter-actions"><label>Tamanho do texto <input class="letter-size" type="range" min="12" max="80" value="32"></label><button class="small-button clear-lettering" type="button">Limpar textos</button><button class="small-button export-lettering" type="button">Baixar página legendada</button></div><div class="engine-output" data-lettering-output></div></section>' : '') +
         '<div class="file-list" data-file-list>' +
@@ -117,6 +119,81 @@
           output.textContent = error.message;
           notice(error.message, true);
         } finally { button.disabled = false; }
+      });
+    });
+
+
+    document.querySelectorAll(".project .batch-process").forEach(button => {
+      button.addEventListener("click", async () => {
+        const card = button.closest(".project");
+        const file = card.querySelector(".batch-source").files[0];
+        const progress = card.querySelector(".batch-progress");
+        const output = card.querySelector("[data-batch-output]");
+        if (!file) return notice("Escolha um ZIP, CBZ, PDF ou imagem.", true);
+        if (file.size > 50 * 1024 * 1024) return notice("O arquivo deve ter até 50 MiB.", true);
+        button.disabled = true;
+        output.textContent = "";
+        const pages = [];
+        let worker = null;
+        try {
+          const ext = file.name.toLowerCase().split(".").pop();
+          if (["zip","cbz"].includes(ext)) {
+            if (!window.JSZip) throw new Error("A biblioteca ZIP não carregou. Atualize a página e tente novamente.");
+            const zip = await JSZip.loadAsync(file);
+            const entries = Object.values(zip.files).filter(x => !x.dir && /\.(png|jpe?g|webp)$/i.test(x.name)).sort((x,y)=>x.name.localeCompare(y.name,undefined,{numeric:true}));
+            if (!entries.length) throw new Error("O arquivo não contém páginas PNG, JPG ou WEBP.");
+            if (entries.length > 20) throw new Error("Por segurança, processe no máximo 20 páginas por lote.");
+            for (const entry of entries) pages.push({name:entry.name, blob:await entry.async("blob")});
+          } else if (ext === "pdf") {
+            if (!window.pdfjsLib) throw new Error("O leitor de PDF não carregou. Atualize a página e tente novamente.");
+            pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js";
+            const pdf = await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise;
+            if (pdf.numPages > 20) throw new Error("Por segurança, processe no máximo 20 páginas por lote.");
+            for (let n=1;n<=pdf.numPages;n++) {
+              progress.textContent = "Preparando PDF · página "+n+"/"+pdf.numPages;
+              const page=await pdf.getPage(n), viewport=page.getViewport({scale:1.5});
+              const canvas=document.createElement("canvas");
+              canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
+              await page.render({canvasContext:canvas.getContext("2d"),viewport}).promise;
+              const blob=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+              if(blob) pages.push({name:"pagina-"+String(n).padStart(3,"0")+".png",blob});
+            }
+          } else if (file.type.startsWith("image/")) pages.push({name:file.name,blob:file});
+          else throw new Error("Formato não suportado. Use ZIP, CBZ, PDF, PNG, JPG ou WEBP.");
+          if (!window.Tesseract) throw new Error("O OCR não carregou. Atualize a página e tente novamente.");
+          const lang = ({en:"eng",ko:"kor",ja:"jpn",zh:"chi_sim"})[card.dataset.sourceLanguage] || "eng";
+          progress.textContent = "Iniciando OCR ("+lang+")…";
+          worker = await Tesseract.createWorker(lang, 1, {logger:m => {
+            if(m.status==="recognizing text") progress.textContent="Reconhecendo texto · "+Math.round((m.progress||0)*100)+"%";
+          }});
+          const project = (window.__almoraProjects || []).find(p=>p.id===card.dataset.project);
+          const results=[];
+          for(let i=0;i<pages.length;i++){
+            progress.textContent="OCR · página "+(i+1)+"/"+pages.length;
+            const recognized=await worker.recognize(pages[i].blob);
+            const source=String(recognized.data.text||"").trim();
+            if(!source){results.push("PÁGINA "+(i+1)+" · Nenhum texto reconhecido.");continue;}
+            progress.textContent="Traduzindo · página "+(i+1)+"/"+pages.length;
+            const translated=await api("/api/projects/"+card.dataset.project+"/translate",{
+              method:"POST",headers:{"Content-Type":"application/json"},
+              body:JSON.stringify({text:source.slice(0,5800),source_language:project?.source_language||lang,context:project?.narrative_context||""})
+            });
+            results.push("PÁGINA "+(i+1)+" — "+pages[i].name+"\nTEXTO RECONHECIDO:\n"+source+"\n\nTRADUÇÃO:\n"+translated.translation);
+          }
+          const report=results.join("\n\n"+ "─".repeat(32)+"\n\n");
+          const blob=new Blob([report],{type:"text/plain;charset=utf-8"});
+          const url=URL.createObjectURL(blob);
+          output.innerHTML='<a class="download-result" download="'+esc(file.name.replace(/\.[^.]+$/,""))+'-traduzido.txt" href="'+url+'">Baixar OCR + traduções (.txt)</a><pre class="batch-report">'+esc(report)+'</pre>';
+          progress.textContent="Concluído · "+pages.length+" página(s). Revise o OCR e as traduções antes de aplicar o lettering.";
+          notice("Lote concluído. O relatório foi gerado; nenhuma página original foi alterada.");
+        } catch(error) {
+          progress.textContent="";
+          output.textContent=error.message;
+          notice(error.message,true);
+        } finally {
+          if(worker) await worker.terminate().catch(()=>{});
+          button.disabled=false;
+        }
       });
     });
 
