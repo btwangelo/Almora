@@ -24,6 +24,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify Worker syntax and regression tests
+        run: |
+          node --input-type=module --check < workers/almora-translate/src/index.js
+          node --test workers/almora-translate/tests/*.test.mjs
+
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v4
         with:
