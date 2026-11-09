@@ -76,6 +76,54 @@
   async function apiBlob(path) { return (await request(path)).blob(); }
   function sha256Hex(value) { return crypto.subtle.digest("SHA-256", value instanceof ArrayBuffer ? value : new TextEncoder().encode(String(value))).then(buffer => Array.from(new Uint8Array(buffer)).map(byte => byte.toString(16).padStart(2,"0")).join("")); }
   function blobDataUrl(blob) { return new Promise((resolve,reject) => { const reader=new FileReader(); reader.onload=()=>resolve(String(reader.result)); reader.onerror=()=>reject(new Error("Não foi possível preparar a imagem.")); reader.readAsDataURL(blob); }); }
+
+  function scoreOcrResult(result) {
+    const text = String(result?.data?.text || "").trim();
+    const confidence = Number(result?.data?.confidence);
+    const chars = [...text].filter(char => /[\\p{L}\\p{N}]/u.test(char)).length;
+    const symbols = [...text].filter(char => !/[\\p{L}\\p{N}\\s.,!?;:'"“”‘’()\\[\\]{}…—–-]/u.test(char)).length;
+    const meaningfulRatio = text.length ? chars / text.length : 0;
+    const symbolRatio = text.length ? symbols / text.length : 0;
+    const words = text.split(/\\s+/).filter(word => /[\\p{L}\\p{N}]{2,}/u.test(word)).length;
+    let score = Number.isFinite(confidence) ? confidence : 0;
+    if (text.length < 8) score -= 30;
+    if (text.length >= 18 && meaningfulRatio < 0.48) score -= 35;
+    if (text.length >= 18 && symbolRatio > 0.20) score -= 25;
+    if (text.length >= 35 && words < 4) score -= 12;
+    return { text, confidence: Number.isFinite(confidence) ? Math.round(confidence) : null,
+      meaningful_ratio: Math.round(meaningfulRatio * 100), symbol_ratio: Math.round(symbolRatio * 100),
+      words, score: Math.max(0, Math.min(100, Math.round(score))),
+      reliable: text.length >= 8 && score >= 42 && meaningfulRatio >= 0.48 && symbolRatio <= 0.20 };
+  }
+
+  async function recognizePageWithRetry(worker, blob) {
+    const first = await worker.recognize(blob);
+    let best = scoreOcrResult(first);
+    if (best.reliable) return { ...best, attempts: 1 };
+    const image = await loadImageFile(blob);
+    const scale = Math.min(2.2, 2600 / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.imageSmoothingEnabled = true;
+    context.imageSmoothingQuality = "high";
+    context.filter = "grayscale(1) contrast(1.45)";
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    context.filter = "none";
+    const retry = await worker.recognize(canvas);
+    const candidate = scoreOcrResult(retry);
+    canvas.width = 0;
+    canvas.height = 0;
+    if (candidate.score > best.score) best = candidate;
+    return { ...best, attempts: 2 };
+  }
+
+  function normalizeForComparison(value) {
+    return String(value || "").normalize("NFKC").toLocaleLowerCase()
+      .replace(/[\\p{P}\\p{S}\\s]+/gu, "");
+  }
+
   async function translateLongText(projectId, text, language, _context, onProgress) {
     const chunks = [];
     let remaining = String(text || "").trim();
@@ -348,11 +396,20 @@
             const batchKey = await sha256Hex(fileHash + "|" + i + "|" + currentPage.name);
             if (completedKeys.has(batchKey)) { progress.textContent = "Página " + (i+1) + "/" + pageCount + " já salva; pulando para evitar duplicação…"; continue; }
             progress.textContent="OCR · página "+(i+1)+"/"+pageCount;
-            const recognized=await worker.recognize(currentPage.blob);
-            const source=String(recognized.data.text||"").trim();
-            let translatedText="";
-            if(source){
-              translatedText = await translateLongText(card.dataset.project, source.slice(0,24000), project?.source_language || "en", "", (part,total) => { progress.textContent = "Traduzindo · página " + (i+1) + "/" + pageCount + " · trecho " + part + "/" + total; });
+            const ocr = await recognizePageWithRetry(worker, currentPage.blob);
+            const source = ocr.text;
+            let translatedCandidate = "";
+            let translatedText = "";
+            let translationWarning = "";
+            if (source && ocr.reliable) {
+              translatedCandidate = await translateLongText(card.dataset.project, source.slice(0,24000), project?.source_language || "en", "", (part,total) => { progress.textContent = "Traduzindo · página " + (i+1) + "/" + pageCount + " · trecho " + part + "/" + total; });
+              if (normalizeForComparison(translatedCandidate) === normalizeForComparison(source)) {
+                translationWarning = "A IA devolveu o texto sem traduzir; precisa de revisão.";
+              } else translatedText = translatedCandidate;
+            } else if (source) {
+              translationWarning = "OCR suspeito mesmo após uma segunda leitura; tradução automática bloqueada para evitar uma tradução incorreta.";
+            } else {
+              translationWarning = "Nenhum texto foi reconhecido; página precisa de revisão.";
             }
             progress.textContent="Salvando página "+(i+1)+"/"+pageCount+"…";
             const pageImage=await loadImage(await readDataUrl(currentPage.blob));
@@ -379,12 +436,18 @@
                 original_name:currentPage.name.replace(/\.[^.]+$/,"")+".jpg",
                 mime_type:"image/jpeg", image_b64:imageData,
                 ocr_text:source, translated_text:translatedText,
+                translation_candidate:translatedCandidate,
+                ocr_quality:{confidence:ocr.confidence,score:ocr.score,reliable:ocr.reliable,attempts:ocr.attempts,meaningful_ratio:ocr.meaningful_ratio,symbol_ratio:ocr.symbol_ratio,words:ocr.words},
+                translation_warning:translationWarning,
                 translation_model:translatedText ? "Cloudflare Workers AI" : ""
               })
             });
             results.push("PÁGINA "+(i+1)+" — "+currentPage.name+" · guardada como página "+saved.page_number+
               "\nTEXTO RECONHECIDO:\n"+(source||"Nenhum texto reconhecido.")+
-              (translatedText?"\n\nTRADUÇÃO:\n"+translatedText:"\n\nTRADUÇÃO: não gerada (sem texto reconhecido)."));
+              (translatedText?"\n\nTRADUÇÃO:\n"+translatedText:
+                "\n\nTRADUÇÃO: NÃO VALIDADA\n"+(translatedCandidate||"Não gerada.")+
+                (translationWarning?"\nAVISO: "+translationWarning:""))+
+              "\nOCR: "+(ocr.reliable?"confiável":"revisão necessária")+" · confiança "+(ocr.confidence===null?"indisponível":ocr.confidence+"%")+" · "+ocr.attempts+" tentativa(s));
           }
           const report=results.join("\n\n"+ "─".repeat(32)+"\n\n");
           const blob=new Blob([report],{type:"text/plain;charset=utf-8"});
