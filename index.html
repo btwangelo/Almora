@@ -1216,6 +1216,7 @@ async function pages(el){
     toast('Erro ao ler capítulo: '+e.message);
   }finally{
     el.value='';
+    await window.ALMORADrafts?.clearField(el);
    }
   }
   async function almoraUploadToR2(file) {
@@ -1892,6 +1893,7 @@ async function almoraPrepareBatch(input) {
     almoraBatchRender();
   }
   input.value='';
+  await window.ALMORADrafts?.clearField(input);
 }
 
 async function almoraPublishBatch() {
