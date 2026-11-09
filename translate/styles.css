@@ -58,3 +58,14 @@ input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none}
 @media(max-width:620px){.topbar{padding:9px 12px;min-height:60px}.brand-word{font-size:23px}.brand-mark{width:25px;height:24px}.brand-section{font-size:9px}.topbar nav.topnav{gap:8px}.topnav a{font-size:11px}.quiet{font-size:11px;padding:7px 9px}.shell{padding:28px 12px 55px}.panel{padding:16px}}
 
 .batch-file-name{margin:8px 0 12px;padding:10px 12px;border:1px dashed var(--line);border-radius:9px;color:var(--muted);font-size:12px;overflow-wrap:anywhere;background:var(--panel)}
+
+/* Progress indicators for long-running Translate operations */
+.task-progress{display:grid;gap:7px;margin:10px 0;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--text)}
+.task-progress-heading{display:flex;justify-content:space-between;gap:12px;align-items:center;font-size:12px;font-weight:600}
+.task-progress-heading strong{color:var(--accent);font-variant-numeric:tabular-nums;white-space:nowrap}
+.task-progress-track{height:8px;overflow:hidden;border-radius:99px;background:#ffffff16}
+.task-progress-track span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .22s ease}
+.task-progress-track.is-indeterminate span{width:38%;animation:almora-progress-indeterminate 1.25s ease-in-out infinite alternate}
+.task-progress-detail{font-size:11px;color:var(--muted);line-height:1.45}
+@keyframes almora-progress-indeterminate{from{transform:translateX(-8%)}to{transform:translateX(175%)}}
+@media(prefers-reduced-motion:reduce){.task-progress-track span{transition:none}.task-progress-track.is-indeterminate span{animation:none;width:70%}}
