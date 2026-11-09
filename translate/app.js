@@ -232,9 +232,17 @@
           const project = (window.__almoraProjects || []).find(p=>p.id===card.dataset.project);
           const results=[];
           const existingDetail = await api("/api/projects/"+card.dataset.project);
-          let nextPageNumber = (existingDetail.pages || []).reduce((max,p)=>Math.max(max,Number(p.page_number)||0),0)+1;
           const fileHash = await sha256Hex(await file.arrayBuffer());
-          const completedKeys = new Set((existingDetail.pages || []).map(p => p.ocr_data?.batch_key).filter(Boolean));
+          const existingOriginal = (existingDetail.files || []).find(item => item.checksum_sha256 === fileHash);
+          if (!existingOriginal) {
+            progress.textContent = "Preservando o arquivo original no armazenamento seguro…";
+            await api("/api/projects/"+card.dataset.project+"/files", { method:"POST", headers:{"Content-Type":file.type || "application/octet-stream","X-File-Name":encodeURIComponent(file.name)}, body:file });
+          }
+          const priorPages = existingDetail.pages || [];
+          const batchPages = priorPages.filter(p => p.ocr_data?.batch_file_hash === fileHash && Number.isInteger(Number(p.ocr_data?.batch_index)));
+          const maxPageNumber = priorPages.reduce((max,p)=>Math.max(max,Number(p.page_number)||0),0);
+          const batchStartNumber = batchPages.length ? Math.min(...batchPages.map(p => Number(p.page_number)-Number(p.ocr_data.batch_index))) : maxPageNumber + 1;
+          const completedKeys = new Set(priorPages.map(p => p.ocr_data?.batch_key).filter(Boolean));
           for(let i=0;i<pages.length;i++){
             const batchKey = await sha256Hex(fileHash + "|" + i + "|" + pages[i].name);
             if (completedKeys.has(batchKey)) { progress.textContent = "Página " + (i+1) + "/" + pages.length + " já salva; pulando para evitar duplicação…"; continue; }
@@ -260,8 +268,11 @@
             const saved=await api("/api/projects/"+card.dataset.project+"/pages",{
               method:"POST",headers:{"Content-Type":"application/json"},
               body:JSON.stringify({
-                page_number:nextPageNumber++,
+                page_number:batchStartNumber+i,
                 batch_key:batchKey,
+                batch_file_hash:fileHash,
+                batch_index:i,
+                batch_start_number:batchStartNumber,
                 original_name:pages[i].name.replace(/\.[^.]+$/,"")+".jpg",
                 mime_type:"image/jpeg", image_b64:imageData,
                 ocr_text:source, translated_text:translatedText,
