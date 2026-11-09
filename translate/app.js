@@ -7,6 +7,8 @@
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
       storageKey: "sb-mcdinntggkanmsqubozn-auth-token",
+      // Force both ALMORA and Translate clients to read the same origin-scoped browser storage.
+      storage: window.localStorage,
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true
