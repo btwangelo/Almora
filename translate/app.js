@@ -711,9 +711,11 @@
     session = nextSession || null;
     if (!session) {
       $("app").hidden = true;
-      notice("Entre na sua conta ALMORA para continuar. ");
-      const link = document.createElement("a"); link.href = "../#conta"; link.textContent = "Abrir login da ALMORA"; $("notice").append(link);
-      $("notice").append(document.createTextNode(" e depois volte a esta página."));
+      notice("O ALMORA Translate utiliza automaticamente a sessão da ALMORA. Abra esta ferramenta pelo ALMORA Studio, na área administrativa.");
+      const link = document.createElement("a");
+      link.href = "../#studio";
+      link.textContent = "Abrir ALMORA Studio";
+      $("notice").append(link);
       return;
     }
     $("notice").hidden = true;
