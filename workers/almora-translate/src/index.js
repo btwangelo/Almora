@@ -378,6 +378,52 @@ async function handle(request, env) {
       if (!canReadProject(auth, project)) return fail("Projeto não encontrado ou sem permissão.", 404, origin, env);
 
 
+      if (request.method === "POST" && action === "review") {
+        const input = await request.json().catch(() => ({}));
+        const decision = String(input.decision || "");
+        const notes = String(input.notes || "").trim().slice(0, 4000);
+        let nextStatus = "";
+        let reviewType = "";
+        if (decision === "submitted") {
+          if (!isTranslator(auth) || ![project.created_by, project.assigned_translator_id].includes(auth.user.id) && !isAdmin(auth)) {
+            return fail("Somente o responsável pela tradução pode enviá-la para revisão.", 403, origin, env);
+          }
+          if (!["uploaded", "translator_review", "changes_requested"].includes(project.status)) {
+            return fail("Este projeto ainda não está pronto para revisão do tradutor.", 409, origin, env);
+          }
+          nextStatus = "editorial_review";
+          reviewType = "translator";
+        } else if (decision === "approved" || decision === "changes_requested") {
+          if (!isEditor(auth)) return fail("Somente a equipe editorial pode avaliar este projeto.", 403, origin, env);
+          if (project.status !== "editorial_review") return fail("O projeto não está aguardando revisão editorial.", 409, origin, env);
+          nextStatus = decision;
+          reviewType = "editorial";
+        } else {
+          return fail("Decisão de revisão inválida.", 400, origin, env);
+        }
+        await db(env, "almora_translation_reviews", {
+          method: "POST",
+          headers: { "prefer": "return=minimal" },
+          body: JSON.stringify({
+            project_id: projectId,
+            reviewer_id: auth.user.id,
+            review_type: reviewType,
+            decision,
+            notes: notes || null
+          })
+        });
+        const patch = { status: nextStatus, updated_at: new Date().toISOString() };
+        if (decision === "submitted") patch.submitted_at = new Date().toISOString();
+        if (decision === "approved") patch.approved_at = new Date().toISOString();
+        await db(env, "almora_translation_projects?id=eq." + projectId, {
+          method: "PATCH",
+          headers: { "prefer": "return=minimal" },
+          body: JSON.stringify(patch)
+        });
+        await addEvent(env, projectId, auth.user.id, "review_" + decision, { notes });
+        return response({ success: true, status: nextStatus }, 200, origin, env);
+      }
+
       if (request.method === "POST" && action === "translate") {
         if (!isTranslator(auth)) return fail("Apenas tradutores autorizados e administradores podem usar o motor de tradução.", 403, origin, env);
         const input = await request.json();
