@@ -1170,6 +1170,8 @@ async function pages(el){
       if(file.size > Number(window.almoraSiteSettings?.r2_max_upload_mb||80) * 1024 * 1024) throw new Error('O arquivo '+file.name+' ultrapassa o limite de '+(window.almoraSiteSettings?.r2_max_upload_mb||80)+' MB.');
       setPageStatus('Lendo '+file.name+' ('+(fileIndex+1)+' de '+files.length+')...',true);
       const ext=file.name.split('.').pop().toLowerCase();
+      const allowedExtensions=String(window.almoraSiteSettings?.allowed_extensions||'jpg,jpeg,png,webp,zip,cbz').split(',').map(x=>x.trim().toLowerCase().replace(/^\\./,'')).filter(Boolean);
+      if(!allowedExtensions.includes(ext))throw new Error('A extensão .'+ext+' não está permitida nas configurações do site.');
 
       if(ext==='cbz'||ext==='zip'){
         if(typeof JSZip==='undefined')throw new Error('O leitor ZIP não carregou. Atualize a página e tente novamente.');
@@ -1266,7 +1268,7 @@ async function pages(el){
     if(f){
       const name=f.name.replace(/[^a-zA-Z0-9._-]/g,'_');
       const path=user.id+'/'+Date.now()+'-'+name;
-      cover = await almoraUploadToR2(f);
+      cover = await almoraUploadToR2(f,'cover');
   }
     const payload={
       title:t,
@@ -1331,7 +1333,7 @@ async function addC(){
       const blob=await fetch(draft[i]).then(r=>r.blob());
       const path=`${user.id}/${id}/${Date.now()}-${i+1}.jpg`;
 
-      const url = await almoraUploadToR2(blob);
+      const url = await almoraUploadToR2(blob,'chapter_page');
 
       uploaded.push({page_number:i+1,image_url:url});
     }
@@ -1461,7 +1463,7 @@ async function saveWorkEditor(id){
   try{
     let cover=get('we_cover_url').value.trim()||null;
     const file=get('we_cover_file').files[0];
-    if(file)cover=await almoraUploadToR2(file);
+    if(file)cover=await almoraUploadToR2(file,'cover');
     const payload={
       title,alternative_title:get('we_alt').value.trim()||null,
       work_type:get('we_cat').value,author_name:get('we_author').value.trim()||null,
@@ -1864,6 +1866,9 @@ async function almoraPrepareBatch(input) {
   for(const file of files) {
     try {
       if(file.size > Number(window.almoraSiteSettings?.r2_max_upload_mb||80) * 1024 * 1024) throw new Error('Cada arquivo deve ter no máximo '+(window.almoraSiteSettings?.r2_max_upload_mb||80)+' MB.');
+      const batchExtension=file.name.split('.').pop().toLowerCase();
+      const allowedBatchExtensions=String(window.almoraSiteSettings?.allowed_extensions||'jpg,jpeg,png,webp,zip,cbz').split(',').map(x=>x.trim().toLowerCase().replace(/^\\./,'')).filter(Boolean);
+      if(!allowedBatchExtensions.includes(batchExtension))throw new Error('A extensão .'+batchExtension+' não está permitida nas configurações do site.');
       if(!/\.(cbz|zip)$/i.test(file.name)) throw new Error('Use arquivos CBZ ou ZIP.');
       const parsed=almoraParseChapterFilename(file.name);
       const archive=await JSZip.loadAsync(file);
@@ -1948,7 +1953,7 @@ async function almoraPublishBatch() {
         const compressed=await comp(pageFile,900);
         if(!compressed) throw new Error('Falha ao processar uma página.');
         const blob=await fetch(compressed).then(r=>r.blob());
-        const url=await almoraUploadToR2(blob);
+        const url=await almoraUploadToR2(blob,'chapter_page');
         uploaded.push({page_number:i+1,image_url:url});
         item.progress=Math.round(((i+1)/item.pages.length)*90);
         almoraBatchRender();
@@ -5711,6 +5716,6 @@ window.almoraSavePrivacy = async function() {
   scheduleRestore();
 })();
 </script>
-<script src="site-settings-runtime.js?v=1"></script>
+<script src="site-settings-runtime.js?v=2"></script>
 </body>
 </html>
