@@ -37,8 +37,6 @@
       search.addEventListener('input',()=>filterWorks(search.value));heading.insertAdjacentElement('afterend',search);
       collapseChapterRows(section,heading);
     }
-    const translate=boxes(section).find(box=>box.textContent.includes('ALMORA TRANSLATE'));
-    if(translate)translate.dataset.studioTranslate='true';
     applyPage();
   }
 
