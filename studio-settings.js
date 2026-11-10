@@ -53,19 +53,19 @@
       ['in_app_notifications','Notificações dentro da plataforma','checkbox',true]
     ],
     storage:[
-      ['max_upload_mb','Limite por arquivo (MB)','number',50],
+      ['max_upload_mb','Limite por arquivo (MB)','number',50,null,1,500],
       ['allowed_extensions','Extensões aceitas','text','jpg, jpeg, png, webp, zip, cbz'],
       ['storage_warning_percent','Avisar ao atingir (%)','number',80]
     ],
     logs:[
       ['audit_enabled','Registrar ações administrativas','checkbox',true],
-      ['retention_days','Retenção desejada (dias)','number',180],
+      ['retention_days','Retenção desejada (dias)','number',180,null,7,3650],
       ['log_note','Observação sobre auditoria','textarea','Registros administrativos devem ser consultados apenas por pessoas autorizadas.']
     ],
     security:[
       ['confirm_sensitive_actions','Exigir confirmação em ações sensíveis','checkbox',true],
       ['notify_new_sessions','Notificar novos acessos administrativos','checkbox',true],
-      ['session_timeout_minutes','Tempo de inatividade (minutos)','number',60]
+      ['session_timeout_minutes','Tempo de inatividade (minutos)','number',60,null,5,1440]
     ],
     about:[
       ['version','Versão exibida','text','Em desenvolvimento'],
@@ -106,7 +106,7 @@
     if(type==='checkbox')return '<label class="almora-settings-toggle" for="'+id+'"><strong>'+label+'</strong><input id="'+id+'" data-setting="'+key+'" type="checkbox" '+(v?'checked':'')+'></label>';
     if(type==='select')return '<label class="almora-settings-field"><span>'+label+'</span><select id="'+id+'" data-setting="'+key+'">'+f[4].map(o=>'<option value="'+esc(o[0])+'" '+(String(v)===o[0]?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select></label>';
     if(type==='textarea')return '<label class="almora-settings-field"><span>'+label+'</span><textarea id="'+id+'" data-setting="'+key+'" rows="4">'+esc(v)+'</textarea></label>';
-    const min=type==='number'?' min="1" max="500"':'';
+    const min=type==='number'?' min="'+(f[5]??1)+'" max="'+(f[6]??500)+'"':'';
     return '<label class="almora-settings-field"><span>'+label+'</span><input id="'+id+'" data-setting="'+key+'" type="'+type+'" value="'+esc(v)+'"'+min+'></label>';
   }
   async function renderPage(id){
@@ -153,7 +153,16 @@
   async function savePage(event,id,spec){
     event.preventDefault();if(busy||!allowed(id))return;
     const form=event.currentTarget,button=form.querySelector('#almora-settings-save'),settings={};
-    spec.forEach(f=>{const el=form.querySelector('[data-setting="'+f[0]+'"]');if(el)settings[f[0]]=f[2]==='checkbox'?el.checked:f[2]==='number'?Number(el.value):el.value.trim();});
+    spec.forEach(f=>{
+      const el=form.querySelector('[data-setting="'+f[0]+'"]');
+      if(!el)return;
+      if(f[2]==='checkbox')settings[f[0]]=el.checked;
+      else if(f[2]==='number'){
+        const value=Number(el.value),min=f[5]??1,max=f[6]??500;
+        if(!Number.isFinite(value)||value<min||value>max)throw new Error('Valor inválido para '+f[1]+'.');
+        settings[f[0]]=value;
+      }else settings[f[0]]=el.value.trim();
+    });
     if(id==='personalization'&&!/^#[0-9a-f]{6}$/i.test(settings.accent_color||''))return notify('Informe uma cor hexadecimal válida.');
     if(id==='about'&&settings.support_url&&!/^https?:\/\//i.test(settings.support_url))return notify('O link de suporte precisa começar com http:// ou https://.');
     busy=true;button.disabled=true;button.textContent='Salvando...';
