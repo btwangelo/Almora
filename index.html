@@ -1037,7 +1037,7 @@ ${S.works.map(w=>`
 <div class="act">
 <button class="g" onclick="arch('${w.id}')">${w.archived?'Restaurar':'Arquivar'}</button>
 <button class="g" onclick="editWork('${w.id}')">Editar informações</button>
-<button class="d" onclick="delW('${w.id}')">Excluir</button>
+${window.almoraStudioRole==='superadmin'?'<button class="d" onclick="delW(\'${w.id}\')">Excluir</button>':''}
 </div>
 
 ${adminChapterOrder(w).map((c,index,list)=>`
@@ -1047,7 +1047,7 @@ ${adminChapterOrder(w).map((c,index,list)=>`
 <button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},1)" ${index===list.length-1?'disabled':''} title="Mover para baixo">↓</button>
 <button class="g" onclick="archC('${w.id}','${c.n}')">${c.archived?'Restaurar':'Arquivar'}</button>
 <button class="g" onclick="editChapter('${w.id}','${c.n}')">Editar</button>
-<button class="d" onclick="delC('${w.id}','${c.n}')">✕</button>
+${window.almoraStudioRole==='superadmin'?'<button class="d" onclick="delC(\'${w.id}\',\'${c.n}\')">✕</button>':''}
 </div>
 `).join('')}
 ${chapterOrderChanged(w)?`<div class="act" style="margin-top:10px"><button type="button" class="g" onclick="cancelChapterOrder('${w.id}')">Cancelar</button><button type="button" id="save-chapter-order-${w.id}" onclick="saveChapterOrder('${w.id}')">Concluir reordenação</button></div>`:''}
