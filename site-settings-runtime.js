@@ -8,7 +8,7 @@
     announcements_enabled:true,chapter_alerts_enabled:true,in_app_notifications:true,
     r2_max_upload_mb:80,allowed_extensions:'jpg,jpeg,png,webp,zip,cbz',
     max_chapter_pages:300,max_chapter_mb:120,require_rights:true,default_age_rating:'Livre',
-    session_timeout_minutes:60,site_name:'ALMORA',tagline:'Onde o amor não precisa de tradução.',site_description:'Leia histórias GL e BL na ALMORA. Descubra novas obras, acompanhe capítulos e organize sua biblioteca.',language:'pt-BR',timezone:'America/Sao_Paulo',date_format:'DD/MM/AAAA'
+    session_timeout_minutes:60,site_name:'ALMORA',tagline:'Onde o amor não precisa de tradução.',site_description:'Leia histórias GL e BL na ALMORA. Descubra novas obras, acompanhe capítulos e organize sua biblioteca.',site_version:'Em desenvolvimento',support_url:'https://github.com/btwangelo/Almora/issues',language:'pt-BR',timezone:'America/Sao_Paulo',date_format:'DD/MM/AAAA'
   };
   let status={...defaults},statusReady=false,roleReady=false,owner=false,loading=null,timeoutId=null;
   const route=()=>location.hash.slice(1).split('/')[0]||'home';
@@ -107,6 +107,26 @@
     const footer=document.querySelector('footer');if(footer&&footer.firstChild?.nodeType===3)footer.firstChild.textContent=siteName+' — '+(status.tagline||defaults.tagline);
     const logo=document.querySelector('header .logo');if(logo)logo.setAttribute('aria-label',siteName);
     window.almoraLocaleSettings={language:status.language||'pt-BR',timezone:status.timezone||'America/Sao_Paulo',dateFormat:status.date_format||'DD/MM/AAAA'};
+    window.almoraVersion=status.site_version||defaults.site_version;
+    window.almoraSupportUrl=status.support_url||defaults.support_url;
+    if(!Date.prototype.__almoraLocalePatched){
+      const nativeDateString=Date.prototype.toLocaleDateString;
+      const nativeDateTimeString=Date.prototype.toLocaleString;
+      Object.defineProperty(Date.prototype,'__almoraLocalePatched',{value:true});
+      const selectedLocale=()=>{const p=window.almoraLocaleSettings||{};if(p.dateFormat==='MM/DD/AAAA')return 'en-US';if(p.dateFormat==='AAAA-MM-DD')return 'en-CA';return p.language==='en'?'en-US':p.language==='es'?'es-ES':'pt-BR';};
+      Date.prototype.toLocaleDateString=function(locales,options){const p=window.almoraLocaleSettings||{};return nativeDateString.call(this,selectedLocale(),{...(options||{}),timeZone:p.timezone||'America/Sao_Paulo'});};
+      Date.prototype.toLocaleString=function(locales,options){const p=window.almoraLocaleSettings||{};return nativeDateTimeString.call(this,selectedLocale(),{...(options||{}),timeZone:p.timezone||'America/Sao_Paulo'});};
+    }
+    const footerLinks=document.querySelector('footer>div');
+    if(footerLinks){
+      let support=footerLinks.querySelector('[data-almora-support]');
+      if(status.support_url){
+        if(!support){support=document.createElement('a');support.dataset.almoraSupport='true';support.textContent='Suporte';support.target='_blank';support.rel='noopener noreferrer';support.style.cssText='color:var(--ac);text-decoration:underline';footerLinks.appendChild(support);}
+        support.href=status.support_url;
+      }else support?.remove();
+    }
+    const versionLabel=document.querySelector('.almora-studio-sidebar-bottom span:last-child');
+    if(versionLabel)versionLabel.textContent='ALMORA · '+(status.site_version||'Em desenvolvimento');
     applySiteGates();
     applySiteGates();
     const rating=document.getElementById('n_ag');
