@@ -67,7 +67,8 @@
 
     shell.append(sidebar,workspace);
     workspace.append(topbar,main);
-    const nodes=[...app.childNodes].filter(node=>node!==shell);\n    nodes.forEach(node=>{if(node.nodeType===1&&node.tagName==='H2'&&node.textContent.trim()==='ALMORA STUDIO')node.hidden=true;});
+    const nodes=[...app.childNodes].filter(node=>node!==shell);
+    nodes.forEach(node=>{if(node.nodeType===1&&node.tagName==='H2'&&node.textContent.trim()==='ALMORA STUDIO')node.hidden=true;});
     app.appendChild(shell);
     nodes.forEach(node=>{if(node!==nav&&node!==toolbar)main.appendChild(node);});
     // O conteúdo operacional continua intacto; apenas muda de posição no layout.
