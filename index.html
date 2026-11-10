@@ -916,7 +916,7 @@ async function pin(){
   ren();
 }                    
 function studio(){
-if(!unlocked)return `<div class="box" style="max-width:380px;margin:30px auto"><h2 style="margin-top:0">ALMORA STUDIO</h2><p style="color:var(--mu)">Acesse com sua conta administrativa.</p><div class="act"><button onclick="pin()">Verificar acesso administrativo</button></div></div>`;
+if(!unlocked)return `<div class="box" style="max-width:380px;margin:30px auto"><h2 style="margin-top:0">ALMORA STUDIO</h2><p style="color:var(--mu)">Entre com uma conta autorizada da equipe ALMORA.</p><div class="act"><button onclick="pin()">Verificar acesso administrativo</button></div></div>`;
 
 return `
 <h2>ALMORA STUDIO</h2>
@@ -4027,6 +4027,7 @@ window.almoraSaveProfile = async function() {
 
   if (typeof user === 'undefined' || !user) {
     adminStatus = false;
+    window.almoraStudioRole = 'reader';
 
     if (previousAdminStatus !== adminStatus &&
         (location.hash.slice(1).split('/')[0] === 'studio')) {
