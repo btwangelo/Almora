@@ -75,7 +75,7 @@
   };
   const access={
     platform:['superadmin'],notifications:['superadmin'],storage:['superadmin'],staff:['superadmin'],logs:['superadmin'],security:['superadmin'],
-    personalization:['superadmin','admin'],locale:['superadmin','admin'],content:['superadmin','admin','moderator'],community:['superadmin','admin'],about:['superadmin','admin']
+    personalization:['superadmin','admin'],locale:['superadmin','admin'],content:['superadmin','admin'],community:['superadmin','admin'],about:['superadmin','admin']
   };
   let busy=false;
   function allowed(id,r=role()){return (access[id]||[]).includes(r);}
