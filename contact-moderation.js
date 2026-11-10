@@ -43,8 +43,10 @@ window.almoraShowContactRequests=()=>{
  const refresh=[...document.querySelectorAll('#almora-moderation button')].find(b=>b.textContent.includes('Atualizar denúncias'));
  if(filter)filter.hidden=true;if(list)list.hidden=true;if(reportLabel)reportLabel.hidden=true;if(refresh)refresh.hidden=true;
  if(root)root.hidden=false;
- document.getElementById('almora-mod-tab-reports')?.classList.remove('on');
- document.getElementById('almora-mod-tab-contacts')?.classList.add('on');
+ const reportsTab=document.getElementById('almora-mod-tab-reports');
+ const contactsTab=document.getElementById('almora-mod-tab-contacts');
+ reportsTab?.classList.remove('on');reportsTab?.classList.add('g');
+ contactsTab?.classList.remove('g');contactsTab?.classList.add('on');
  window.almoraLoadContactRequests();
 };
 window.almoraShowReportQueue=()=>{
@@ -55,8 +57,10 @@ window.almoraShowReportQueue=()=>{
  const refresh=[...document.querySelectorAll('#almora-moderation button')].find(b=>b.textContent.includes('Atualizar denúncias'));
  if(filter)filter.hidden=false;if(list)list.hidden=false;if(reportLabel)reportLabel.hidden=false;if(refresh)refresh.hidden=false;
  if(root)root.hidden=true;
- document.getElementById('almora-mod-tab-contacts')?.classList.remove('on');
- document.getElementById('almora-mod-tab-reports')?.classList.add('on');
+ const reportsTab=document.getElementById('almora-mod-tab-reports');
+ const contactsTab=document.getElementById('almora-mod-tab-contacts');
+ contactsTab?.classList.remove('on');contactsTab?.classList.add('g');
+ reportsTab?.classList.remove('g');reportsTab?.classList.add('on');
  window.almoraLoadReports?.();
 };
 window.almoraLoadContactRequests=async()=>{
