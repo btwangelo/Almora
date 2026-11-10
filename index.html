@@ -908,7 +908,7 @@ async function pin(){
   if(error)return toast('Erro ao verificar acesso: '+error.message);
 
   if(!['superadmin','admin','moderator'].includes(data))
-    return toast('Acesso restrito à equipe autorizada.');
+    return toast('Seu cargo atual não permite entrar no ALMORA Studio. O acesso é reservado ao dono, administradores e moderadores autorizados.');
 
   window.almoraStudioRole=data;
   unlocked=true;
@@ -1165,7 +1165,7 @@ async function pages(el){
     const expanded=[];
     for(let fileIndex=0;fileIndex<files.length;fileIndex++){
       const file=files[fileIndex];
-      if(file.size > 80 * 1024 * 1024) throw new Error('O arquivo '+file.name+' ultrapassa 80 MiB.');
+      if(file.size > Number(window.almoraSiteSettings?.r2_max_upload_mb||80) * 1024 * 1024) throw new Error('O arquivo '+file.name+' ultrapassa o limite de '+(window.almoraSiteSettings?.r2_max_upload_mb||80)+' MB.');
       setPageStatus('Lendo '+file.name+' ('+(fileIndex+1)+' de '+files.length+')...',true);
       const ext=file.name.split('.').pop().toLowerCase();
 
@@ -1191,9 +1191,9 @@ async function pages(el){
       }
     }
 
-    if(expanded.length>300)throw new Error('O limite é de 300 páginas por capítulo.');
+    if(expanded.length>Number(window.almoraSiteSettings?.max_chapter_pages||300))throw new Error('O limite atual é de '+(window.almoraSiteSettings?.max_chapter_pages||300)+' páginas por capítulo.');
     const totalBytes=expanded.reduce((sum,file)=>sum+file.size,0);
-    if(totalBytes>120*1024*1024)throw new Error('O capítulo ultrapassa o limite de 120 MB descompactados.');
+    if(totalBytes>Number(window.almoraSiteSettings?.max_chapter_mb||120)*1024*1024)throw new Error('O capítulo ultrapassa o limite atual de '+(window.almoraSiteSettings?.max_chapter_mb||120)+' MB descompactados.');
 
     setPageStatus('Preparando pré-visualização de '+expanded.length+' páginas...',true);
     const nextDraft=(await Promise.all(expanded.map(file=>comp(file,900)))).filter(Boolean);
@@ -1253,7 +1253,7 @@ async function pages(el){
   const t=$('#n_t').value.trim();
   const rights=$('#n_l').value.trim();
   if(!t)return toast('Informe o título');
-  if(!rights)return toast('Informe titular/licença');
+  if(window.almoraSiteSettings?.require_rights!==false&&!rights)return toast('Informe titular/licença para publicar esta obra.');
   if(!user)return toast('Entre na conta administrativa');
 
   const f=$('#n_cv').files[0];
@@ -1275,7 +1275,7 @@ async function pages(el){
       age_rating:$('#n_ag').value,
       status:'published',
       work_status:$('#n_s').value,
-      rights_holder:rights,
+      rights_holder:rights||null,
       synopsis:$('#n_sy').value.trim(),
       cover_url:cover,
       created_by:user.id
@@ -1859,7 +1859,7 @@ async function almoraPrepareBatch(input) {
 
   for(const file of files) {
     try {
-      if(file.size > 80 * 1024 * 1024) throw new Error('Cada arquivo deve ter no máximo 80 MiB.');
+      if(file.size > Number(window.almoraSiteSettings?.r2_max_upload_mb||80) * 1024 * 1024) throw new Error('Cada arquivo deve ter no máximo '+(window.almoraSiteSettings?.r2_max_upload_mb||80)+' MB.');
       if(!/\.(cbz|zip)$/i.test(file.name)) throw new Error('Use arquivos CBZ ou ZIP.');
       const parsed=almoraParseChapterFilename(file.name);
       const archive=await JSZip.loadAsync(file);
@@ -1868,9 +1868,9 @@ async function almoraPrepareBatch(input) {
         .sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
 
       if(!entries.length) throw new Error('Nenhuma imagem encontrada.');
-      if(entries.length>300) throw new Error('Limite de 300 páginas por capítulo.');
+      if(entries.length>Number(window.almoraSiteSettings?.max_chapter_pages||300)) throw new Error('Limite de '+(window.almoraSiteSettings?.max_chapter_pages||300)+' páginas por capítulo.');
       const totalBytes=entries.reduce((sum,e)=>sum+(Number(e._data?.uncompressedSize)||0),0);
-      if(totalBytes>120*1024*1024) throw new Error('Arquivo ultrapassa 120 MB descompactados.');
+      if(totalBytes>Number(window.almoraSiteSettings?.max_chapter_mb||120)*1024*1024) throw new Error('Arquivo ultrapassa '+(window.almoraSiteSettings?.max_chapter_mb||120)+' MB descompactados.');
 
       almoraBatch.push({
         file,archive,pages:entries,workId,
@@ -1938,7 +1938,7 @@ async function almoraPublishBatch() {
         const entry=item.pages[i];
         const original=await entry.async('blob');
         totalUncompressed+=original.size;
-        if(totalUncompressed>120*1024*1024) throw new Error('Capítulo ultrapassa 120 MB descompactados.');
+        if(totalUncompressed>Number(window.almoraSiteSettings?.max_chapter_mb||120)*1024*1024) throw new Error('Capítulo ultrapassa '+(window.almoraSiteSettings?.max_chapter_mb||120)+' MB descompactados.');
         const pageFile=new File([original],entry.name.split('/').pop(),{type:original.type||'image/jpeg'});
         const compressed=await comp(pageFile,900);
         if(!compressed) throw new Error('Falha ao processar uma página.');
@@ -5534,8 +5534,8 @@ window.almoraSavePrivacy = async function() {
 </script>
 
 <script src="social-profiles.js?v=custom-color-picker1"></script>
-<script src="studio-settings.js?v=2"></script>
-<script src="studio-dashboard.js?v=settings-pages2"></script>
+<script src="studio-settings.js?v=owner-settings-1"></script>
+<script src="studio-dashboard.js?v=role-nav-1"></script>
 <script id="almora-draft-persistence">
 (() => {
   "use strict";
@@ -5706,5 +5706,6 @@ window.almoraSavePrivacy = async function() {
   scheduleRestore();
 })();
 </script>
+<script src="site-settings-runtime.js?v=1"></script>
 </body>
 </html>
