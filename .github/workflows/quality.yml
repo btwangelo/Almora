@@ -27,6 +27,7 @@ jobs:
           node --check social-profiles.js
           node --check studio-dashboard.js
           node --check studio-settings.js
+          node --check site-settings-runtime.js
 
       - name: Check inline scripts in index.html
         run: |
