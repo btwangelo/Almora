@@ -8,13 +8,20 @@ const me=async()=>{const {data:{user},error}=await client().auth.getUser();if(er
 
 window.almoraRefreshContactStaffBadge=async()=>{
  const badge=document.getElementById('almora-contact-staff-badge');
- if(!badge)return;
+ const nav=document.querySelector('[data-studio-page="moderation"]');
+ let sideBadge=nav?.querySelector('#almora-contact-staff-sidebar-badge');
+ if(nav&&!sideBadge){
+  sideBadge=document.createElement('span');
+  sideBadge.id='almora-contact-staff-sidebar-badge';
+  sideBadge.className='almora-contact-unread-badge';
+  nav.appendChild(sideBadge);
+ }
+ if(!badge&&!sideBadge)return;
  try{
   const user=await me();
   const {count,error}=await client().from('contact_staff_notifications').select('id',{count:'exact',head:true}).eq('staff_user_id',user.id).is('read_at',null);
   if(error)throw error;
-  badge.textContent=count?String(count>99?'99+':count):'';
-  badge.hidden=!count;
+  [badge,sideBadge].filter(Boolean).forEach(el=>{el.textContent=count?String(count>99?'99+':count):'';el.hidden=!count;});
  }catch(error){console.warn('Contagem de solicitações staff indisponível:',error);}
 };
 
@@ -119,7 +126,16 @@ const style=document.createElement('style');
 style.textContent='.almora-contact-mod-tabs{margin:16px 0}.almora-contact-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:99px;background:#d93654;color:#fff;font-size:11px;font-weight:700}.almora-contact-request-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.almora-contact-request textarea{width:100%;box-sizing:border-box;margin:8px 0}.almora-contact-request .almora-mod-actions select{flex:1;min-width:140px}.almora-contact-response-feedback{display:block;color:var(--mu);margin-top:8px}.almora-contact-requests[hidden]{display:none!important}';
 document.head.appendChild(style);
 document.addEventListener('click',event=>{
- if(event.target.closest('#almora-tab-mod'))setTimeout(()=>window.almoraRefreshContactStaffBadge?.(),0);
+ if(event.target.closest('#almora-tab-mod,[data-studio-page="moderation"]'))setTimeout(()=>window.almoraRefreshContactStaffBadge?.(),0);
 });
 window.addEventListener('focus',()=>window.almoraRefreshContactStaffBadge?.());
+if(document.body){
+ const observer=new MutationObserver(()=>{
+  if(document.querySelector('[data-studio-page="moderation"]')){
+   observer.disconnect();
+   window.almoraRefreshContactStaffBadge?.();
+  }
+ });
+ observer.observe(document.body,{childList:true,subtree:true});
+}
 })();
