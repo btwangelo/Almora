@@ -18,8 +18,8 @@
   const boxes=section=>[...section.querySelectorAll(':scope > .box')];
   const workHeading=section=>[...section.querySelectorAll(':scope > h2')].find(h=>h.textContent.toLocaleLowerCase('pt-BR').includes('obras cadastradas'));
   const role=()=>window.almoraStudioRole||'admin';
-  const roleName=()=>({superadmin:'Superadministrador',admin:'Administrador',moderator:'Moderador'}[role()]||'Equipe ALMORA');
-  const allowed=id=>role()!=='moderator'||['overview','moderation','settings'].includes(id);
+  const roleName=()=>({superadmin:'Dono',admin:'Administrador',moderator:'Moderador'}[role()]||'Equipe ALMORA');
+  const allowed=id=>{const r=role();if(r==='superadmin'||r==='admin')return true;if(r==='moderator')return ['overview','moderation','settings'].includes(id);return false;};
 
   function make(tag,cls,id){
     const el=document.createElement(tag);
