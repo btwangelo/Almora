@@ -1,6 +1,8 @@
 -- Require authenticated ALMORA accounts for contact requests.
 alter table public.contact_messages alter column name drop not null, alter column email drop not null, alter column user_id set not null, add column if not exists staff_response text, add column if not exists responded_at timestamptz;
 alter table public.contact_messages drop constraint if exists contact_messages_email_format;
+alter table public.contact_messages drop constraint if exists contact_messages_user_id_fkey;
+alter table public.contact_messages add constraint contact_messages_user_id_fkey foreign key(user_id) references auth.users(id) on delete cascade;
 drop policy if exists contact_messages_public_submit on public.contact_messages;
 drop policy if exists contact_messages_staff_read on public.contact_messages;
 drop policy if exists contact_messages_staff_update on public.contact_messages;
