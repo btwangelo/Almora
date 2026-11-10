@@ -84,6 +84,19 @@
   if(document.body){
     new MutationObserver(()=>applySiteGates()).observe(document.body,{childList:true,subtree:true});
   }
+  function applySiteGates(){
+    document.querySelectorAll('.almora-comment-form,.almora-chapter-comment-form').forEach(form=>{
+      const disabled=status.comments_enabled===false;
+      form.hidden=disabled;
+      let note=form.nextElementSibling;
+      if(disabled){
+        if(!note||!note.classList?.contains('almora-comments-disabled-note')){
+          note=document.createElement('p');note.className='almora-comments-disabled-note';note.textContent='Os comentários estão temporariamente desativados pela equipe da ALMORA.';form.insertAdjacentElement('afterend',note);
+        }
+      }else if(note?.classList?.contains('almora-comments-disabled-note'))note.remove();
+    });
+  }
+  if(document.body)new MutationObserver(applySiteGates).observe(document.body,{childList:true,subtree:true});
   function applyDefaults(){
     const siteName=String(status.site_name||'ALMORA').trim()||'ALMORA';
     document.title=siteName+' | Leia histórias GL e BL';
@@ -94,6 +107,7 @@
     const footer=document.querySelector('footer');if(footer&&footer.firstChild?.nodeType===3)footer.firstChild.textContent=siteName+' — '+(status.tagline||defaults.tagline);
     const logo=document.querySelector('header .logo');if(logo)logo.setAttribute('aria-label',siteName);
     window.almoraLocaleSettings={language:status.language||'pt-BR',timezone:status.timezone||'America/Sao_Paulo',dateFormat:status.date_format||'DD/MM/AAAA'};
+    applySiteGates();
     applySiteGates();
     const rating=document.getElementById('n_ag');
     if(rating&&status.default_age_rating&&[...rating.options].some(o=>o.value===status.default_age_rating))rating.value=status.default_age_rating;
