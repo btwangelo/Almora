@@ -101,7 +101,7 @@
     return '<button type="button" class="almora-settings-card '+(can?'':'is-locked')+'" data-open-category="'+p.id+'" aria-label="'+esc(p.title)+(can?'':' — acesso bloqueado')+'"><span class="almora-settings-icon">'+p.icon+'</span><span class="almora-settings-card-copy"><strong>'+esc(p.title)+'</strong><small>'+esc(p.desc)+'</small><em>'+(can?'Acesso liberado':'🔒 '+esc(p.access))+'</em></span><span class="almora-settings-arrow">'+(can?'›':'⌑')+'</span></button>';
   }
   function fieldHtml(f,v){
-    const [key,label,type,def,hint,min,max,options]=f;
+    const [key,label,type,def,hint,min,max]=f;const options=f[5];
     const id='almora-setting-'+key,help=hint?'<small class="almora-settings-help">'+esc(hint)+'</small>':'';
     if(type==='checkbox')return '<label class="almora-settings-toggle" for="'+id+'"><span><strong>'+esc(label)+'</strong>'+help+'</span><input id="'+id+'" data-setting="'+key+'" type="checkbox" '+(v?'checked':'')+'></label>';
     if(type==='select')return '<label class="almora-settings-field"><span>'+esc(label)+'</span><select id="'+id+'" data-setting="'+key+'">'+(options||[]).map(o=>'<option value="'+esc(o[0])+'" '+(String(v)===o[0]?'selected':'')+'>'+esc(o[1])+'</option>').join('')+'</select>'+help+'</label>';
@@ -165,7 +165,7 @@
       try{
         const userId=host.querySelector('#almora-staff-user').value,roleKey=host.querySelector('#almora-staff-role').value;
         if(!userId)throw new Error('Selecione uma conta.');
-        if(userId===auth.data.user.id&&roleKey!=='admin')throw new Error('Não altere o próprio cargo por este formulário.');
+        if(userId===auth.data.user.id)throw new Error('A conta do dono já possui todos os privilégios e não precisa receber outro cargo.');
         const saved=await db().from('staff_roles').insert({user_id:userId,role_key:roleKey,assigned_by:auth.data.user.id});
         if(saved.error)throw saved.error;
         notify('Cargo atribuído com sucesso.');await renderStaff(host,page);
