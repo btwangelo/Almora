@@ -1167,10 +1167,12 @@ async function pages(el){
     const expanded=[];
     for(let fileIndex=0;fileIndex<files.length;fileIndex++){
       const file=files[fileIndex];
-      if(file.size > Number(window.almoraSiteSettings?.r2_max_upload_mb||80) * 1024 * 1024) throw new Error('O arquivo '+file.name+' ultrapassa o limite de '+(window.almoraSiteSettings?.r2_max_upload_mb||80)+' MB.');
+      const sourceExt=file.name.split('.').pop().toLowerCase();
+      const sourceLimitMb=['zip','cbz'].includes(sourceExt)?Number(window.almoraSiteSettings?.max_chapter_mb||120):Math.min(Number(window.almoraSiteSettings?.r2_max_upload_mb||80),Number(window.almoraSiteSettings?.chapter_page_max_upload_mb||10));
+      if(file.size > sourceLimitMb*1024*1024) throw new Error('O arquivo '+file.name+' ultrapassa o limite de '+sourceLimitMb+' MB para este tipo de conteúdo.');
       setPageStatus('Lendo '+file.name+' ('+(fileIndex+1)+' de '+files.length+')...',true);
       const ext=file.name.split('.').pop().toLowerCase();
-      const allowedExtensions=String(window.almoraSiteSettings?.allowed_extensions||'jpg,jpeg,png,webp,zip,cbz').split(',').map(x=>x.trim().toLowerCase().replace(/^\\./,'')).filter(Boolean);
+      const allowedExtensions=String(window.almoraSiteSettings?.allowed_extensions||'jpg,jpeg,png,webp,zip,cbz').split(',').map(x=>x.trim().toLowerCase().replace(/^\./,'')).filter(Boolean);
       if(!allowedExtensions.includes(ext))throw new Error('A extensão .'+ext+' não está permitida nas configurações do site.');
 
       if(ext==='cbz'||ext==='zip'){
@@ -1865,7 +1867,8 @@ async function almoraPrepareBatch(input) {
 
   for(const file of files) {
     try {
-      if(file.size > Number(window.almoraSiteSettings?.r2_max_upload_mb||80) * 1024 * 1024) throw new Error('Cada arquivo deve ter no máximo '+(window.almoraSiteSettings?.r2_max_upload_mb||80)+' MB.');
+      const archiveLimitMb=Number(window.almoraSiteSettings?.max_chapter_mb||120);
+      if(file.size > archiveLimitMb*1024*1024) throw new Error('Cada arquivo compactado deve ter no máximo '+archiveLimitMb+' MB.');
       const batchExtension=file.name.split('.').pop().toLowerCase();
       const allowedBatchExtensions=String(window.almoraSiteSettings?.allowed_extensions||'jpg,jpeg,png,webp,zip,cbz').split(',').map(x=>x.trim().toLowerCase().replace(/^\\./,'')).filter(Boolean);
       if(!allowedBatchExtensions.includes(batchExtension))throw new Error('A extensão .'+batchExtension+' não está permitida nas configurações do site.');
