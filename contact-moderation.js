@@ -125,6 +125,27 @@ if(typeof originalStudio==='function'){
   return html.slice(0,insertAt)+tabs+html.slice(insertAt);
  };
 }
+function ensureLiveModerationTabs(){
+ const root=document.getElementById('almora-moderation');
+ if(!root||root.querySelector('#almora-mod-tab-contacts'))return;
+ const description=root.querySelector('p');
+ if(!description)return;
+ const tabs=document.createElement('div');
+ tabs.className='almora-mod-actions almora-contact-mod-tabs';
+ tabs.innerHTML='<button id="almora-mod-tab-reports" class="on" type="button" onclick="almoraShowReportQueue()">Denúncias</button><button id="almora-mod-tab-contacts" class="g" type="button" onclick="almoraShowContactRequests()">Solicitações <span id="almora-contact-staff-badge" hidden class="almora-contact-unread-badge"></span></button>';
+ const panel=document.createElement('section');
+ panel.id='almora-contact-requests';
+ panel.className='almora-contact-requests';
+ panel.hidden=true;
+ panel.innerHTML='<div class="empty">Selecione esta aba para carregar as solicitações.</div>';
+ description.insertAdjacentElement('afterend',tabs);
+ tabs.insertAdjacentElement('afterend',panel);
+}
+ensureLiveModerationTabs();
+if(document.body){
+ const moderationObserver=new MutationObserver(ensureLiveModerationTabs);
+ moderationObserver.observe(document.body,{childList:true,subtree:true});
+}
 const style=document.createElement('style');
 style.textContent='.almora-contact-mod-tabs{margin:16px 0}.almora-contact-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:5px;border-radius:99px;background:#d93654;color:#fff;font-size:11px;font-weight:700}.almora-contact-request-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.almora-contact-request textarea{width:100%;box-sizing:border-box;margin:8px 0}.almora-contact-request .almora-mod-actions select{flex:1;min-width:140px}.almora-contact-response-feedback{display:block;color:var(--mu);margin-top:8px}.almora-contact-requests[hidden]{display:none!important}';
 document.head.appendChild(style);
