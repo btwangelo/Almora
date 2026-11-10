@@ -81,21 +81,6 @@
       }else if(note?.classList?.contains('almora-comments-disabled-note'))note.remove();
     });
   }
-  if(document.body){
-    new MutationObserver(()=>applySiteGates()).observe(document.body,{childList:true,subtree:true});
-  }
-  function applySiteGates(){
-    document.querySelectorAll('.almora-comment-form,.almora-chapter-comment-form').forEach(form=>{
-      const disabled=status.comments_enabled===false;
-      form.hidden=disabled;
-      let note=form.nextElementSibling;
-      if(disabled){
-        if(!note||!note.classList?.contains('almora-comments-disabled-note')){
-          note=document.createElement('p');note.className='almora-comments-disabled-note';note.textContent='Os comentários estão temporariamente desativados pela equipe da ALMORA.';form.insertAdjacentElement('afterend',note);
-        }
-      }else if(note?.classList?.contains('almora-comments-disabled-note'))note.remove();
-    });
-  }
   if(document.body)new MutationObserver(applySiteGates).observe(document.body,{childList:true,subtree:true});
   function applyDefaults(){
     const siteName=String(status.site_name||'ALMORA').trim()||'ALMORA';
