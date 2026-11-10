@@ -153,16 +153,18 @@
   async function savePage(event,id,spec){
     event.preventDefault();if(busy||!allowed(id))return;
     const form=event.currentTarget,button=form.querySelector('#almora-settings-save'),settings={};
+    let invalidNumber=null;
     spec.forEach(f=>{
       const el=form.querySelector('[data-setting="'+f[0]+'"]');
       if(!el)return;
       if(f[2]==='checkbox')settings[f[0]]=el.checked;
       else if(f[2]==='number'){
         const value=Number(el.value),min=f[5]??1,max=f[6]??500;
-        if(!Number.isFinite(value)||value<min||value>max)throw new Error('Valor inválido para '+f[1]+'.');
+        if(!Number.isFinite(value)||value<min||value>max){invalidNumber=f[1];return;}
         settings[f[0]]=value;
       }else settings[f[0]]=el.value.trim();
     });
+    if(invalidNumber)return notify('Confira o valor do campo: '+invalidNumber+'.');
     if(id==='personalization'&&!/^#[0-9a-f]{6}$/i.test(settings.accent_color||''))return notify('Informe uma cor hexadecimal válida.');
     if(id==='about'&&settings.support_url&&!/^https?:\/\//i.test(settings.support_url))return notify('O link de suporte precisa começar com http:// ou https://.');
     busy=true;button.disabled=true;button.textContent='Salvando...';
