@@ -85,7 +85,7 @@ window.almoraLoadContactRequests=async()=>{
   root.querySelector('#almora-contact-requests-refresh')?.addEventListener('click',()=>window.almoraLoadContactRequests());
   root.querySelectorAll('[data-contact-reply]').forEach(button=>button.addEventListener('click',async()=>{
    const id=button.dataset.contactReply;
-   const textarea=root.querySelector('#almora-contact-response-'+CSS.escape(id));
+   const textarea=document.getElementById('almora-contact-response-'+id);
    const feedback=button.closest('article')?.querySelector('.almora-contact-response-feedback');
    const response=String(textarea?.value||'').trim();
    if(response.length<2){if(feedback)feedback.textContent='Escreva uma resposta antes de enviar.';return;}
