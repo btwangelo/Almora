@@ -1,6 +1,7 @@
 (() => {
 'use strict';
 let submitInProgress=false;
+let lastSuccessfulSubmitAt=0;
 function goHome(){
  if((location.hash.slice(1)||'').split('/')[0]==='contato')location.hash='#home';
 }
@@ -56,8 +57,7 @@ window.almoraInitContactForm=async()=>{
    if(value('almora-contact-website'))return;
    const payload={category:value('almora-contact-category'),subject:value('almora-contact-subject'),message:value('almora-contact-message')};
    if(payload.subject.length<3||payload.message.length<10){showFeedback('Informe um título e uma mensagem com pelo menos 10 caracteres.','error');return;}
-   const last=Number(sessionStorage.getItem('almora_contact_last_sent')||0);
-   if(Date.now()-last<30000){showFeedback('Aguarde 30 segundos antes de enviar outra solicitação.','error');return;}
+   if(Date.now()-lastSuccessfulSubmitAt<30000){showFeedback('Aguarde 30 segundos antes de enviar outra solicitação.','error');return;}
    submitInProgress=true;
    if(button){button.disabled=true;button.textContent='Enviando…';}
    showFeedback('Enviando sua solicitação à equipe…');
@@ -68,7 +68,7 @@ window.almoraInitContactForm=async()=>{
      .single();
     if(insertError)throw insertError;
     if(!created?.id)throw new Error('O banco não confirmou o registro da solicitação.');
-    sessionStorage.setItem('almora_contact_last_sent',String(Date.now()));
+    lastSuccessfulSubmitAt=Date.now();
     form.reset();
     showFeedback('');
     if(button){button.disabled=false;button.textContent='Enviar solicitação';}
