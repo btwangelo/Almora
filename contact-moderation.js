@@ -6,34 +6,39 @@ const statuses={pending:'Pendente',in_progress:'Em análise',resolved:'Resolvida
 const client=()=>window.almoraDB;
 const me=async()=>{const {data:{user},error}=await client().auth.getUser();if(error)throw error;if(!user)throw new Error('Sessão expirada. Entre novamente.');return user;};
 const badgeText=count=>count?String(count>99?'99+':count):'';
+function setBadge(element,count){
+ if(!element)return;
+ element.textContent=badgeText(count);
+ element.hidden=!(count>0);
+ element.setAttribute('aria-label',count>0?String(count)+' pendências':'Sem pendências');
+}
 function ensureBadges(){
  const nav=document.querySelector('[data-studio-page="moderation"]');
  if(nav&&!nav.querySelector('#almora-contact-staff-sidebar-badge')){
-  const badge=document.createElement('span');badge.id='almora-contact-staff-sidebar-badge';badge.className='almora-contact-unread-badge';nav.appendChild(badge);
+  const badge=document.createElement('span');badge.id='almora-contact-staff-sidebar-badge';badge.className='almora-contact-unread-badge';badge.hidden=true;nav.appendChild(badge);
  }
  const menuLink=document.querySelector('#almora-account-menu a[href="#studio"]');
  if(menuLink&&!menuLink.querySelector('#almora-contact-staff-menu-badge')){
-  const badge=document.createElement('span');badge.id='almora-contact-staff-menu-badge';badge.className='almora-contact-unread-badge';menuLink.appendChild(badge);
+  const badge=document.createElement('span');badge.id='almora-contact-staff-menu-badge';badge.className='almora-contact-unread-badge';badge.hidden=true;menuLink.appendChild(badge);
  }
 }
 window.almoraRefreshContactStaffBadge=async()=>{
  ensureBadges();
- const badges=['#almora-contact-staff-badge','#almora-contact-staff-sidebar-badge','#almora-contact-staff-menu-badge']
-  .map(selector=>document.querySelector(selector)).filter(Boolean);
- if(!badges.length)return;
+ const user=await me().catch(error=>{console.warn('Sessão da equipe indisponível para os contadores:',error);return null;});
+ if(!user){['#almora-contact-staff-badge','#almora-contact-staff-sidebar-badge','#almora-contact-staff-menu-badge','#almora-contact-report-badge'].forEach(s=>setBadge(document.querySelector(s),0));return;}
  try{
-  const user=await me();
-  const [messagesResult,notificationsResult]=await Promise.all([
-   client().from('contact_messages').select('id',{count:'exact'}).order('created_at',{ascending:false}).limit(1000),
-   client().from('contact_staff_notifications').select('contact_message_id,read_at').eq('staff_user_id',user.id).limit(1000)
+  const [requests,reports]=await Promise.all([
+   client().from('contact_staff_notifications').select('id',{count:'exact',head:true}).eq('staff_user_id',user.id).is('read_at',null),
+   client().from('reports').select('id',{count:'exact',head:true}).eq('status','pending')
   ]);
-  if(messagesResult.error)throw messagesResult.error;
-  const notifications=notificationsResult.error?[]:(notificationsResult.data||[]);
-  if(notificationsResult.error)console.warn('Avisos de solicitação indisponíveis; usando as solicitações como referência.',notificationsResult.error);
-  const statusByMessage=new Map(notifications.map(item=>[item.contact_message_id,item.read_at]));
-  const count=(messagesResult.data||[]).filter(item=>!statusByMessage.has(item.id)||!statusByMessage.get(item.id)).length;
-  badges.forEach(el=>{el.textContent=badgeText(count);el.hidden=!count;});
- }catch(error){console.warn('Contagem de solicitações staff indisponível:',error);}
+  if(requests.error)throw requests.error;
+  if(reports.error)throw reports.error;
+  const requestCount=Number(requests.count||0),reportCount=Number(reports.count||0),total=requestCount+reportCount;
+  setBadge(document.querySelector('#almora-contact-staff-badge'),requestCount);
+  setBadge(document.querySelector('#almora-contact-report-badge'),reportCount);
+  setBadge(document.querySelector('#almora-contact-staff-sidebar-badge'),total);
+  setBadge(document.querySelector('#almora-contact-staff-menu-badge'),total);
+ }catch(error){console.warn('Contagem de pendências da equipe indisponível:',error);}
 };
 window.almoraShowContactRequests=()=>{
  const root=document.getElementById('almora-contact-requests');
@@ -131,7 +136,7 @@ if(typeof originalStudio==='function'){
   if(start<0)return html;
   const end=html.indexOf('</section>',start),descriptionEnd=html.indexOf('</p>',start);
   if(end<0||descriptionEnd<0||descriptionEnd>end)return html;
-  const tabs='<div class="almora-mod-actions almora-contact-mod-tabs"><button id="almora-mod-tab-reports" class="on" type="button" onclick="almoraShowReportQueue()">Denúncias</button><button id="almora-mod-tab-contacts" class="g" type="button" onclick="almoraShowContactRequests()">Solicitações <span id="almora-contact-staff-badge" hidden class="almora-contact-unread-badge"></span></button></div><section id="almora-contact-requests" class="almora-contact-requests" hidden><div class="empty">Selecione esta aba para carregar as solicitações.</div></section>';
+  const tabs='<div class="almora-mod-actions almora-contact-mod-tabs"><button id="almora-mod-tab-reports" class="on" type="button" onclick="almoraShowReportQueue()">Denúncias <span id="almora-contact-report-badge" hidden class="almora-contact-unread-badge"></span></button><button id="almora-mod-tab-contacts" class="g" type="button" onclick="almoraShowContactRequests()">Solicitações <span id="almora-contact-staff-badge" hidden class="almora-contact-unread-badge"></span></button></div><section id="almora-contact-requests" class="almora-contact-requests" hidden><div class="empty">Selecione esta aba para carregar as solicitações.</div></section>';
   const insertAt=descriptionEnd+4;
   return html.slice(0,insertAt)+tabs+html.slice(insertAt);
  };
@@ -141,7 +146,7 @@ function ensureLiveModerationTabs(){
  if(!root||root.querySelector('#almora-mod-tab-contacts'))return;
  const description=root.querySelector('p');if(!description)return;
  const tabs=document.createElement('div');tabs.className='almora-mod-actions almora-contact-mod-tabs';
- tabs.innerHTML='<button id="almora-mod-tab-reports" class="on" type="button" onclick="almoraShowReportQueue()">Denúncias</button><button id="almora-mod-tab-contacts" class="g" type="button" onclick="almoraShowContactRequests()">Solicitações <span id="almora-contact-staff-badge" hidden class="almora-contact-unread-badge"></span></button>';
+ tabs.innerHTML='<button id="almora-mod-tab-reports" class="on" type="button" onclick="almoraShowReportQueue()">Denúncias <span id="almora-contact-report-badge" hidden class="almora-contact-unread-badge"></span></button><button id="almora-mod-tab-contacts" class="g" type="button" onclick="almoraShowContactRequests()">Solicitações <span id="almora-contact-staff-badge" hidden class="almora-contact-unread-badge"></span></button>';
  const panel=document.createElement('section');panel.id='almora-contact-requests';panel.className='almora-contact-requests';panel.hidden=true;
  panel.innerHTML='<div class="empty">Selecione esta aba para carregar as solicitações.</div>';
  description.insertAdjacentElement('afterend',tabs);tabs.insertAdjacentElement('afterend',panel);
@@ -149,7 +154,7 @@ function ensureLiveModerationTabs(){
 ensureLiveModerationTabs();
 if(document.body){const moderationObserver=new MutationObserver(ensureLiveModerationTabs);moderationObserver.observe(document.body,{childList:true,subtree:true});}
 const style=document.createElement('style');
-style.textContent='.almora-contact-mod-tabs{margin:16px 0}.almora-contact-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:auto;border-radius:99px;background:#d93654;color:#fff;font-size:11px;font-weight:700}.almora-contact-request-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.almora-contact-request textarea{width:100%;box-sizing:border-box;margin:8px 0}.almora-contact-request .almora-mod-actions select{flex:1;min-width:140px}.almora-contact-response-feedback{display:block;color:var(--mu);margin-top:8px}.almora-contact-requests[hidden]{display:none!important}#almora-account-menu a[href="#studio"]{justify-content:space-between}';
+style.textContent='.almora-contact-mod-tabs{margin:16px 0}.almora-contact-unread-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:99px;background:#d93654;color:#fff;font-size:11px;font-weight:700;line-height:1}.almora-contact-unread-badge[hidden]{display:none!important}.almora-contact-request-head{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}.almora-contact-request textarea{width:100%;box-sizing:border-box;margin:8px 0}.almora-contact-request .almora-mod-actions select{flex:1;min-width:140px}.almora-contact-response-feedback{display:block;color:var(--mu);margin-top:8px}.almora-contact-requests[hidden]{display:none!important}#almora-account-menu a[href="#studio"]{justify-content:space-between}';
 document.head.appendChild(style);
 document.addEventListener('click',event=>{
  if(event.target.closest('#almora-tab-mod,[data-studio-page="moderation"]'))setTimeout(()=>window.almoraRefreshContactStaffBadge?.(),0);
