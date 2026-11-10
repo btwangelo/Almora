@@ -904,15 +904,15 @@ async function out(){
 async function pin(){
   if(!user)return toast('Entre na sua conta primeiro.');
 
-  const {data,error}=await almoraDB.rpc('is_admin');
-
+  const {data,error}=await almoraDB.rpc('current_user_role');
   if(error)return toast('Erro ao verificar acesso: '+error.message);
 
-  if(data!==true)
-    return toast('Acesso restrito à administração.');
+  if(!['superadmin','admin','moderator'].includes(data))
+    return toast('Acesso restrito à equipe autorizada.');
 
+  window.almoraStudioRole=data;
   unlocked=true;
-  toast('Acesso administrativo autorizado!');
+  toast('Acesso ao ALMORA Studio autorizado!');
   ren();
 }                    
 function studio(){
@@ -1052,12 +1052,6 @@ ${adminChapterOrder(w).map((c,index,list)=>`
 ${chapterOrderChanged(w)?`<div class="act" style="margin-top:10px"><button type="button" class="g" onclick="cancelChapterOrder('${w.id}')">Cancelar</button><button type="button" id="save-chapter-order-${w.id}" onclick="saveChapterOrder('${w.id}')">Concluir reordenação</button></div>`:''}
 </div>
 `).join('')||'<div class="empty">Nenhuma obra.</div>'}
-
-<div class="box">
-<b>ALMORA TRANSLATE</b>
-<p style="color:var(--mu)">Tradução assistida por IA, OCR de páginas e ferramentas de reconstrução para a equipe editorial.</p>
-<div class="act"><a class="g" href="/translate/" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;padding:10px 14px;border-radius:10px">Abrir ALMORA Translate ↗</a></div>
-</div>
 
 </section>
 `;
@@ -3739,12 +3733,9 @@ window.almoraSaveProfile = async function() {
 
   async function verifyAdmin() {
     if (!user) return false;
-
-    const { data, error } = await almoraDB.rpc('is_admin');
-
+    const { data, error } = await almoraDB.rpc('current_user_role');
     if (error) throw error;
-
-    return data === true;
+    return ['moderator','admin','superadmin'].includes(data);
   }
 
   window.almoraLoadReports = async function() {
@@ -4045,9 +4036,9 @@ window.almoraSaveProfile = async function() {
     return;
   }
 
-  const { data, error } = await almoraDB.rpc('is_admin');
-
-  adminStatus = !error && data === true;
+  const { data, error } = await almoraDB.rpc('current_user_role');
+  adminStatus = !error && ['moderator','admin','superadmin'].includes(data);
+  window.almoraStudioRole = adminStatus ? data : 'reader';
 
   if (previousAdminStatus !== adminStatus &&
       (location.hash.slice(1).split('/')[0] === 'studio')) {
@@ -5542,7 +5533,8 @@ window.almoraSavePrivacy = async function() {
 </script>
 
 <script src="social-profiles.js?v=custom-color-picker1"></script>
-<script src="studio-dashboard.js?v=announcements1"></script>
+<script src="studio-settings.js?v=1"></script>
+<script src="studio-dashboard.js?v=settings-pages1"></script>
 <script id="almora-draft-persistence">
 (() => {
   "use strict";
@@ -5569,7 +5561,6 @@ window.almoraSavePrivacy = async function() {
     } catch (_) { return "local"; }
   };
   const route = () => {
-    if (location.pathname.includes("/translate")) return "translate";
     const parts = (location.hash.slice(1) || "home").split("/");
     return "almora:" + parts.slice(0, 2).join("/");
   };
