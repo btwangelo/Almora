@@ -62,12 +62,12 @@
     const main=make('main','almora-studio-main');
     const overview=make('section','almora-studio-overview','almora-studio-overview');
     overview.innerHTML='<div class="almora-studio-welcome"><div><span class="almora-studio-eyebrow">CENTRAL DE OPERAÇÕES</span><h1>Bem-vindo ao Studio.</h1><p>Gerencie obras, publicações e a comunidade da ALMORA em um só lugar.</p></div><span class="almora-studio-welcome-mark">A</span></div><div class="almora-studio-section-heading"><div><span class="almora-studio-eyebrow">ATALHOS</span><h2>Acesso rápido</h2></div><span>Selecione uma área para começar</span></div><div class="almora-studio-quick-grid"><button type="button" data-go="works"><span>▤</span><strong>Obras cadastradas</strong><small>Consultar e organizar o catálogo</small><b>→</b></button><button type="button" data-go="launch"><span>＋</span><strong>Publicar obra</strong><small>Adicionar uma nova publicação</small><b>→</b></button><button type="button" data-go="chapters"><span>▥</span><strong>Capítulos</strong><small>Gerenciar capítulos das obras</small><b>→</b></button><button type="button" data-go="moderation"><span>⚑</span><strong>Moderação</strong><small>Acompanhar denúncias e comunidade</small><b>→</b></button><button type="button" data-go="analytics"><span>▧</span><strong>Estatísticas</strong><small>Consultar os dados da plataforma</small><b>→</b></button><button type="button" data-go="settings"><span>⚙</span><strong>Configurações</strong><small>Preferências e controles do Studio</small><b>→</b></button></div><div class="almora-studio-note"><span>✦</span><div><strong>Seu espaço de administração</strong><p>As ferramentas existentes foram mantidas. Use o menu lateral para alternar entre as áreas sem sair do Studio.</p></div></div>';
-    overview.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>window.almoraStudioPage(b.dataset.go)));
+    overview.querySelectorAll('[data-go]').forEach(b=>{if(!allowed(b.dataset.go)){b.remove();return;}b.addEventListener('click',()=>window.almoraStudioPage(b.dataset.go));});
     main.appendChild(overview);
 
     shell.append(sidebar,workspace);
     workspace.append(topbar,main);
-    const nodes=[...app.childNodes].filter(node=>node!==shell);
+    const nodes=[...app.childNodes].filter(node=>node!==shell);\n    nodes.forEach(node=>{if(node.nodeType===1&&node.tagName==='H2'&&node.textContent.trim()==='ALMORA STUDIO')node.hidden=true;});
     app.appendChild(shell);
     nodes.forEach(node=>{if(node!==nav&&node!==toolbar)main.appendChild(node);});
     // O conteúdo operacional continua intacto; apenas muda de posição no layout.
@@ -154,7 +154,7 @@
 
   const style=document.createElement('style');
   style.textContent=`
-  #app.almora-studio-dashboard-active{width:100%;max-width:100%;padding:0;margin:0}
+  #app.almora-studio-dashboard-active{width:100%;max-width:100%;padding:0;margin:0}\n  #app.almora-studio-dashboard-active .almora-studio-tabs{display:none!important}
   #app.almora-studio-dashboard-active>.almora-studio-shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:calc(100vh - 20px);background:var(--bg);border:1px solid var(--bd);border-radius:20px;overflow:hidden}
   .almora-studio-sidebar{background:linear-gradient(180deg,var(--sf),color-mix(in srgb,var(--sf) 88%,var(--ac)));border-right:1px solid var(--bd);padding:22px 15px;display:flex;flex-direction:column;gap:22px;min-width:0}
   .almora-studio-brand{display:flex;align-items:center;gap:11px;padding:3px 8px;color:var(--tx)}
