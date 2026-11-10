@@ -1337,7 +1337,7 @@ async function addC(){
 
       const url = await almoraUploadToR2(blob,'chapter_page');
 
-      uploaded.push({page_number:i+1,image_url:url});
+      uploaded.push({page_number:i+1,image_url:url,file_size_bytes:blob.size});
     }
 
     const {data:chapter,error:chapterError}=await almoraDB
@@ -1360,7 +1360,8 @@ async function addC(){
     const pageRows=uploaded.map(p=>({
       chapter_id:chapter.id,
       page_number:p.page_number,
-      image_url:p.image_url
+      image_url:p.image_url,
+      file_size_bytes:p.file_size_bytes
     }));
 
     const {error:pagesError}=await almoraDB
@@ -1957,7 +1958,7 @@ async function almoraPublishBatch() {
         if(!compressed) throw new Error('Falha ao processar uma página.');
         const blob=await fetch(compressed).then(r=>r.blob());
         const url=await almoraUploadToR2(blob,'chapter_page');
-        uploaded.push({page_number:i+1,image_url:url});
+        uploaded.push({page_number:i+1,image_url:url,file_size_bytes:blob.size});
         item.progress=Math.round(((i+1)/item.pages.length)*90);
         almoraBatchRender();
       }
@@ -1971,7 +1972,7 @@ async function almoraPublishBatch() {
       }).select().single();
       if(chapterError) throw chapterError;
 
-      const pageRows=uploaded.map(p=>({chapter_id:chapter.id,page_number:p.page_number,image_url:p.image_url}));
+      const pageRows=uploaded.map(p=>({chapter_id:chapter.id,page_number:p.page_number,image_url:p.image_url,file_size_bytes:p.file_size_bytes}));
       const {error:pagesError}=await almoraDB.from('pages').insert(pageRows);
       if(pagesError) {
         await almoraDB.from('chapters').delete().eq('id',chapter.id);
