@@ -32,9 +32,9 @@
       ['accent_color','Cor principal','color','#b13df5','Atualiza a cor de destaque da interface nesta sessão.']
     ],
     locale:[
-      ['language','Idioma padrão','select','pt-BR',null,[['pt-BR','Português (Brasil)'],['en','English'],['es','Español']]],
-      ['timezone','Fuso horário','select','America/Sao_Paulo',null,[['America/Sao_Paulo','Brasília (UTC−3)'],['UTC','UTC'],['Europe/Lisbon','Lisboa']]],
-      ['date_format','Formato de data','select','DD/MM/AAAA',null,[['DD/MM/AAAA','DD/MM/AAAA'],['AAAA-MM-DD','AAAA-MM-DD'],['MM/DD/AAAA','MM/DD/AAAA']]]
+      ['language','Idioma de formatação','select','pt-BR','Atualiza o idioma do documento e os formatos de data; os textos da interface continuam em português.',[['pt-BR','Português (Brasil)'],['en','English'],['es','Español']]],
+      ['timezone','Fuso horário','select','America/Sao_Paulo','Aplicado aos horários exibidos pelo site.',[['America/Sao_Paulo','Brasília (UTC−3)'],['UTC','UTC'],['Europe/Lisbon','Lisboa']]],
+      ['date_format','Formato de data','select','DD/MM/AAAA','Aplica o formato selecionado às datas exibidas pelo site.',[['DD/MM/AAAA','DD/MM/AAAA'],['AAAA-MM-DD','AAAA-MM-DD'],['MM/DD/AAAA','MM/DD/AAAA']]]
     ],
     content:[
       ['require_rights','Exigir titular ou licença informada','checkbox',true,'Impede a publicação sem o campo de titular/licença preenchido.'],
@@ -55,11 +55,11 @@
       ['in_app_notifications','Ativar notificações internas','checkbox',true,'Controla a criação de notificações internas de capítulos.']
     ],
     storage:[
-      ['r2_max_upload_mb','Limite por arquivo enviado ao armazenamento de obras (MB)','number',80,'Aplicado no site antes do envio ao serviço de armazenamento. O serviço externo mantém seu próprio teto.',1,80],
+      ['r2_max_upload_mb','Limite geral por arquivo no Studio (MB)','number',80,'O painel bloqueia envios acima deste valor. O Worker de armazenamento mantém um teto externo fixo de 80 MB.',1,80],
       ['allowed_extensions','Extensões permitidas (separadas por vírgula)','text','jpg, jpeg, png, webp, zip, cbz','Aplicado aos envios pelo painel.'],
       ['avatar_max_upload_mb','Limite de avatar (MB)','number',50,'Atualiza o limite real do bucket de avatares.',1,50],
       ['cover_max_upload_mb','Limite de capas e imagens de anúncios (MB)','number',50,'Atualiza o limite real do bucket de capas.',1,50],
-      ['chapter_page_max_upload_mb','Limite por página no bucket de capítulos (MB)','number',10,'Atualiza o limite real do bucket chapter-pages.',1,10]
+      ['chapter_page_max_upload_mb','Limite por página de capítulo (MB)','number',10,'Aplicado pelo painel antes do envio das páginas. Também atualiza o limite do bucket chapter-pages.',1,10]
     ],
     logs:[
       ['audit_enabled','Registrar ações administrativas','checkbox',true,'Desativar interrompe os registros automáticos gerados pelos gatilhos do banco.']
