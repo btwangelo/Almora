@@ -2842,6 +2842,7 @@ window.almoraUpdateProfilePreview = function() {
 };
 
 window.almoraSaveProfile = async function() {
+  await window.almoraRefreshSiteSettings?.(true);
   if (!user || !currentProfile ||
       currentProfile.id !== user.id) return;
 
@@ -2855,8 +2856,9 @@ window.almoraSaveProfile = async function() {
 
   try {
     if (file) {
-      if (file.size > 50000000) {
-        return toast('A imagem deve ter no máximo 50 MB.');
+      const avatarLimit=Number(window.almoraSiteSettings?.avatar_max_upload_mb||50);
+      if (file.size > avatarLimit*1048576) {
+        return toast('A imagem deve ter no máximo '+avatarLimit+' MB.');
       }
 
       const extensions = {
@@ -5382,6 +5384,9 @@ window.almoraSavePrivacy = async function() {
       const permission=await almoraDB.rpc('is_admin');
       if(permission.error)throw permission.error;
       if(permission.data!==true)throw new Error('Acesso restrito à administração.');
+      const roleResult=await almoraDB.rpc('current_user_role');
+      if(roleResult.error)throw roleResult.error;
+      const canDeleteAnnouncements=roleResult.data==='superadmin';
       const result=await almoraDB.from('announcements').select('id,title,body,image_url,link_url,is_published,created_at,published_at').order('created_at',{ascending:false}).limit(100);
       if(result.error)throw result.error;
       const rows=result.data||[];
@@ -5389,7 +5394,7 @@ window.almoraSavePrivacy = async function() {
       rows.forEach(row=>{
         list+='<article class="box" style="margin:10px 0"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><b>'+safe(row.title)+'</b><small style="color:var(--mu)">'+(row.is_published?'Publicado':'Rascunho')+' · '+new Date(row.published_at||row.created_at).toLocaleString('pt-BR')+'</small></div>';
         if(row.image_url)list+='<img src="'+safe(row.image_url)+'" alt="" loading="lazy" style="width:100%;max-height:160px;object-fit:contain;margin-top:8px;border-radius:8px">';
-        list+='<p style="white-space:pre-wrap">'+safe(row.body.length>240?row.body.slice(0,240)+'…':row.body)+'</p><div class="act"><button class="g" type="button" data-announcement-edit="'+row.id+'">Editar</button><button class="g" type="button" data-announcement-delete="'+row.id+'">Excluir</button></div></article>';
+        list+='<p style="white-space:pre-wrap">'+safe(row.body.length>240?row.body.slice(0,240)+'…':row.body)+'</p><div class="act"><button class="g" type="button" data-announcement-edit="'+row.id+'">Editar</button>'+(canDeleteAnnouncements?'<button class="g" type="button" data-announcement-delete="'+row.id+'">Excluir</button>':'')+'</div></article>';
       });
       mount.innerHTML='<h2>Anúncios públicos</h2><p style="color:var(--mu)">Publique comunicados para todos os leitores da ALMORA. Eles aparecem na central de notificações, inclusive para quem administra o site.</p>'+
         '<form id="almora-announcement-form" class="box" style="display:grid;gap:10px"><h3 id="almora-announcement-form-title" style="margin:0">Criar anúncio</h3>'+
@@ -5397,7 +5402,7 @@ window.almoraSavePrivacy = async function() {
         '<label for="almora-announcement-body">Mensagem</label><textarea id="almora-announcement-body" maxlength="12000" rows="6" required placeholder="Escreva o comunicado para os leitores..."></textarea>'+
         '<label for="almora-announcement-image">Imagem (opcional)</label><input id="almora-announcement-image" type="file" accept="image/*"><div id="almora-announcement-image-preview"></div>'+
         '<label for="almora-announcement-link">Link (opcional)</label><input id="almora-announcement-link" type="url" placeholder="https://...">'+
-        '<div class="act"><button type="submit">Publicar anúncio</button><button type="button" class="g" id="almora-announcement-cancel" hidden>Cancelar edição</button></div><small style="color:var(--mu)">Imagens de até 50 MB. A publicação ficará visível para todos imediatamente.</small></form>'+
+        '<div class="act"><button type="submit">Publicar anúncio</button><button type="button" class="g" id="almora-announcement-cancel" hidden>Cancelar edição</button></div><small style="color:var(--mu)">O limite da imagem é definido em Armazenamento. A publicação ficará visível para todos imediatamente.</small></form>'+
         '<h3>Anúncios publicados</h3><div id="almora-announcement-list">'+(list||'<div class="empty">Nenhum anúncio publicado ainda.</div>')+'</div>';
       const form=mount.querySelector('#almora-announcement-form'),titleInput=mount.querySelector('#almora-announcement-title'),bodyInput=mount.querySelector('#almora-announcement-body'),imageInput=mount.querySelector('#almora-announcement-image'),linkInput=mount.querySelector('#almora-announcement-link'),preview=mount.querySelector('#almora-announcement-image-preview'),cancel=mount.querySelector('#almora-announcement-cancel');
       let editing=null,currentImage=null;
@@ -5415,16 +5420,17 @@ window.almoraSavePrivacy = async function() {
         if(deleted.error)return toast('Não foi possível excluir: '+deleted.error.message);
         toast('Anúncio excluído.');mount.dataset.loaded='0';mount.dataset.loading='0';await window.almoraLoadStudioAnnouncements();
       }));
-      imageInput.addEventListener('change',()=>{
+      imageInput.addEventListener('change',async()=>{
+        await window.almoraRefreshSiteSettings?.(true);
         const file=imageInput.files?.[0];if(!file){preview.innerHTML=currentImage?'<img src="'+safe(currentImage)+'" alt="Imagem atual" style="max-width:100%;max-height:180px;border-radius:8px">':'';return;}
-        if(!file.type.startsWith('image/')||file.size>50000000){imageInput.value='';return toast('Escolha uma imagem de até 50 MB.');}
+        const coverLimit=Number(window.almoraSiteSettings?.cover_max_upload_mb||50);if(!file.type.startsWith('image/')||file.size>coverLimit*1048576){imageInput.value='';return toast('Escolha uma imagem válida de até '+coverLimit+' MB.');}
         preview.innerHTML='<img src="'+URL.createObjectURL(file)+'" alt="Prévia da imagem" style="max-width:100%;max-height:180px;border-radius:8px">';
       });
       form.addEventListener('submit',async event=>{
-        event.preventDefault();const title=titleInput.value.trim(),body=bodyInput.value.trim(),link=linkInput.value.trim();
+        event.preventDefault();await window.almoraRefreshSiteSettings?.(true);const title=titleInput.value.trim(),body=bodyInput.value.trim(),link=linkInput.value.trim();
         if(!title||!body)return toast('Preencha o título e a mensagem.');
         if(link&&!announcementUrl(link))return toast('Informe um link válido começando com http:// ou https://.');
-        const file=imageInput.files?.[0];if(file&&(!file.type.startsWith('image/')||file.size>50000000))return toast('Escolha uma imagem de até 50 MB.');
+        const file=imageInput.files?.[0],coverLimit=Number(window.almoraSiteSettings?.cover_max_upload_mb||50);if(file&&(!file.type.startsWith('image/')||file.size>coverLimit*1048576))return toast('Escolha uma imagem válida de até '+coverLimit+' MB.');
         const submit=form.querySelector('button[type="submit"]');submit.disabled=true;submit.textContent='Publicando...';
         try{
           let imageUrl=currentImage;
