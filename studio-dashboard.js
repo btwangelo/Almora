@@ -130,7 +130,11 @@
     listNodes.forEach(node=>{node.hidden=activePage!=='works'||node.dataset.studioTranslate==='true';});
     if(search){search.hidden=activePage!=='works';if(activePage==='works')filterWorks(search.value);}
     if(translate)translate.hidden=true;
-    if(toolbar){toolbar.hidden=activePage!=='settings';toolbar.style.display=activePage==='settings'?'flex':'none';}
+    if(toolbar){
+      toolbar.hidden=false;toolbar.style.display='flex';
+      const backup=toolbar.querySelector('button[onclick="bk()"]');
+      if(backup)backup.hidden=(window.almoraStudioRole||'admin')==='moderator';
+    }
     updateButtons();
   }
 
