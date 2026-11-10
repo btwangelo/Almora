@@ -152,7 +152,15 @@ document.head.appendChild(style);
 document.addEventListener('click',event=>{
  if(event.target.closest('#almora-tab-mod,[data-studio-page="moderation"]'))setTimeout(()=>window.almoraRefreshContactStaffBadge?.(),0);
 });
-window.addEventListener('focus',()=>window.almoraRefreshContactStaffBadge?.());
+window.addEventListener('focus',()=>{window.almoraRefreshContactStaffBadge?.();window.almoraRefreshNotificationBadge?.();});
+window.setInterval(()=>{
+ if(location.hash.startsWith('#studio')){
+  window.almoraRefreshContactStaffBadge?.();
+  const panel=document.getElementById('almora-contact-requests');
+  if(panel&&!panel.hidden)window.almoraLoadContactRequests?.();
+ }
+ window.almoraRefreshNotificationBadge?.();
+},45000);
 window.almoraRefreshContactStaffBadge?.();
 if(document.body){
  const observer=new MutationObserver(()=>{
