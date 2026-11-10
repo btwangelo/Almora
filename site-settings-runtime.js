@@ -72,7 +72,7 @@
   function applyDefaults(){
     const rating=document.getElementById('n_ag');
     if(rating&&status.default_age_rating&&[...rating.options].some(o=>o.value===status.default_age_rating))rating.value=status.default_age_rating;
-    const rights=document.querySelector('label[for="n_l"]');
+    const rights=document.querySelector('#n_l')?.previousElementSibling;
     if(rights)rights.textContent=status.require_rights===false?'Titular dos direitos / licença (opcional)':'Titular dos direitos / licença (obrigatório)';
   }
 
@@ -121,7 +121,7 @@
     refresh(true).then(()=>{if(typeof window.ren==='function')window.ren();});
   });
   if(db()?.auth?.onAuthStateChange){
-    db().auth.onAuthStateChange(()=>{roleReady=false;refresh(true).then(()=>{if(typeof window.ren==='function')window.ren();});});
+    db().auth.onAuthStateChange((event)=>{if(!['SIGNED_IN','SIGNED_OUT','INITIAL_SESSION'].includes(event))return;roleReady=false;refresh(true).then(()=>{if(typeof window.ren==='function')window.ren();});});
   }
   refresh(true).then(()=>{if(typeof window.ren==='function')window.ren();});
 })();
