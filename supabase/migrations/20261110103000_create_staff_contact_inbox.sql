@@ -11,7 +11,7 @@ create table if not exists public.contact_messages (
  assigned_to uuid references auth.users(id) on delete set null,
  created_at timestamptz not null default now(),
  updated_at timestamptz not null default now(),
- constraint contact_messages_email_format check (email ~* '^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,}$')
+ constraint contact_messages_email_format check (position('@' in email) > 1 and position('.' in split_part(email,'@',2)) > 1 and email not like '% %')
 );
 create index if not exists contact_messages_status_created_idx on public.contact_messages(status,created_at desc);
 alter table public.contact_messages enable row level security;
