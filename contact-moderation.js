@@ -129,6 +129,7 @@ document.addEventListener('click',event=>{
  if(event.target.closest('#almora-tab-mod,[data-studio-page="moderation"]'))setTimeout(()=>window.almoraRefreshContactStaffBadge?.(),0);
 });
 window.addEventListener('focus',()=>window.almoraRefreshContactStaffBadge?.());
+window.almoraRefreshContactStaffBadge?.();
 if(document.body){
  const observer=new MutationObserver(()=>{
   if(document.querySelector('[data-studio-page="moderation"]')){
