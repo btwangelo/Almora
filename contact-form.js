@@ -27,3 +27,10 @@ window.almoraInitContactForm = () => {
  });
 };
 })();
+if (document.readyState === 'loading') {
+ document.addEventListener('DOMContentLoaded', () => {
+  if ((location.hash.slice(1) || '') === 'contato') window.almoraInitContactForm();
+ });
+} else if ((location.hash.slice(1) || '') === 'contato') {
+ window.almoraInitContactForm();
+}
