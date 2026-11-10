@@ -92,10 +92,12 @@
 
   const originalUpload=window.almoraUploadToR2;
   if(typeof originalUpload==='function'){
-    window.almoraUploadToR2=async function(file){
+    window.almoraUploadToR2=async function(file,purpose='generic'){
       const current=await refresh();
-      if(file&&Number(file.size)>Number(current.r2_max_upload_mb||80)*1048576)
-        throw new Error('O arquivo ultrapassa o limite atual de '+current.r2_max_upload_mb+' MB definido pela administração.');
+      const purposeLimit=purpose==='chapter_page'?Number(current.chapter_page_max_upload_mb||10):purpose==='cover'?Number(current.cover_max_upload_mb||50):Number(current.r2_max_upload_mb||80);
+      const effectiveLimit=Math.min(Number(current.r2_max_upload_mb||80),purposeLimit);
+      if(file&&Number(file.size)>effectiveLimit*1048576)
+        throw new Error('O arquivo ultrapassa o limite atual de '+effectiveLimit+' MB para este tipo de envio.');
       const allowed=String(current.allowed_extensions||defaults.allowed_extensions).split(',').map(x=>x.trim().toLowerCase().replace(/^\./,'')).filter(Boolean);
       const typeExt={'image/jpeg':'jpg','image/png':'png','image/webp':'webp','image/gif':'gif','image/avif':'avif','application/zip':'zip'};
       const extension=(file?.name?.split('.').pop()||typeExt[file?.type]||'').toLowerCase();
