@@ -118,8 +118,11 @@ if(typeof originalStudio==='function'){
   if(start<0)return html;
   const end=html.indexOf('</section>',start);
   if(end<0)return html;
+  const descriptionEnd=html.indexOf('</p>',start);
+  if(descriptionEnd<0||descriptionEnd>end)return html;
+  const insertAt=descriptionEnd+4;
   const tabs='<div class="almora-mod-actions almora-contact-mod-tabs"><button id="almora-mod-tab-reports" class="on" type="button" onclick="almoraShowReportQueue()">Denúncias</button><button id="almora-mod-tab-contacts" class="g" type="button" onclick="almoraShowContactRequests()">Solicitações <span id="almora-contact-staff-badge" hidden class="almora-contact-unread-badge"></span></button></div><section id="almora-contact-requests" class="almora-contact-requests" hidden><div class="empty">Selecione esta aba para carregar as solicitações.</div></section>';
-  return html.slice(0,end)+tabs+html.slice(end);
+  return html.slice(0,insertAt)+tabs+html.slice(insertAt);
  };
 }
 const style=document.createElement('style');
