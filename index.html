@@ -639,6 +639,7 @@ const authErr=e=>{
     'user_already_exists':'Este e-mail já está cadastrado.',
     'over_email_send_rate_limit':'O serviço de e-mail da ALMORA atingiu o limite temporário de envios. Aguarde ou tente novamente mais tarde. A equipe precisa configurar um serviço SMTP próprio para liberar novos cadastros.'
   };
+  if(/cadastro de novas contas está temporariamente fechado/i.test(e.message||''))return 'Novos cadastros estão temporariamente fechados pela equipe da ALMORA.';
   return msgs[e.code]||msgs[e.message]||'Erro: '+(e.message||'Tente novamente.');
 };
 
@@ -1157,6 +1158,7 @@ function moveDraft(index,direction){
   drawD();
                                      }
 async function pages(el){
+  await window.almoraRefreshSiteSettings?.(true);
   const files=[...el.files].sort((a,b)=>a.name.localeCompare(b.name,undefined,{numeric:true}));
   if(!files.length)return;
   // Keep the current project preview visible while the selected file is processed.
@@ -1250,6 +1252,7 @@ async function pages(el){
   return result.url;
   }
   async function addW(){
+  await window.almoraRefreshSiteSettings?.(true);
   const t=$('#n_t').value.trim();
   const rights=$('#n_l').value.trim();
   if(!t)return toast('Informe o título');
@@ -1841,6 +1844,7 @@ function almoraBatchRender() {
 }
 
 async function almoraPrepareBatch(input) {
+  await window.almoraRefreshSiteSettings?.(true);
   const files=[...input.files];
   if(!files.length) return;
 
@@ -1891,6 +1895,7 @@ async function almoraPrepareBatch(input) {
 }
 
 async function almoraPublishBatch() {
+  await window.almoraRefreshSiteSettings?.(true);
   if(!user) return toast('Entre na conta administrativa.');
   if(!unlocked) return toast('Acesso restrito à administração.');
 
