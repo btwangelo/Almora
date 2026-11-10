@@ -27,6 +27,7 @@
       statusReady=true;
       window.almoraSiteSettings=status;
       window.almoraIsSiteOwner=owner;
+      applyDefaults();
       return status;
     })();
     try{return await loading;}finally{loading=null;}
@@ -113,12 +114,13 @@
     const versionLabel=document.querySelector('.almora-studio-sidebar-bottom span:last-child');
     if(versionLabel)versionLabel.textContent='ALMORA · '+(status.site_version||'Em desenvolvimento');
     applySiteGates();
-    applySiteGates();
     const rating=document.getElementById('n_ag');
     if(rating&&status.default_age_rating&&[...rating.options].some(o=>o.value===status.default_age_rating))rating.value=status.default_age_rating;
     const rights=document.querySelector('#n_l')?.previousElementSibling;
     if(rights)rights.textContent=status.require_rights===false?'Titular dos direitos / licença (opcional)':'Titular dos direitos / licença (obrigatório)';
+    resetSessionTimer();
   }
+  window.almoraApplySiteSettings=applyDefaults;
 
   const originalMail=window.mail;
   if(typeof originalMail==='function'){
