@@ -5361,7 +5361,7 @@ window.almoraSavePrivacy = async function() {
         }
         if(item.notificationType==='contact'){
           const request=contactMap[item.contact_message_id]||{};
-          return '<article class="box" style="margin:10px 0;opacity:'+(item.read_at?'0.75':'1')+'"><small style="color:var(--ac);font-weight:700;letter-spacing:.04em">RESPOSTA DA EQUIPE ALMORA</small><h2 style="margin:7px 0">'+safe(request.subject||'Sua solicitação')+'</h2><div style="white-space:pre-wrap;line-height:1.6">'+safe(request.staff_response||'A equipe atualizou sua solicitação.')+'</div><small style="display:block;color:var(--mu);margin-top:12px">'+new Date(request.responded_at||item.created_at).toLocaleString('pt-BR')+'</small>'+(item.read_at?'':'<div class="act"><button class="g" type="button" onclick="almoraMarkNotificationRead(\\''+item.id+'\\',\\'contact\\')">Marcar como lida</button></div>')+'</article>';
+          return '<article class="box" style="margin:10px 0;opacity:'+(item.read_at?'0.75':'1')+'"><small style="color:var(--ac);font-weight:700;letter-spacing:.04em">RESPOSTA DA EQUIPE ALMORA</small><h2 style="margin:7px 0">'+safe(request.subject||'Sua solicitação')+'</h2><div style="white-space:pre-wrap;line-height:1.6">'+safe(request.staff_response||'A equipe atualizou sua solicitação.')+'</div><small style="display:block;color:var(--mu);margin-top:12px">'+new Date(request.responded_at||item.created_at).toLocaleString('pt-BR')+'</small>'+(item.read_at?'':'<div class="act"><button class="g" type="button" data-contact-notification-read="'+item.id+'">Marcar como lida</button></div>')+'</article>';
         }
         if(item.notificationType==='follow'){
           const p=pm[item.follower_id]||{},name=p.display_name||'Um leitor',handle=p.username?' (@'+safe(p.username)+')':'';
@@ -5370,6 +5370,7 @@ window.almoraSavePrivacy = async function() {
         const w=wm[item.work_id]||{},c=cm[item.chapter_id]||{},label=c.chapter_label||(c.chapter_type==='extra'?'Extra':c.chapter_type==='special'?'Especial':'Capítulo '+c.chapter_number);
         return '<article class="box" style="margin:10px 0;opacity:'+(item.read_at?'0.72':'1')+'"><b>'+safe(w.title||'Nova publicação')+'</b><p>'+safe(label)+' foi publicado.</p><small style="color:var(--mu)">'+new Date(item.created_at).toLocaleString('pt-BR')+'</small><div class="act"><a href="#obra/'+item.work_id+'"><button class="g" type="button">Abrir obra</button></a>'+(item.read_at?'':'<button class="g" type="button" onclick="almoraMarkNotificationRead(\''+item.id+'\',\'chapter\')">Marcar como lida</button>')+'</div></article>';
       }).join('');
+      app.querySelectorAll('[data-contact-notification-read]').forEach(button=>button.addEventListener('click',()=>window.almoraMarkNotificationRead(button.dataset.contactNotificationRead,'contact')));
       window.almoraRefreshNotificationBadge();
     }catch(error){app.innerHTML='<div class="empty">Não foi possível carregar notificações: '+safe(error.message)+'</div>';}
   }
