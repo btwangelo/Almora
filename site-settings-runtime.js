@@ -8,7 +8,7 @@
     announcements_enabled:true,chapter_alerts_enabled:true,in_app_notifications:true,
     r2_max_upload_mb:80,allowed_extensions:'jpg,jpeg,png,webp,zip,cbz',
     max_chapter_pages:300,max_chapter_mb:120,require_rights:true,default_age_rating:'Livre',
-    session_timeout_minutes:60
+    session_timeout_minutes:60,site_name:'ALMORA',tagline:'Onde o amor não precisa de tradução.',site_description:'Leia histórias GL e BL na ALMORA. Descubra novas obras, acompanhe capítulos e organize sua biblioteca.',language:'pt-BR',timezone:'America/Sao_Paulo',date_format:'DD/MM/AAAA'
   };
   let status={...defaults},statusReady=false,roleReady=false,owner=false,loading=null,timeoutId=null;
   const route=()=>location.hash.slice(1).split('/')[0]||'home';
@@ -70,6 +70,15 @@
   }
 
   function applyDefaults(){
+    const siteName=String(status.site_name||'ALMORA').trim()||'ALMORA';
+    document.title=siteName+' | Leia histórias GL e BL';
+    document.documentElement.lang=status.language||'pt-BR';
+    const description=document.querySelector('meta[name="description"]');if(description)description.content=status.site_description||defaults.site_description;
+    const appName=document.querySelector('meta[name="application-name"]');if(appName)appName.content=siteName;
+    const ogName=document.querySelector('meta[property="og:site_name"]');if(ogName)ogName.content=siteName;
+    const footer=document.querySelector('footer');if(footer&&footer.firstChild?.nodeType===3)footer.firstChild.textContent=siteName+' — '+(status.tagline||defaults.tagline);
+    const logo=document.querySelector('header .logo');if(logo)logo.setAttribute('aria-label',siteName);
+    window.almoraLocaleSettings={language:status.language||'pt-BR',timezone:status.timezone||'America/Sao_Paulo',dateFormat:status.date_format||'DD/MM/AAAA'};
     const rating=document.getElementById('n_ag');
     if(rating&&status.default_age_rating&&[...rating.options].some(o=>o.value===status.default_age_rating))rating.value=status.default_age_rating;
     const rights=document.querySelector('#n_l')?.previousElementSibling;
