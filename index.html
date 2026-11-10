@@ -1870,7 +1870,7 @@ async function almoraPrepareBatch(input) {
       const archiveLimitMb=Number(window.almoraSiteSettings?.max_chapter_mb||120);
       if(file.size > archiveLimitMb*1024*1024) throw new Error('Cada arquivo compactado deve ter no máximo '+archiveLimitMb+' MB.');
       const batchExtension=file.name.split('.').pop().toLowerCase();
-      const allowedBatchExtensions=String(window.almoraSiteSettings?.allowed_extensions||'jpg,jpeg,png,webp,zip,cbz').split(',').map(x=>x.trim().toLowerCase().replace(/^\\./,'')).filter(Boolean);
+      const allowedBatchExtensions=String(window.almoraSiteSettings?.allowed_extensions||'jpg,jpeg,png,webp,zip,cbz').split(',').map(x=>x.trim().toLowerCase().replace(/^\./,'')).filter(Boolean);
       if(!allowedBatchExtensions.includes(batchExtension))throw new Error('A extensão .'+batchExtension+' não está permitida nas configurações do site.');
       if(!/\.(cbz|zip)$/i.test(file.name)) throw new Error('Use arquivos CBZ ou ZIP.');
       const parsed=almoraParseChapterFilename(file.name);
