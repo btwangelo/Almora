@@ -238,8 +238,11 @@
     const verified=await db().rpc('current_user_role');
     if(verified.error){host.innerHTML='<div class="empty">Não foi possível confirmar seu cargo. Atualize a página e tente novamente.</div>';return;}
     window.almoraStudioRole=verified.data||'reader';
-    if(!['superadmin','admin','moderator'].includes(window.almoraStudioRole)){
-      host.innerHTML='<section class="almora-settings-denied"><span class="almora-settings-denied-icon">🔒</span><div class="almora-settings-eyebrow">ACESSO RESTRITO</div><h2>Seu cargo não permite abrir as configurações.</h2><p>Seu cargo atual é <strong>'+esc(roleLabel(window.almoraStudioRole))+'</strong>. Solicite ao dono do ALMORA a revisão das suas permissões.</p></section>';return;
+    if(!['superadmin','admin'].includes(window.almoraStudioRole)){
+      const message=window.almoraStudioRole==='moderator'
+        ?'Moderadores podem usar as ferramentas de moderação, mas não podem alterar as configurações gerais do site. Esta área é reservada ao dono e aos administradores.'
+        :'Seu cargo atual não permite abrir o ALMORA Studio. Solicite ao dono a revisão das suas permissões.';
+      host.innerHTML='<section class="almora-settings-denied"><span class="almora-settings-denied-icon">🔒</span><div class="almora-settings-eyebrow">ACESSO RESTRITO</div><h2>Você não tem permissão para entrar nas configurações.</h2><p>Seu cargo atual é <strong>'+esc(roleLabel(window.almoraStudioRole))+'</strong>. '+esc(message)+'</p></section>';return;
     }
     renderHome();
     try{
