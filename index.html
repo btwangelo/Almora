@@ -1716,7 +1716,7 @@ if(r==='studio'&&window.almoraBatchRender) almoraBatchRender();
 if(r==='obra'&&user) syncWishlistButton(a);
 if(r==='obra'&&window.almoraLoadWorkFavoriteCount) almoraLoadWorkFavoriteCount(a);
 almoraUpdatePageMeta(r,a,b)}
-addEventListener('hashchange',()=>{scrollTo(0,0);ren()});
+addEventListener('hashchange',()=>{scrollTo(0,0);if(typeof window.ren==='function')window.ren();else ren()});
 $('#q').addEventListener('input',()=>{const r=location.hash.slice(1).split('/')[0];if(!['bl','gl','explorar'].includes(r))location.hash='#explorar';else ren()});
 $('#th').onclick=()=>{const d=document.documentElement,c=getComputedStyle(d).getPropertyValue('--bg').trim()==='#121214';d.dataset.theme=c?'light':'dark'};
 
@@ -5189,7 +5189,10 @@ window.almoraSavePrivacy = async function() {
     almoraSetMeta('meta[property="og:description"]', 'content', descriptions[route]);
     almoraSetMeta('meta[name="twitter:title"]', 'content', document.title);
     almoraSetMeta('meta[name="twitter:description"]', 'content', descriptions[route]);
+    if(route==='contato') window.almoraInitContactForm?.();
   };
+  // Re-renderiza rotas institucionais também em acesso direto por URL/hash.
+  if(Object.prototype.hasOwnProperty.call(pages,location.hash.slice(1).split('/')[0])) window.ren();
 })();
 </script>
 
@@ -5737,7 +5740,7 @@ window.almoraSavePrivacy = async function() {
 })();
 </script>
 <script src="site-settings-runtime.js?v=5"></script>
-  <script src="contact-form.js?v=5"></script>
-  <script src="contact-moderation.js?v=5"></script>
+  <script src="contact-form.js?v=6"></script>
+  <script src="contact-moderation.js?v=6"></script>
 </body>
 </html>
