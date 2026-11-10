@@ -26,6 +26,7 @@ jobs:
         run: |
           node --check social-profiles.js
           node --check studio-dashboard.js
+          node --check studio-settings.js
 
       - name: Check inline scripts in index.html
         run: |
