@@ -148,7 +148,7 @@
     if(staff.error)throw staff.error;if(profiles.error)throw profiles.error;
     const names=Object.fromEntries((profiles.data||[]).map(p=>[p.id,p]));
     const labels={owner:'Dono',admin:'Administrador',moderator:'Moderador',editor_bl:'Editor BL',editor_gl:'Editor GL',translator:'Tradutor',reviewer:'Revisor'};
-    const roleOptions=['admin','moderator','editor_bl','editor_gl','translator','reviewer'];
+    const roleOptions=['admin','moderator'];
     const rows=(staff.data||[]).map(item=>{
       const p=names[item.user_id]||{},name=p.display_name||p.username||'Conta da equipe';
       return '<div class="almora-staff-row"><span class="almora-staff-avatar">'+esc(name.slice(0,1).toUpperCase())+'</span><span><strong>'+esc(name)+'</strong><small>@'+esc(p.username||'conta')+'</small></span><b>'+esc(labels[item.role_key]||item.role_key)+'</b>'+(item.role_key==='owner'?'':'<button type="button" class="g almora-staff-remove" data-remove-role="'+esc(item.id)+'">Remover</button>')+'</div>';
