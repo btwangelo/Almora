@@ -19,7 +19,9 @@
     let nav=document.getElementById('almora-studio-dashboard-nav');
     if(!nav){
       nav=document.createElement('nav');nav.id='almora-studio-dashboard-nav';nav.className='almora-studio-dashboard-nav';nav.setAttribute('aria-label','Seções do Studio');
-      pages.forEach(([id,label])=>{
+      const role=window.almoraStudioRole||'admin';
+      const visiblePages=role==='moderator'?pages.filter(([id])=>['moderation','settings'].includes(id)):pages;
+      visiblePages.forEach(([id,label])=>{
         const button=document.createElement('button');button.type='button';button.className='g';button.dataset.studioPage=id;button.textContent=label;
         button.addEventListener('click',()=>window.almoraStudioPage(id));nav.appendChild(button);
       });
@@ -29,6 +31,11 @@
     if(!announcementPanel){
       announcementPanel=document.createElement('section');announcementPanel.id='almora-studio-announcements';announcementPanel.style.display='none';
       section.insertAdjacentElement('beforebegin',announcementPanel);
+    }
+    let settingsPanel=document.getElementById('almora-studio-settings');
+    if(!settingsPanel){
+      settingsPanel=document.createElement('section');settingsPanel.id='almora-studio-settings';settingsPanel.style.display='none';
+      section.insertAdjacentElement('beforebegin',settingsPanel);
     }
     const heading=workHeading(section);
     if(heading&&!document.getElementById('almora-studio-work-search')){
@@ -73,7 +80,13 @@
     });
   }
 
-  window.almoraStudioPage=page=>{if(!pages.some(item=>item[0]===page))return;activePage=page;if(page==='announcements'){const panel=document.getElementById('almora-studio-announcements');if(panel)panel.dataset.loaded='0';}applyPage();};
+  window.almoraStudioPage=page=>{
+    if(!pages.some(item=>item[0]===page))return;
+    if((window.almoraStudioRole||'admin')==='moderator'&&!['moderation','settings'].includes(page))return;
+    activePage=page;
+    if(page==='announcements'){const panel=document.getElementById('almora-studio-announcements');if(panel)panel.dataset.loaded='0';}
+    applyPage();
+  };
 
   function applyPage(){
     if(!isStudio()||!app)return;
@@ -83,7 +96,9 @@
     const toolbar=app.querySelector('[data-studio-toolbar]');
     const nav=document.getElementById('almora-studio-dashboard-nav');
     const announcementPanel=document.getElementById('almora-studio-announcements');
+    const settingsPanel=document.getElementById('almora-studio-settings');
     if(!section||!nav)return;
+    if((window.almoraStudioRole||'admin')==='moderator'&&!['moderation','settings'].includes(activePage))activePage='settings';
     const allBoxes=boxes(section);const forms=allBoxes.filter(box=>box.dataset.studioTranslate!=='true');
     const translate=allBoxes.find(box=>box.dataset.studioTranslate==='true');
     const heading=workHeading(section);const search=document.getElementById('almora-studio-work-search');
@@ -93,11 +108,16 @@
     else if(activePage==='analytics'&&typeof window.almoraStudioTab==='function')window.almoraStudioTab('stats');
     else if(typeof window.almoraStudioTab==='function')window.almoraStudioTab('works');
 
-    const showMain=['works','launch','chapters','settings'].includes(activePage);
+    const showMain=['works','launch','chapters'].includes(activePage);
     section.hidden=!showMain;section.style.display=showMain?'block':'none';
     if(announcementPanel){
       announcementPanel.hidden=activePage!=='announcements';announcementPanel.style.display=activePage==='announcements'?'block':'none';
       if(activePage==='announcements'&&announcementPanel.dataset.loaded!=='1'&&announcementPanel.dataset.loading!=='1')window.almoraLoadStudioAnnouncements?.();
+    }
+    if(settingsPanel){
+      settingsPanel.hidden=activePage!=='settings';
+      settingsPanel.style.display=activePage==='settings'?'block':'none';
+      if(activePage==='settings')window.almoraRenderStudioSettings?.();
     }
     if(moderation)moderation.style.display=activePage==='moderation'?'block':'none';
     if(analytics)analytics.style.display=activePage==='analytics'?'block':'none';
@@ -109,7 +129,7 @@
     if(heading)heading.hidden=activePage!=='works';
     listNodes.forEach(node=>{node.hidden=activePage!=='works'||node.dataset.studioTranslate==='true';});
     if(search){search.hidden=activePage!=='works';if(activePage==='works')filterWorks(search.value);}
-    if(translate)translate.hidden=activePage!=='settings';
+    if(translate)translate.hidden=true;
     if(toolbar){toolbar.hidden=activePage!=='settings';toolbar.style.display=activePage==='settings'?'flex':'none';}
     updateButtons();
   }
