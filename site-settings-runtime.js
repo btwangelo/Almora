@@ -120,8 +120,7 @@
   window.addEventListener('hashchange',()=>{
     refresh(true).then(()=>{if(typeof window.ren==='function')window.ren();});
   });
-  if(db()?.auth?.onAuthStateChange){
-    db().auth.onAuthStateChange((event)=>{if(!['SIGNED_IN','SIGNED_OUT','INITIAL_SESSION'].includes(event))return;roleReady=false;refresh(true).then(()=>{if(typeof window.ren==='function')window.ren();});});
-  }
+  const originalOut=window.out;
+  if(typeof originalOut==='function')window.out=async function(...args){const result=await originalOut.apply(this,args);await refresh(true);if(typeof window.ren==='function')window.ren();return result;};
   refresh(true).then(()=>{if(typeof window.ren==='function')window.ren();});
 })();
