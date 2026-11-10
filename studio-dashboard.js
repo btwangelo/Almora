@@ -8,7 +8,6 @@
     ['launch','Publicar obra','＋'],
     ['chapters','Capítulos','▥'],
     ['moderation','Moderação','⚑'],
-    ['inbox','Mensagens recebidas','✉'],
     ['analytics','Estatísticas','▥'],
     ['announcements','Anúncios','▧'],
     ['settings','Configurações','⚙']
@@ -20,7 +19,7 @@
   const workHeading=section=>[...section.querySelectorAll(':scope > h2')].find(h=>h.textContent.toLocaleLowerCase('pt-BR').includes('obras cadastradas'));
   const role=()=>window.almoraStudioRole||'admin';
   const roleName=()=>({superadmin:'Dono',admin:'Administrador',moderator:'Moderador'}[role()]||'Equipe ALMORA');
-  const allowed=id=>{const r=role();if(r==='superadmin'||r==='admin')return true;if(r==='moderator')return ['overview','moderation','inbox','settings'].includes(id);return false;};
+  const allowed=id=>{const r=role();if(r==='superadmin'||r==='admin')return true;if(r==='moderator')return ['overview','moderation','settings'].includes(id);return false;};
 
   function make(tag,cls,id){
     const el=document.createElement(tag);
@@ -48,8 +47,6 @@
 
     let announcementPanel=document.getElementById('almora-studio-announcements');
     if(!announcementPanel){announcementPanel=make('section','','almora-studio-announcements');announcementPanel.hidden=true;section.insertAdjacentElement('beforebegin',announcementPanel);}
-    let contactPanel=document.getElementById('almora-studio-contact-inbox');
-    if(!contactPanel){contactPanel=make('section','','almora-studio-contact-inbox');contactPanel.hidden=true;section.insertAdjacentElement('beforebegin',contactPanel);}
     let settingsPanel=document.getElementById('almora-studio-settings');
     if(!settingsPanel){settingsPanel=make('section','','almora-studio-settings');settingsPanel.hidden=true;section.insertAdjacentElement('beforebegin',settingsPanel);}
 
@@ -127,7 +124,6 @@
     const analytics=document.getElementById('almora-studio-statistics');
     const toolbar=app.querySelector('[data-studio-toolbar]');
     const announcementPanel=document.getElementById('almora-studio-announcements');
-    const contactPanel=document.getElementById('almora-studio-contact-inbox');
     const settingsPanel=document.getElementById('almora-studio-settings');
     const overview=document.getElementById('almora-studio-overview');
     if(!section||!document.getElementById('almora-studio-shell'))return;
@@ -145,7 +141,6 @@
     section.hidden=!showMain;section.style.display=showMain?'block':'none';
     if(overview){overview.hidden=activePage!=='overview';overview.style.display=activePage==='overview'?'block':'none';}
     if(announcementPanel){announcementPanel.hidden=activePage!=='announcements';announcementPanel.style.display=activePage==='announcements'?'block':'none';if(activePage==='announcements'&&announcementPanel.dataset.loaded!=='1'&&announcementPanel.dataset.loading!=='1')window.almoraLoadStudioAnnouncements?.();}
-    if(contactPanel){contactPanel.hidden=activePage!=='inbox';contactPanel.style.display=activePage==='inbox'?'block':'none';if(activePage==='inbox'&&contactPanel.dataset.loaded!=='1'&&contactPanel.dataset.loading!=='1')window.almoraLoadContactInbox?.();}
     if(settingsPanel){settingsPanel.hidden=activePage!=='settings';settingsPanel.style.display=activePage==='settings'?'block':'none';if(activePage==='settings'&&settingsPanel.dataset.loaded!=='1'){settingsPanel.dataset.loaded='1';window.almoraRenderStudioSettings?.();}else if(activePage!=='settings')settingsPanel.dataset.loaded='0';}
     if(moderation)moderation.style.display=activePage==='moderation'?'block':'none';
     if(analytics)analytics.style.display=activePage==='analytics'?'block':'none';
