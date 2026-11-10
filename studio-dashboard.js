@@ -117,7 +117,12 @@
     if(settingsPanel){
       settingsPanel.hidden=activePage!=='settings';
       settingsPanel.style.display=activePage==='settings'?'block':'none';
-      if(activePage==='settings')window.almoraRenderStudioSettings?.();
+      if(activePage==='settings'&&settingsPanel.dataset.loaded!=='1'){
+        settingsPanel.dataset.loaded='1';
+        window.almoraRenderStudioSettings?.();
+      }else if(activePage!=='settings'){
+        settingsPanel.dataset.loaded='0';
+      }
     }
     if(moderation)moderation.style.display=activePage==='moderation'?'block':'none';
     if(analytics)analytics.style.display=activePage==='analytics'?'block':'none';
