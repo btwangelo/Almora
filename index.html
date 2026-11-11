@@ -143,8 +143,11 @@ footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
 .almora-catalog-filters select{min-width:145px;max-width:100%;flex:1}
 .almora-tag{background:color-mix(in srgb,var(--ac) 18%,var(--sf2));color:var(--tx)}
 </style>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="preconnect" href="https://mcdinntggkanmsqubozn.supabase.co" crossorigin>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0"></script>
 <script>
 const ALMORA_URL = 'https://mcdinntggkanmsqubozn.supabase.co';
 const ALMORA_KEY = 'sb_publishable_dbymLTRkJyrohmyCjS6aPA_25sOAS61';
@@ -186,6 +189,21 @@ window.almoraDB = almoraDB;
 <div id="toast"></div>
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let almoraJSZipPromise=null;
+function almoraEnsureJSZip(){
+  if(window.JSZip)return Promise.resolve(window.JSZip);
+  if(!almoraJSZipPromise){
+    almoraJSZipPromise=new Promise((resolve,reject)=>{
+      const script=document.createElement('script');
+      script.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+      script.async=true;
+      script.onload=()=>window.JSZip?resolve(window.JSZip):reject(new Error('A biblioteca ZIP não ficou disponível.'));
+      script.onerror=()=>{almoraJSZipPromise=null;reject(new Error('Não foi possível carregar o leitor ZIP. Verifique sua conexão e tente novamente.'));};
+      document.head.appendChild(script);
+    });
+  }
+  return almoraJSZipPromise;
+}
 let S={works:[],prog:{},lib:{},fav:{},rate:{},bookmarks:{},pin:null},unlocked=false,draft=[],draftStatus='',chapterOrderDraft={};
 let almoraCatalogStatus='loading';
 try{Object.assign(S,JSON.parse(localStorage.getItem('almora')||'{}'))}catch(e){}
@@ -733,6 +751,8 @@ async function loadCatalog(){
 }
 
 async function initAuth(){
+  // Busca o catálogo em paralelo à restauração da sessão, sem serializar as duas esperas.
+  const catalogPromise=loadCatalog();
   try{
     const {data,error}=await almoraDB.auth.getSession();
     if(error)throw error;
@@ -741,7 +761,7 @@ async function initAuth(){
     head();
 
     // Exibe o catálogo assim que a consulta principal termina; dados pessoais sincronizam depois.
-    await loadCatalog();
+    await catalogPromise;
     ren();
     await Promise.allSettled([
       almoraSyncFavorites(),
@@ -1173,6 +1193,7 @@ async function pages(el){
   // Keep the current project preview visible while the selected file is processed.
   setPageStatus('Carregando conteúdo...',true);
   try{
+    if(files.some(file=>/\.(cbz|zip)$/i.test(file.name)))await almoraEnsureJSZip();
     const expanded=[];
     for(let fileIndex=0;fileIndex<files.length;fileIndex++){
       const file=files[fileIndex];
@@ -1185,7 +1206,6 @@ async function pages(el){
       if(!allowedExtensions.includes(ext))throw new Error('A extensão .'+ext+' não está permitida nas configurações do site.');
 
       if(ext==='cbz'||ext==='zip'){
-        if(typeof JSZip==='undefined')throw new Error('O leitor ZIP não carregou. Atualize a página e tente novamente.');
         const archive=await JSZip.loadAsync(file);
         const entries=Object.values(archive.files)
           .filter(entry=>!entry.dir&&!entry.name.split('/').some(part=>part==='__MACOSX'||part.startsWith('._'))&&/\.(jpe?g|png|webp|gif|avif)$/i.test(entry.name))
@@ -1877,7 +1897,13 @@ async function almoraPrepareBatch(input) {
     input.value='';
     return;
   }
-  if(typeof JSZip==='undefined') { toast('Leitor ZIP não carregado. Atualize a página.'); input.value=''; return; }
+  try{
+    await almoraEnsureJSZip();
+  }catch(error){
+    toast(error.message||'Não foi possível carregar o leitor ZIP.');
+    input.value='';
+    return;
+  }
 
   let maxOrder=Math.max(0,...work.chapters.map(c=>Number(c.order??c.n)||0),...almoraBatch.map(c=>Number(c.order)||0));
 
