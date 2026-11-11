@@ -608,23 +608,61 @@ async function syncWishlistButton(id){
    }
   }
 let obs;
-function reader(id,n){const w=W(id),c=w&&!w.archived&&w.chapters.find(c=>String(c.n)===n&&!c.archived);if(!c)return`<div class="empty">Capítulo não encontrado ou arquivado.</div>`;
-const cs=[...w.chapters].filter(x=>!x.archived).sort((a,b)=>(a.order??a.n)-(b.order??b.n)),i=cs.indexOf(c),p=S.prog[id]=S.prog[id]||{read:[]};
-if(p.n!==c.n){w.reads=(w.reads||0)+1}p.n=c.n;if(!p.read.includes(c.n))p.read.push(c.n);save();
-const nv=`<button class="g" ${i?`onclick="location.hash='#ler/${id}/${cs[i-1].n}'"`:'disabled'}>◀</button><button class="g" ${cs[i+1]?`onclick="location.hash='#ler/${id}/${cs[i+1].n}'"`:'disabled'}>▶</button>`;
-setTimeout(()=>{obs?.disconnect();obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){
-  S.prog[id].pg=+e.target.dataset.i;
-  const currentBookmarkKey=[id,c.n,S.prog[id].pg].join(':');
-  const bookmarkButton=document.getElementById('almora-page-bookmark');
-  if(bookmarkButton)bookmarkButton.textContent=S.bookmarks&&S.bookmarks[currentBookmarkKey]?'★ Página marcada':'☆ Marcar página';
-  save();
-  almoraSaveReadingProgress(id,c.n,S.prog[id].pg);
-  }
-  }),{threshold:.6});document.querySelectorAll('.rd img').forEach(im=>obs.observe(im));const pg=p.pg;if(pg&&p.n===c.n&&pg>0)document.querySelector(`.rd img[data-i="${pg}"]`)?.scrollIntoView()},50);
-const bookmarkKey=[id,c.n,p.pg||0].join(':');
-const isBookmarked=!!(S.bookmarks&&S.bookmarks[bookmarkKey]);
-return `<div class="bar"><a href="#obra/${id}"><button class="g">← ${esc(w.title)}</button></a>${nv}<span>${esc(almoraChapterDisplay(c))}${almoraChapterSubtitle(c)}</span><button class="g" type="button" id="almora-page-bookmark" onclick="almoraToggleBookmark('${id}','${c.n}',S.prog['${id}'].pg||0,this)">${isBookmarked?'★ Página marcada':'☆ Marcar página'}</button><input type="range" min="360" max="1000" value="${parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720}" oninput="document.documentElement.style.setProperty('--w',this.value+'px')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div>
-<div class="rd">${c.pages.map((s,k)=>`<img data-i="${k}" loading="${k<3?'eager':'lazy'}" src="${s}" alt="Página ${k+1}" onerror="this.alt='Erro ao carregar a página ${k+1}'">`).join('')}</div><div class="bar" style="position:static;justify-content:center">${nv}</div>`}
+let almoraReaderRequest=0;
+async function almoraLoadChapterPages(chapter,request){
+  if(Array.isArray(chapter.pages)&&chapter.pages.length)return chapter.pages;
+  const {data,error}=await almoraDB.from('pages').select('image_url,page_number').eq('chapter_id',chapter.id).order('page_number',{ascending:true});
+  if(error)throw error;
+  chapter.pages=(data||[]).map(page=>page.image_url).filter(Boolean);
+  if(request!==almoraReaderRequest)return chapter.pages;
+  const container=document.querySelector('.rd');
+  if(!container)return chapter.pages;
+  if(!chapter.pages.length){container.innerHTML='<div class="empty">Este capítulo ainda não possui páginas.</div>';return chapter.pages;}
+  container.innerHTML=chapter.pages.map((src,index)=>'<img data-i="'+index+'" loading="'+(index<2?'eager':'lazy')+'" decoding="async" src="'+esc(src)+'" alt="Página '+(index+1)+'" onerror="this.alt=\'Erro ao carregar a página '+(index+1)+'\'">').join('');
+  obs?.disconnect();
+  obs=new IntersectionObserver(entries=>entries.forEach(entry=>{
+    if(!entry.isIntersecting)return;
+    const pageIndex=+entry.target.dataset.i;
+    S.prog[chapter.work_id].pg=pageIndex;
+    const key=[chapter.work_id,chapter.n,pageIndex].join(':');
+    const button=document.getElementById('almora-page-bookmark');
+    if(button)button.textContent=S.bookmarks&&S.bookmarks[key]?'★ Página marcada':'☆ Marcar página';
+    save();almoraSaveReadingProgress(chapter.work_id,chapter.n,pageIndex);
+  }),{threshold:.6});
+  container.querySelectorAll('img').forEach(img=>obs.observe(img));
+  const saved=S.prog[chapter.work_id]?.pg||0;
+  if(saved>0)container.querySelector('img[data-i="'+saved+'"]')?.scrollIntoView();
+  return chapter.pages;
+}
+function reader(id,n){
+  const w=W(id),c=w&&!w.archived&&w.chapters.find(ch=>String(ch.n)===n&&!ch.archived);
+  if(!c)return '<div class="empty">Capítulo não encontrado ou arquivado.</div>';
+  const request=++almoraReaderRequest;
+  const chapters=[...w.chapters].filter(x=>!x.archived).sort((a,b)=>(a.order??a.n)-(b.order??b.n));
+  const index=chapters.indexOf(c),progress=S.prog[id]=S.prog[id]||{read:[]};
+  if(progress.n!==c.n)w.reads=(w.reads||0)+1;
+  progress.n=c.n;if(!progress.read.includes(c.n))progress.read.push(c.n);save();
+  const navButtons='<button class="g" '+(index?('onclick="location.hash=\'#ler/'+id+'/'+chapters[index-1].n+'\'"'):'disabled')+'>◀</button><button class="g" '+(chapters[index+1]?('onclick="location.hash=\'#ler/'+id+'/'+chapters[index+1].n+'\'"'):'disabled')+'>▶</button>';
+  const key=[id,c.n,progress.pg||0].join(':');
+  const bookmarked=!!(S.bookmarks&&S.bookmarks[key]);
+  setTimeout(()=>{
+    if(request!==almoraReaderRequest)return;
+    if(Array.isArray(c.pages)&&c.pages.length){
+      const container=document.querySelector('.rd');
+      if(container)container.innerHTML=c.pages.map((src,k)=>'<img data-i="'+k+'" loading="'+(k<2?'eager':'lazy')+'" decoding="async" src="'+esc(src)+'" alt="Página '+(k+1)+'">').join('');
+      obs?.disconnect();
+      obs=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){const page=+entry.target.dataset.i;S.prog[id].pg=page;save();almoraSaveReadingProgress(id,c.n,page);}}),{threshold:.6});
+      document.querySelectorAll('.rd img').forEach(img=>obs.observe(img));
+    }else{
+      almoraLoadChapterPages(c,request).catch(error=>{
+        console.error('Erro ao carregar páginas do capítulo:',error);
+        const container=document.querySelector('.rd');
+        if(container)container.innerHTML='<div class="empty">Não foi possível carregar este capítulo. Tente novamente.</div>';
+      });
+    }
+  },0);
+  return '<div class="bar"><a href="#obra/'+id+'"><button class="g">← '+esc(w.title)+'</button></a>'+navButtons+'<span>'+esc(almoraChapterDisplay(c))+almoraChapterSubtitle(c)+'</span><button class="g" type="button" id="almora-page-bookmark" onclick="almoraToggleBookmark(\''+id+'\',\''+c.n+'\',S.prog[\''+id+'\'].pg||0,this)">'+(bookmarked?'★ Página marcada':'☆ Marcar página')+'</button><input type="range" min="360" max="1000" value="'+(parseInt(getComputedStyle(document.documentElement).getPropertyValue('--w'))||720)+'" oninput="document.documentElement.style.setProperty(\'--w\',this.value+\'px\')" title="Largura"><button class="g" onclick="document.documentElement.requestFullscreen?.()">⛶</button></div><div class="rd"><div class="empty">Carregando páginas do capítulo...</div></div><div class="bar" style="position:static;justify-content:center">'+navButtons+'</div>';
+}
 /* CONTA / AUTH (Firebase Authentication) */
 /* Cole aqui a config do seu app web no Firebase (Console > Configurações do projeto > Seus apps) */
 
@@ -646,83 +684,47 @@ async function loadCatalog(){
   try{
     const [
       {data:works,error:worksError},
-      {data:chapters,error:chaptersError},
-      {data:pages,error:pagesError}
-    ] = await Promise.all([
+      {data:chapters,error:chaptersError}
+    ]=await Promise.all([
       almoraDB.from('works').select('*').order('created_at',{ascending:false}),
-      almoraDB.from('chapters').select('*').order('reading_order',{ascending:true}).order('chapter_number',{ascending:true}),
-      almoraDB.from('pages').select('*').order('page_number')
+      almoraDB.from('chapters').select('*').order('reading_order',{ascending:true}).order('chapter_number',{ascending:true})
     ]);
-
     if(worksError)throw worksError;
     if(chaptersError)throw chaptersError;
-    if(pagesError)throw pagesError;
-
     const oldWorks=S.works||[];
-    const pageGroups={};
-
-    pages.forEach(p=>{
-      if(!pageGroups[p.chapter_id])pageGroups[p.chapter_id]=[];
-      pageGroups[p.chapter_id].push(p);
-    });
-
     const chapterGroups={};
-
-    chapters.forEach(c=>{
-      if(!chapterGroups[c.work_id])chapterGroups[c.work_id]=[];
-
-      const chapterPages=(pageGroups[c.id]||[])
-        .sort((a,b)=>a.page_number-b.page_number)
-        .map(p=>p.image_url);
-
-      chapterGroups[c.work_id].push({
-        id:c.id,
-        n:Number(c.chapter_number),
-        title:c.title||'',
-        type:c.chapter_type||'chapter',
-        label:c.chapter_label||'',
-        order:Number(c.reading_order??c.chapter_number),
-        archived:!!c.archived,
-        date:new Date(c.created_at).getTime(),
-        pages:chapterPages
+    chapters.forEach(chapter=>{
+      if(!chapterGroups[chapter.work_id])chapterGroups[chapter.work_id]=[];
+      chapterGroups[chapter.work_id].push({
+        id:chapter.id,n:Number(chapter.chapter_number),title:chapter.title||'',
+        type:chapter.chapter_type||'chapter',label:chapter.chapter_label||'',
+        order:Number(chapter.reading_order??chapter.chapter_number),
+        archived:!!chapter.archived,date:new Date(chapter.created_at).getTime(),
+        work_id:chapter.work_id,pages:[]
       });
     });
-
-    const remoteWorks=works.map(w=>{
-      const old=oldWorks.find(x=>x.id===w.id);
-
+    const remoteWorks=works.map(work=>{
+      const old=oldWorks.find(item=>item.id===work.id);
       return {
-        id:w.id,
-        title:w.title,
-        alt:w.alternative_title||'',
-        cat:w.work_type,
-        author:w.author_name||'',
-        illus:w.illustrator||'',
-        genres:(w.genre||[]).join(', '),
-        tropes:Array.isArray(w.tropes)?w.tropes:[],
-        age:w.age_rating,
-        status:w.work_status||'Em andamento',
-        rights:w.rights_holder||'',
-        synopsis:w.synopsis||'',
-        cover:w.cover_url||'',
-        created:new Date(w.created_at).getTime(),
-        reads:old?.reads||0,
-        archived:!!w.archived,
-        chapters:chapterGroups[w.id]||[]
+        id:work.id,title:work.title,alt:work.alternative_title||'',cat:work.work_type,
+        author:work.author_name||'',illus:work.illustrator||'',
+        genres:(work.genre||[]).join(', '),tropes:Array.isArray(work.tropes)?work.tropes:[],
+        age:work.age_rating,status:work.work_status||'Em andamento',
+        rights:work.rights_holder||'',synopsis:work.synopsis||'',
+        cover:work.cover_url||'',created:new Date(work.created_at).getTime(),
+        reads:old?.reads||0,archived:!!work.archived,chapters:chapterGroups[work.id]||[]
       };
     });
-
     S.works=remoteWorks;
-    // Guarda os dados de navegação sem as imagens das páginas, evitando exceder a cota local.
     try{
-      const catalogCache=remoteWorks.map(w=>({...w,chapters:(w.chapters||[]).map(c=>({...c,pages:[]}))}));
-      localStorage.setItem('almora_catalog_cache',JSON.stringify(catalogCache));
-    }catch(cacheError){
-      console.warn('Não foi possível atualizar o cache do catálogo:',cacheError);
-    }
-  }catch(e){
-    console.error('Erro ao carregar catálogo:',e);
-    toast('Erro ao carregar catálogo: '+e.message);
+      const cache=remoteWorks.map(work=>({...work,chapters:work.chapters.map(chapter=>({...chapter,pages:[]}))}));
+      localStorage.setItem('almora_catalog_cache',JSON.stringify(cache));
+    }catch(cacheError){console.warn('Não foi possível atualizar o cache do catálogo:',cacheError);}
+    return true;
+  }catch(error){
+    console.error('Erro ao carregar catálogo:',error);
+    toast('Erro ao carregar catálogo: '+error.message);
+    return false;
   }
 }
 
@@ -5743,3 +5745,16 @@ window.almoraSavePrivacy = async function() {
   <script src="contact-moderation.js?v=6"></script>
 </body>
 </html>
+
+<style id="almora-motion-refinement">
+:root{--almora-ease:cubic-bezier(.22,.61,.36,1);--almora-motion-fast:180ms;--almora-motion:260ms}
+#app{animation:almoraContentReveal 300ms var(--almora-ease) both}
+#app .card,#app .work-card,#app .item,#app button,#app .btn,#app input,#app select,#app textarea,
+#app a,.bar,.almora-account-menu,#toast{
+ transition-property:transform,opacity,box-shadow,border-color,background-color,color,filter;
+ transition-duration:var(--almora-motion);
+ transition-timing-function:var(--almora-ease)
+}
+@keyframes almoraContentReveal{from{opacity:.72;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){#app{animation:none!important}#app *,.bar,.almora-account-menu,#toast{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
+</style>
