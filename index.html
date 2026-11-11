@@ -5757,4 +5757,26 @@ window.almoraSavePrivacy = async function() {
  transition-timing-function:var(--almora-ease)
 }
 @media(prefers-reduced-motion:reduce){#app{animation:none!important}#app *,.bar,.almora-account-menu,#toast{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
+/* Camada global de movimento: inclui componentes injetados por módulos externos. */
+:where(button,a,[role="button"],input,select,textarea,
+.card,.work-card,.item,.almora-studio-nav-item,.almora-studio-quick-grid button,
+.almora-settings-card,.almora-contact-modal-overlay,.almora-contact-modal,
+.almora-account-menu,.bar,#toast){
+  transition-property:transform,opacity,box-shadow,border-color,background-color,color,filter;
+  transition-duration:var(--almora-motion,240ms);
+  transition-timing-function:var(--almora-ease,cubic-bezier(.2,.75,.25,1));
+}
+.almora-contact-modal-overlay{animation-duration:220ms!important;animation-timing-function:var(--almora-ease)!important}
+.almora-contact-modal{animation-duration:260ms!important;animation-timing-function:var(--almora-ease)!important}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    scroll-behavior:auto!important;
+    animation-duration:.01ms!important;
+    animation-delay:0ms!important;
+    animation-iteration-count:1!important;
+    transition-duration:.01ms!important;
+    transition-delay:0ms!important;
+  }
+}
 </style>
