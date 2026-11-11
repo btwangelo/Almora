@@ -1711,14 +1711,12 @@ function almoraUpdatePageMeta(route,id,chapter){
     structured.textContent='';
   }
 }
-let almoraLastAnimatedView='';
+let almoraEntryAnimationPlayed=false;
 function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
 A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():r==='comunidade'?'<section class="almora-directory"><h1>Comunidade</h1><div class="empty">Carregando leitores...</div></section>':r==='conexoes'?'<section class="almora-connections-page"><div class="empty">Carregando conexões...</div></section>':home();
-const animationKey=h;
-if(animationKey!==almoraLastAnimatedView){
-  almoraLastAnimatedView=animationKey;
-  A.classList.remove('almora-entering');
-  requestAnimationFrame(()=>{A.classList.add('almora-entering');});
+if(!almoraEntryAnimationPlayed){
+  almoraEntryAnimationPlayed=true;
+  requestAnimationFrame(()=>A.classList.add('almora-entering'));
 }
 if(r==='contato') window.almoraInitContactForm?.();
 if(r==='studio'){
@@ -2154,40 +2152,12 @@ ren();initAuth();
   }
 }
 
-@keyframes almoraCardIn {
-  from {
-    opacity: 0;
-    transform: translateY(16px) scale(.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
 #app.almora-entering {
   animation: almoraPageIn .4s ease both;
 }
 
-#app.almora-entering .card {
-  animation: almoraCardIn .45s ease both;
-}
-
-#app.almora-entering .card:nth-child(2) {
-  animation-delay: .04s;
-}
-
-#app.almora-entering .card:nth-child(3) {
-  animation-delay: .08s;
-}
-
-#app.almora-entering .card:nth-child(4) {
-  animation-delay: .12s;
-}
-
-#app.almora-entering .card:nth-child(5) {
-  animation-delay: .16s;
-}
+/* Os cartões não recebem animação de entrada própria.
+   Isso evita reinícios quando o catálogo é atualizado e recria seus elementos. */
 
 /* As imagens do leitor usam apenas o fade-in de carregamento abaixo. */
 
