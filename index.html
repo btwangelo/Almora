@@ -5750,13 +5750,11 @@ window.almoraSavePrivacy = async function() {
 
 <style id="almora-motion-refinement">
 :root{--almora-ease:cubic-bezier(.2,.75,.25,1);--almora-motion-fast:160ms;--almora-motion:240ms}
-#app{will-change:opacity,transform}
 #app .card,#app .work-card,#app .item,#app button,#app .btn,#app input,#app select,#app textarea,
 #app a,.bar,.almora-account-menu,#toast{
  transition-property:transform,opacity,box-shadow,border-color,background-color,color,filter;
  transition-duration:var(--almora-motion);
  transition-timing-function:var(--almora-ease)
 }
-@keyframes almoraContentReveal{from{opacity:.72;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){#app{animation:none!important}#app *,.bar,.almora-account-menu,#toast{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}}
 </style>
