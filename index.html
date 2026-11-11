@@ -187,6 +187,7 @@ window.almoraDB = almoraDB;
 <script>
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let S={works:[],prog:{},lib:{},fav:{},rate:{},bookmarks:{},pin:null},unlocked=false,draft=[],draftStatus='',chapterOrderDraft={};
+let almoraCatalogStatus='loading';
 try{Object.assign(S,JSON.parse(localStorage.getItem('almora')||'{}'))}catch(e){}
  
 // Restaura imediatamente o catálogo da última visita; o Supabase atualiza em segundo plano.
@@ -195,6 +196,7 @@ try{
   const currentRoute=(location.hash.slice(1)||'home').split('/')[0];
   if(Array.isArray(cachedCatalog)&&cachedCatalog.length&&currentRoute!=='ler'){
     S.works=cachedCatalog;
+    almoraCatalogStatus='cached';
   }
 }catch(e){console.warn('Cache local do catálogo indisponível:',e)}
 
@@ -221,7 +223,7 @@ const last=w=>w.chapters.length?Math.max(...w.chapters.map(c=>c.date)):w.created
 const ago=d=>{const h=(Date.now()-d)/36e5;return h<1?'agora':h<24?Math.floor(h)+' h atrás':h<48?'1 dia atrás':h<720?Math.floor(h/24)+' dias atrás':new Date(d).toLocaleDateString('pt-BR')};
 const cover=w=>w.cover?`style="background-image:url(${w.cover})"`:'';
 const card=(w,extra='',rank)=>`<a class="card" href="#obra/${w.id}"><div class="cv" ${cover(w)}>${rank?`<b>${rank}</b>`:''}${w.reads?`<i>👁 ${w.reads}</i>`:''}</div><div class="t">${esc(w.title)}</div>${extra}</a>`;
-const sec=(t,ws,fn)=>`<h2>${t}</h2>`+(ws.length?fn(ws):`<div class="empty">Nenhuma obra ainda.</div>`);
+const sec=(t,ws,fn)=>`<h2>${t}</h2>`+(ws.length?fn(ws):almoraCatalogStatus==='loading'?`<div class="empty" aria-live="polite">Carregando catálogo...</div>`:almoraCatalogStatus==='error'?`<div class="empty" role="status">Não foi possível carregar o catálogo. Verifique sua conexão e tente novamente.</div>`:`<div class="empty">Nenhuma obra ainda.</div>`);
 const rowOf=ws=>`<div class="row">${ws.map((w,i)=>card(w,'',i+1)).join('')}</div>`;
 const gridOf=ws=>`<div class="grid">${ws.map(w=>card(w)).join('')}</div>`;
 function almoraChapterDisplay(c){
@@ -256,7 +258,7 @@ function nav(r){
   window.almoraRefreshNotificationBadge?.();
   }
 function home(){const p=pub(),byR=[...p].sort((a,b)=>(b.reads||0)-(a.reads||0)),byU=[...p].sort((a,b)=>last(b)-last(a));
-return (p.length?'':`<div class="empty"><b>Bem-vindo(a) à ALMORA.</b><br>O catálogo está vazio. Cadastre a primeira obra no <a href="#studio" style="color:var(--ac)"><u>ALMORA STUDIO</u></a>.</div>`)+
+return (p.length?'':almoraCatalogStatus==='loading'?`<div class="empty" aria-live="polite">Carregando catálogo...</div>`:almoraCatalogStatus==='error'?`<div class="empty" role="status">Não foi possível carregar as obras. Verifique sua conexão e tente novamente.</div>`:`<div class="empty"><b>Bem-vindo(a) à ALMORA.</b><br>O catálogo está vazio. Cadastre a primeira obra no <a href="#studio" style="color:var(--ac)"><u>ALMORA STUDIO</u></a>.</div>`)+
 sec('Popular hoje',byR.filter(w=>w.reads).slice(0,10),rowOf)+sec('Últimas atualizações',byU.filter(w=>w.chapters.length).slice(0,12),upd)+
 sec('BL em destaque',byU.filter(w=>w.cat==='BL').slice(0,8),rowOf)+sec('GL em destaque',byU.filter(w=>w.cat==='GL').slice(0,8),rowOf)+
 sec('Recém-adicionadas',[...p].sort((a,b)=>b.created-a.created).slice(0,8),rowOf)+sec('Concluídas',p.filter(w=>w.status==='Concluída').slice(0,8),rowOf)}
@@ -716,6 +718,7 @@ async function loadCatalog(){
       };
     });
     S.works=remoteWorks;
+    almoraCatalogStatus='loaded';
     try{
       const cache=remoteWorks.map(work=>({...work,chapters:work.chapters.map(chapter=>({...chapter,pages:[]}))}));
       localStorage.setItem('almora_catalog_cache',JSON.stringify(cache));
@@ -723,6 +726,7 @@ async function loadCatalog(){
     return true;
   }catch(error){
     console.error('Erro ao carregar catálogo:',error);
+    almoraCatalogStatus=S.works.length?'cached':'error';
     toast('Erro ao carregar catálogo: '+error.message);
     return false;
   }
@@ -736,9 +740,10 @@ async function initAuth(){
     user=data.session?.user||null;
     head();
 
-    // Mantém a página já desenhada visível enquanto os dados atuais são sincronizados.
+    // Exibe o catálogo assim que a consulta principal termina; dados pessoais sincronizam depois.
     await loadCatalog();
-    await Promise.all([
+    ren();
+    await Promise.allSettled([
       almoraSyncFavorites(),
       almoraSyncReadingProgress()
     ]);
@@ -750,8 +755,11 @@ async function initAuth(){
 
       if(event==='SIGNED_IN' || event==='SIGNED_OUT'){
         loadCatalog().then(async()=>{
-          await almoraSyncFavorites();
-          await almoraSyncReadingProgress();
+          ren();
+          await Promise.allSettled([
+            almoraSyncFavorites(),
+            almoraSyncReadingProgress()
+          ]);
           ren();
         });
       }else if((location.hash.slice(1)||'home').split('/')[0]==='conta'){
@@ -1703,8 +1711,15 @@ function almoraUpdatePageMeta(route,id,chapter){
     structured.textContent='';
   }
 }
+let almoraLastAnimatedView='';
 function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
 A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():r==='comunidade'?'<section class="almora-directory"><h1>Comunidade</h1><div class="empty">Carregando leitores...</div></section>':r==='conexoes'?'<section class="almora-connections-page"><div class="empty">Carregando conexões...</div></section>':home();
+const animationKey=r+':'+almoraCatalogStatus;
+if(animationKey!==almoraLastAnimatedView){
+  almoraLastAnimatedView=animationKey;
+  A.classList.remove('almora-entering');
+  requestAnimationFrame(()=>{A.classList.add('almora-entering');});
+}
 if(r==='contato') window.almoraInitContactForm?.();
 if(r==='studio'){
   drawD();
@@ -2184,20 +2199,7 @@ ren();initAuth();
 }
 </style>
 
-<script>
-(() => {
-  const app = document.querySelector('#app');
-  if (!app) return;
 
-  // A entrada acontece uma única vez por carregamento completo do site.
-  // Navegações e re-renderizações internas não reiniciam a animação.
-  app.classList.add('almora-entering');
-
-  window.setTimeout(() => {
-    app.classList.remove('almora-entering');
-  }, 700);
-})();
-</script>
 
 <style>
 /* ALMORA — carregamento de imagens */
@@ -5747,8 +5749,8 @@ window.almoraSavePrivacy = async function() {
 </html>
 
 <style id="almora-motion-refinement">
-:root{--almora-ease:cubic-bezier(.22,.61,.36,1);--almora-motion-fast:180ms;--almora-motion:260ms}
-#app{animation:almoraContentReveal 300ms var(--almora-ease) both}
+:root{--almora-ease:cubic-bezier(.2,.75,.25,1);--almora-motion-fast:160ms;--almora-motion:240ms}
+#app{will-change:opacity,transform}
 #app .card,#app .work-card,#app .item,#app button,#app .btn,#app input,#app select,#app textarea,
 #app a,.bar,.almora-account-menu,#toast{
  transition-property:transform,opacity,box-shadow,border-color,background-color,color,filter;
