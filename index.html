@@ -1122,7 +1122,7 @@ ${adminChapterOrder(w).map((c,index,list)=>`
 <div class="almora-chapter-admin-main">
   <div class="almora-chapter-admin-title"><span class="almora-chapter-kind">${({chapter:'CAPÍTULO',extra:'EXTRA',special:'ESPECIAL',prologue:'PRÓLOGO',epilogue:'EPÍLOGO'})[c.type||'chapter']||'CAPÍTULO'}</span>${esc(almoraChapterDisplay(c))}${c.archived?'<span class="pill">Arquivado</span>':''}</div>
   ${c.title&&c.title!==c.label?'<div style="margin-top:3px;font-size:13px;color:var(--mu)">'+esc(c.title)+'</div>':''}
-  <div class="almora-chapter-admin-meta"><span>Posição: ${index+1}</span><span>${c.pages.length} páginas</span><span>${ago(c.date)}</span><span>ID: ${esc(String(c.id).slice(0,8))}</span></div>
+  <div class="almora-chapter-admin-meta"><span>Posição: ${index+1}</span><span>${c.pageCount??c.pages.length} páginas</span><span>${ago(c.date)}</span><span>ID: ${esc(String(c.id).slice(0,8))}</span></div>
 </div>
 <div class="almora-chapter-admin-actions">
   <button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},-1)" ${index===0?'disabled':''} title="Mover para cima" aria-label="Mover capítulo para cima">↑</button>
@@ -1781,9 +1781,9 @@ async function loadStudioChapterPreviews(){
   if(almoraStudioPreviewPromise)return almoraStudioPreviewPromise;
   const chapters=(S.works||[]).flatMap(work=>work.chapters||[]).filter(chapter=>chapter.id&&!chapter.previewLoaded);if(!chapters.length)return;
   almoraStudioPreviewPromise=(async()=>{try{
-    const {data,error}=await almoraDB.from('pages').select('chapter_id,image_url,page_number').in('chapter_id',chapters.map(chapter=>chapter.id)).order('page_number',{ascending:true}).limit(5000);if(error)throw error;
-    const previews=new Map();(data||[]).forEach(page=>{if(!previews.has(String(page.chapter_id)))previews.set(String(page.chapter_id),page.image_url);});
-    (S.works||[]).forEach(work=>(work.chapters||[]).forEach(chapter=>{chapter.preview=previews.get(String(chapter.id))||'';chapter.previewLoaded=true;}));
+    const rows=[];for(let offset=0;;offset+=1000){const {data,error}=await almoraDB.from('pages').select('chapter_id,image_url,page_number').in('chapter_id',chapters.map(chapter=>chapter.id)).order('chapter_id',{ascending:true}).order('page_number',{ascending:true}).range(offset,offset+999);if(error)throw error;rows.push(...(data||[]));if(!data||data.length<1000)break;}
+    const previews=new Map(),pageCounts=new Map();rows.forEach(page=>{const key=String(page.chapter_id);pageCounts.set(key,(pageCounts.get(key)||0)+1);if(!previews.has(key))previews.set(key,page.image_url);});
+    (S.works||[]).forEach(work=>(work.chapters||[]).forEach(chapter=>{const key=String(chapter.id);chapter.preview=previews.get(key)||'';chapter.pageCount=pageCounts.get(key)||0;chapter.previewLoaded=true;}));
     if((location.hash.slice(1)||'').split('/')[0]==='studio')ren();
   }catch(error){console.warn('Pré-visualizações dos capítulos indisponíveis:',error);}finally{almoraStudioPreviewPromise=null;}})();return almoraStudioPreviewPromise;
 }
