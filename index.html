@@ -142,6 +142,13 @@ footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
 .almora-catalog-filters{align-items:stretch}
 .almora-catalog-filters select{min-width:145px;max-width:100%;flex:1}
 .almora-tag{background:color-mix(in srgb,var(--ac) 18%,var(--sf2));color:var(--tx)}
+
+/* Aviso compacto de desenvolvimento acima do cabeçalho */
+.almora-dev-notice{display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 14px;background:var(--sf);border-bottom:1px solid var(--bd);color:var(--mu);font-size:11px;line-height:1.35;text-align:center}
+.almora-dev-logo{display:flex;align-items:center;flex:0 0 auto;font:700 17px Fredoka,sans-serif;letter-spacing:.4px;color:var(--ac2)}
+.almora-dev-logo svg{width:19px;height:18px;margin:0 1px}
+.almora-dev-notice>span{min-width:0}
+@media(max-width:520px){.almora-dev-notice{gap:7px;padding:6px 9px;font-size:10px}.almora-dev-logo{font-size:14px}.almora-dev-logo svg{width:16px;height:15px}}
 </style>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://mcdinntggkanmsqubozn.supabase.co" crossorigin>
@@ -177,6 +184,10 @@ window.almoraDB = almoraDB;
   <meta name="google-site-verification" content="xhRX0O2ix--ol6lqN-6pzjMJGHMx2MR1Ddh1bO6XWX8" />
 </head>
 <body>
+<div class="almora-dev-notice" role="note" aria-label="Aviso sobre o projeto ALMORA">
+  <a class="almora-dev-logo" href="#home" aria-label="ALMORA">Alm<svg viewBox="0 0 100 92" aria-hidden="true"><path d="M8 8l32 14c14-5 26-5 40 0l12-14 4 40c-2 20-14 34-34 40-24-3-40-18-46-38z" fill="#050508" transform="translate(-2 0)"/><path d="M50 36l4 9h10l-8 6 3 10-9-6-9 6 3-10-8-6h10z" fill="#e2d9fa" transform="translate(-6 -2) scale(.9)"/><path d="M62 38c10-5 18-3 20 0-4 12-12 18-20 16z" fill="#b13df5"/></svg>ra</a>
+  <span>O ALMORA é um projeto independente em desenvolvimento. Novas obras estão chegando gradualmente! Ajude-nos a espalhar essa iniciativa.</span>
+</div>
 <header>
 <a class="logo" href="#home" aria-label="ALMORA">Alm<svg viewBox="0 0 100 92"><path d="M8 8l32 14c14-5 26-5 40 0l12-14 4 40c-2 20-14 34-34 40-24-3-40-18-46-38z" fill="#050508" transform="translate(-2 0)"/><path d="M50 36l4 9h10l-8 6 3 10-9-6-9 6 3-10-8-6h10z" fill="#e2d9fa" transform="translate(-6 -2) scale(.9)"/><path d="M62 38c10-5 18-3 20 0-4 12-12 18-20 16z" fill="#b13df5"/></svg>ra</a>
 <nav id="nav"></nav>
