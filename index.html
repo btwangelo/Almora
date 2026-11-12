@@ -142,6 +142,34 @@ footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
 .almora-catalog-filters{align-items:stretch}
 .almora-catalog-filters select{min-width:145px;max-width:100%;flex:1}
 .almora-tag{background:color-mix(in srgb,var(--ac) 18%,var(--sf2));color:var(--tx)}
+.almora-chapter-publish{border-color:color-mix(in srgb,var(--ac) 45%,var(--bd));background:linear-gradient(145deg,color-mix(in srgb,var(--ac) 7%,var(--sf)),var(--sf) 52%)}
+.almora-section-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.almora-section-heading>div{display:grid;gap:3px}
+.almora-section-heading b{font-size:18px}
+.almora-section-heading small,.almora-field-help{color:var(--mu);font-size:12px}
+.almora-eyebrow{color:var(--ac);font-size:10px;font-weight:800;letter-spacing:.12em}
+.almora-chapter-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:end}
+.almora-chapter-fields>div{min-width:0}
+.almora-chapter-fields input,.almora-chapter-fields select{width:100%}
+.almora-order-hint{display:flex;gap:8px;align-items:center;padding:10px;border-radius:9px;background:var(--sf2);color:var(--mu);font-size:12px;line-height:1.4}
+.almora-order-hint span{color:var(--ac);font-size:18px}
+.almora-chapter-admin{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;margin-top:9px;border:1px solid var(--bd);border-radius:12px;background:var(--sf)}
+.almora-chapter-admin-main{min-width:0}
+.almora-chapter-admin-title{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-weight:700;overflow-wrap:anywhere}
+.almora-chapter-admin-meta{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:6px;color:var(--mu);font-size:12px}
+.almora-chapter-kind{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;background:color-mix(in srgb,var(--ac) 18%,var(--sf2));color:var(--tx);font-size:10px;font-weight:800;letter-spacing:.04em;text-transform:uppercase}
+.almora-chapter-admin-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}
+.almora-chapter-admin-actions button{padding:7px 9px;font-size:12px}
+.almora-chapter-reader-list{display:grid;gap:8px}
+.almora-chapter-reader{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--bd);border-radius:12px;background:var(--sf);transition:border-color .2s,transform .2s}
+.almora-chapter-reader:hover{border-color:var(--ac);transform:translateY(-1px)}
+.almora-chapter-reader-main{min-width:0}
+.almora-chapter-reader-label{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font-weight:700;overflow-wrap:anywhere}
+.almora-chapter-reader-title{display:block;margin-top:3px;color:var(--mu);font-size:13px;overflow-wrap:anywhere}
+.almora-chapter-reader-meta{display:flex;flex-wrap:wrap;gap:5px 12px;margin-top:5px;color:var(--mu);font-size:11px}
+.almora-chapter-reader-go{color:var(--ac);font-size:20px;font-weight:700}
+@media(max-width:560px){.almora-chapter-fields{grid-template-columns:1fr}.almora-chapter-admin{grid-template-columns:1fr}.almora-chapter-admin-actions{justify-content:flex-start}.almora-chapter-reader{padding:10px}.almora-order-hint{align-items:flex-start}}
+
 
 /* Aviso de desenvolvimento em destaque acima do cabeçalho */
 .almora-dev-notice{display:flex;align-items:center;justify-content:center;gap:14px;padding:13px 18px;background:color-mix(in srgb,var(--ac) 13%,var(--sf));border-bottom:2px solid var(--ac);color:var(--tx);font-size:14px;line-height:1.5;text-align:center}
@@ -337,7 +365,7 @@ ${user?wishlistButton(id):''}
 <select onchange="lib('${id}',this.value)"><option value="">+ Biblioteca</option>${['Lendo','Quero ler','Concluídas','Abandonadas','Pausadas'].map(x=>`<option ${ls===x?'selected':''}>${x}</option>`).join('')}</select>
 <button class="g" onclick="share('${id}')">Compartilhar</button></div></div></div>
 <h2>Sinopse</h2><p>${esc(w.synopsis||'Sem sinopse.')}</p>
-<h2>Capítulos</h2>${cs.length?[...cs].sort((a,b)=>(a.order??a.n)-(b.order??b.n)).map(c=>`<a class="ch" href="#ler/${id}/${c.n}"><b>${esc(almoraChapterDisplay(c))}${almoraChapterSubtitle(c)}</b><span>${ago(c.date)}${lp&&lp.read&&lp.read.includes(c.n)?' ✓':''}</span></a>`).join(''):'<div class="empty">Sem capítulos publicados.</div>'}`}
+<div class="almora-chapter-list-heading"><h2>Capítulos</h2><span>${cs.length} publicação${cs.length===1?'':'ões'}</span></div>${cs.length?`<div class="almora-chapter-reader-list">${[...cs].sort((a,b)=>(a.order??a.n)-(b.order??b.n)).map((c,index)=>{const read=!!(lp&&lp.read&&lp.read.includes(c.n));const kind=({chapter:'CAPÍTULO',extra:'CONTEÚDO EXTRA',special:'ESPECIAL',prologue:'PRÓLOGO',epilogue:'EPÍLOGO'})[c.type||'chapter']||'CAPÍTULO';return `<a class="almora-chapter-reader" href="#ler/${id}/${c.n}"><div class="almora-chapter-reader-main"><div class="almora-chapter-reader-label"><span class="almora-chapter-kind">${kind}</span><span>${esc(almoraChapterDisplay(c))}</span></div>${c.title&&c.title!==c.label?`<span class="almora-chapter-reader-title">${esc(c.title)}</span>`:''}<div class="almora-chapter-reader-meta"><span>Ordem ${index+1}</span><span>${c.pages?.length||0} páginas</span><span>${ago(c.date)}</span>${read?'<span>✓ Lido</span>':''}</div></div><span class="almora-chapter-reader-go" aria-hidden="true">›</span></a>`}).join('')}</div>`:'<div class="empty">Sem capítulos publicados.</div>'}`}
 function rate(id,n){S.rate[id]=n;save();ren()}
 async function fav(id){
   const next=!S.fav[id];
@@ -1027,27 +1055,35 @@ return `
 </div>
 </div>
 
-<div class="box">
-<b>Novo capítulo</b>
+<div class="box almora-chapter-publish">
+<div class="almora-section-heading"><div><span class="almora-eyebrow">PUBLICAÇÃO</span><b>Novo capítulo</b><small>Identifique o conteúdo antes de disponibilizá-lo aos leitores.</small></div></div>
 
 <label>Pesquisar obra</label>
-<input
-id="c_w_search"
-type="search"
-placeholder="Título, título alternativo ou autor..."
-oninput="almoraFilterChapterWorks()"
->
+<input id="c_w_search" type="search" placeholder="Título, título alternativo ou autor..." oninput="almoraFilterChapterWorks()">
 
 <label>Obra</label>
 <select id="c_w">
 ${S.works.map(w=>`<option value="${w.id}">${esc(w.title)}</option>`).join('')}
 </select>
 
-<label>Número</label>
-<input id="c_n" type="number" step="0.5">
+<div class="almora-chapter-fields">
+  <div><label for="c_type">Tipo de publicação</label>
+  <select id="c_type" onchange="almoraUpdateSingleChapterFields()">
+    <option value="chapter">Capítulo</option><option value="extra">Extra</option><option value="special">Especial</option><option value="prologue">Prólogo</option><option value="epilogue">Epílogo</option>
+  </select></div>
+  <div id="c_number_wrap"><label for="c_n">Número do capítulo</label><input id="c_n" type="number" min="0" step="0.1" placeholder="Ex.: 12 ou 12.5"></div>
+</div>
+<label for="c_label">Identificação exibida ao leitor</label>
+<input id="c_label" maxlength="60" placeholder="Ex.: 12, Extra 1, Especial de Natal...">
+<small class="almora-field-help">É assim que o capítulo aparecerá na lista da obra e nas notificações.</small>
 
-<label>Título (opcional)</label>
-<input id="c_t">
+<label for="c_t">Título do capítulo (opcional)</label>
+<input id="c_t" maxlength="160" placeholder="Ex.: Um novo começo">
+
+<div class="almora-chapter-fields">
+  <div><label for="c_order">Ordem de leitura</label><input id="c_order" type="number" min="1" step="1" placeholder="Automática"></div>
+  <div class="almora-order-hint"><span>ⓘ</span> Define a posição na sequência de leitura. Se ficar vazio, o ALMORA adicionará ao final.</div>
+</div>
 
 <label>Páginas (imagens, CBZ ou ZIP)</label>
 <input id="c_f" type="file" accept="image/*,.cbz,.zip,application/zip,application/x-cbz" multiple onchange="pages(this)">
@@ -1081,14 +1117,20 @@ ${window.almoraStudioRole==='superadmin'?'<button class="d" onclick="delW(\'${w.
 </div>
 
 ${adminChapterOrder(w).map((c,index,list)=>`
-<div class="ch" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
-<span style="flex:1;min-width:130px">${index+1}. ${esc(almoraChapterDisplay(c))}${almoraChapterSubtitle(c)} (${c.pages.length} pág.) ${c.archived?'<small>(arquivado)</small>':''}</span>
-<button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},-1)" ${index===0?'disabled':''} title="Mover para cima">↑</button>
-<button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},1)" ${index===list.length-1?'disabled':''} title="Mover para baixo">↓</button>
-<button class="g" onclick="archC('${w.id}','${c.n}')">${c.archived?'Restaurar':'Arquivar'}</button>
-<button class="g" onclick="editChapter('${w.id}','${c.n}')">Editar</button>
-${window.almoraStudioRole==='superadmin'?'<button class="d" onclick="delC(\'${w.id}\',\'${c.n}\')">✕</button>':''}
+<article class="almora-chapter-admin">
+<div class="almora-chapter-admin-main">
+  <div class="almora-chapter-admin-title"><span class="almora-chapter-kind">${({chapter:'CAPÍTULO',extra:'EXTRA',special:'ESPECIAL',prologue:'PRÓLOGO',epilogue:'EPÍLOGO'})[c.type||'chapter']||'CAPÍTULO'}</span>${esc(almoraChapterDisplay(c))}${c.archived?'<span class="pill">Arquivado</span>':''}</div>
+  ${c.title&&c.title!==c.label?'<div style="margin-top:3px;font-size:13px;color:var(--mu)">'+esc(c.title)+'</div>':''}
+  <div class="almora-chapter-admin-meta"><span>Posição: ${index+1}</span><span>${c.pages.length} páginas</span><span>${ago(c.date)}</span><span>ID: ${esc(String(c.id).slice(0,8))}</span></div>
 </div>
+<div class="almora-chapter-admin-actions">
+  <button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},-1)" ${index===0?'disabled':''} title="Mover para cima" aria-label="Mover capítulo para cima">↑</button>
+  <button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},1)" ${index===list.length-1?'disabled':''} title="Mover para baixo" aria-label="Mover capítulo para baixo">↓</button>
+  <button class="g" onclick="archC('${w.id}','${c.n}')">${c.archived?'Restaurar':'Arquivar'}</button>
+  <button class="g" onclick="editChapter('${w.id}','${c.n}')">Editar</button>
+  ${window.almoraStudioRole==='superadmin'?'<button class="d" onclick="delC(\'${w.id}\',\'${c.n}\')" aria-label="Excluir capítulo">✕</button>':''}
+</div>
+</article>
 `).join('')}
 ${chapterOrderChanged(w)?`<div class="act" style="margin-top:10px"><button type="button" class="g" onclick="cancelChapterOrder('${w.id}')">Cancelar</button><button type="button" id="save-chapter-order-${w.id}" onclick="saveChapterOrder('${w.id}')">Concluir reordenação</button></div>`:''}
 </div>
@@ -1352,86 +1394,71 @@ async function pages(el){
   }
 }
 
+function almoraUpdateSingleChapterFields(){
+  const type=document.getElementById('c_type')?.value||'chapter';
+  const numberWrap=document.getElementById('c_number_wrap');
+  const number=document.getElementById('c_n');
+  const label=document.getElementById('c_label');
+  const defaults={extra:'Extra',special:'Especial',prologue:'Prólogo',epilogue:'Epílogo'};
+  if(numberWrap)numberWrap.hidden=type!=='chapter';
+  if(number){number.required=type==='chapter';number.disabled=type!=='chapter';if(type!=='chapter')number.value='';}
+  if(label&&!label.dataset.edited){
+    label.value=type==='chapter'?(number?.value||''):defaults[type]||'';
+  }
+}
+function almoraUpdateSingleChapterLabel(){
+  const number=document.getElementById('c_n'),label=document.getElementById('c_label');
+  if(number&&label&&!label.dataset.edited)label.value=number.value;
+}
+document.addEventListener('input',event=>{
+  if(event.target?.id==='c_n')almoraUpdateSingleChapterLabel();
+  if(event.target?.id==='c_label')event.target.dataset.edited='1';
+});
+document.addEventListener('change',event=>{
+  if(event.target?.id==='c_type'){const label=document.getElementById('c_label');if(label)delete label.dataset.edited;almoraUpdateSingleChapterFields();}
+});
 async function addC(){
-  const id=$('#c_w').value;
-  const n=$('#c_n').value;
-  const w=W(id);
-  const title=$('#c_t').value.trim();
-
+  const id=$('#c_w').value,w=W(id),type=$('#c_type')?.value||'chapter';
+  const title=$('#c_t').value.trim(),label=$('#c_label')?.value.trim()||'';
+  const rawNumber=$('#c_n')?.value||'';
   if(!user)return toast('Entre na conta administrativa');
-  if(!w||n==='')return toast('Escolha obra e número');
-  if(!draft.length)return toast('Adicione páginas');
-  if(!Number.isFinite(Number(n)))return toast('Informe um número válido.');
-  if(w.chapters.some(c=>Number(c.n)===Number(n)))
-    return toast('Número já existe');
-
+  if(!w)return toast('Escolha uma obra.');
+  if(type==='chapter'&&(rawNumber===''||!Number.isFinite(Number(rawNumber))||Number(rawNumber)<0))return toast('Informe um número válido para o capítulo.');
+  if(!label)return toast('Informe a identificação que será exibida aos leitores.');
+  if(!draft.length)return toast('Adicione páginas.');
+  const number=type==='chapter'?Number(rawNumber):almoraNextInternalNumber(w);
+  if(type==='chapter'&&w.chapters.some(c=>c.type==='chapter'&&Number(c.n)===number))return toast('Já existe um capítulo com esse número.');
+  const maxOrder=Math.max(0,...w.chapters.map(c=>Number(c.order)||0));
+  const rawOrder=$('#c_order')?.value||'';
+  const order=rawOrder===''?maxOrder+1:Number(rawOrder);
+  if(!Number.isFinite(order)||order<1)return toast('Informe uma ordem de leitura válida.');
   const btn=document.querySelector('#app button[onclick="addC()"]');
   if(btn){btn.disabled=true;btn.textContent='Enviando páginas...';}
-
   try{
     const uploaded=[];
-
     for(let i=0;i<draft.length;i++){
       const blob=await fetch(draft[i]).then(r=>r.blob());
-      const path=`${user.id}/${id}/${Date.now()}-${i+1}.jpg`;
-
-      const url = await almoraUploadToR2(blob,'chapter_page');
-
+      const url=await almoraUploadToR2(blob,'chapter_page');
       uploaded.push({page_number:i+1,image_url:url,file_size_bytes:blob.size});
     }
-
-    const {data:chapter,error:chapterError}=await almoraDB
-      .from('chapters')
-      .insert({
-        work_id:id,
-        chapter_number:Number(n),
-        title:title||('Capítulo '+n),
-        status:'published',
-        chapter_type:'chapter',
-        chapter_label:String(n),
-        reading_order:Math.max(0,...w.chapters.map(c=>Number(c.order??c.n)||0))+1,
-        archived:false
-      })
-      .select()
-      .single();
-
+    const chapterTitle=title||label;
+    const {data:chapter,error:chapterError}=await almoraDB.from('chapters').insert({
+      work_id:id,chapter_number:number,title:chapterTitle,status:'published',
+      chapter_type:type,chapter_label:label,reading_order:order,archived:false
+    }).select().single();
     if(chapterError)throw chapterError;
-
-    const pageRows=uploaded.map(p=>({
-      chapter_id:chapter.id,
-      page_number:p.page_number,
-      image_url:p.image_url,
-      file_size_bytes:p.file_size_bytes
-    }));
-
-    const {error:pagesError}=await almoraDB
-      .from('pages')
-      .insert(pageRows);
-
+    const pageRows=uploaded.map(p=>({chapter_id:chapter.id,page_number:p.page_number,image_url:p.image_url,file_size_bytes:p.file_size_bytes}));
+    const {error:pagesError}=await almoraDB.from('pages').insert(pageRows);
     if(pagesError)throw pagesError;
-
     w.chapters.push({
-      id:chapter.id,
-      n:Number(n),
-      title:title||('Capítulo '+n),
-      type:'chapter',
-      label:String(n),
-      order:Math.max(0,...w.chapters.map(c=>Number(c.order??c.n)||0))+1,
-      date:Date.now(),
-      archived:false,
-      pages:uploaded.map(p=>p.image_url)
+      id:chapter.id,n:number,title:chapterTitle,type,label,order,date:Date.now(),
+      archived:false,pages:uploaded.map(p=>p.image_url)
     });
-
-    draft=[];
-    toast('Capítulo publicado com sucesso!');
-    ren();
-
-  }catch(e){
-    toast('Erro ao publicar capítulo: '+e.message);
-  }finally{
-    if(btn){btn.disabled=false;btn.textContent='Publicar capítulo';}
-  }
-    }
+    draft=[];chapterOrderDraft[id]=[...w.chapters].sort((a,b)=>(a.order??a.n)-(b.order??b.n));
+    toast('Publicação adicionada com sucesso!');ren();
+  }catch(e){toast('Erro ao publicar capítulo: '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='Publicar capítulo';}}
+}
     
 async function arch(id){
   const w=W(id);
