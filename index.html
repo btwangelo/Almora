@@ -275,7 +275,7 @@ const save=()=>{
 };
 
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',3200)}
-const W=id=>S.works.find(w=>w.id===id);
+const W=id=>S.works.find(w=>String(w.id)===String(id));
 const last=w=>w.chapters.length?Math.max(...w.chapters.map(c=>c.date)):w.created;
 const ago=d=>{const h=(Date.now()-d)/36e5;return h<1?'agora':h<24?Math.floor(h)+' h atrás':h<48?'1 dia atrás':h<720?Math.floor(h/24)+' dias atrás':new Date(d).toLocaleDateString('pt-BR')};
 const cover=w=>w.cover?`style="background-image:url(${w.cover})"`:'';
@@ -1104,11 +1104,11 @@ ${S.works.map(w=>`<option value="${w.id}">${esc(w.title)}</option>`).join('')}
   <div id="almora-batch-review"></div>
 </div>
 
-<h2>Obras cadastradas</h2>
+<div class="almora-studio-catalog-heading"><div><span class="almora-eyebrow">BIBLIOTECA ADMINISTRATIVA</span><h2>Obras cadastradas</h2><small>${S.works.length} obra(s) no catálogo · organizadas por categoria e título</small></div></div>
 
-${S.works.map(w=>`
-<div class="box">
-<b>${esc(w.title)}</b> · ${w.cat} · ${w.chapters.length} cap. ${w.archived?'(arquivada)':''}
+${[...S.works].sort((a,b)=>Number(!!a.archived)-Number(!!b.archived)||String(a.cat||'').localeCompare(String(b.cat||''),'pt-BR')||String(a.title||'').localeCompare(String(b.title||''),'pt-BR')).map(w=>`
+<article class="box almora-studio-work-card">
+<div class="almora-studio-work-head"><div class="almora-studio-work-cover">${w.cover?'<img src="'+esc(w.cover)+'" alt="Capa de '+esc(w.title)+'" loading="lazy">':'<span aria-hidden="true">▧</span>'}</div><div class="almora-studio-work-info"><span class="almora-studio-work-category">${esc(w.cat||'OBRA')}</span><b>${esc(w.title)}</b><small>${esc(w.author||'Autoria não informada')} · ${w.chapters.length} publicação(ões) ${w.archived?'· Arquivada':''}</small></div></div>
 
 <div class="act">
 <button class="g" onclick="arch('${w.id}')">${w.archived?'Restaurar':'Arquivar'}</button>
@@ -1118,6 +1118,7 @@ ${window.almoraStudioRole==='superadmin'?'<button class="d" onclick="delW(\'${w.
 
 ${adminChapterOrder(w).map((c,index,list)=>`
 <article class="almora-chapter-admin">
+<div class="almora-chapter-admin-preview">${c.preview?'<img src="'+esc(c.preview)+'" alt="Prévia de '+esc(almoraChapterDisplay(c))+'" loading="lazy">':'<span aria-hidden="true">▤</span>'}</div>
 <div class="almora-chapter-admin-main">
   <div class="almora-chapter-admin-title"><span class="almora-chapter-kind">${({chapter:'CAPÍTULO',extra:'EXTRA',special:'ESPECIAL',prologue:'PRÓLOGO',epilogue:'EPÍLOGO'})[c.type||'chapter']||'CAPÍTULO'}</span>${esc(almoraChapterDisplay(c))}${c.archived?'<span class="pill">Arquivado</span>':''}</div>
   ${c.title&&c.title!==c.label?'<div style="margin-top:3px;font-size:13px;color:var(--mu)">'+esc(c.title)+'</div>':''}
@@ -1128,12 +1129,12 @@ ${adminChapterOrder(w).map((c,index,list)=>`
   <button class="g" type="button" onclick="moveChapterOrder('${w.id}',${index},1)" ${index===list.length-1?'disabled':''} title="Mover para baixo" aria-label="Mover capítulo para baixo">↓</button>
   <button class="g" onclick="archC('${w.id}','${c.n}')">${c.archived?'Restaurar':'Arquivar'}</button>
   <button class="g" onclick="editChapter('${w.id}','${c.n}')">Editar</button>
-  ${window.almoraStudioRole==='superadmin'?'<button class="d" onclick="delC(\'${w.id}\',\'${c.n}\')" aria-label="Excluir capítulo">✕</button>':''}
+  ${window.almoraStudioRole==='superadmin'?'<button class="d" onclick="delC(\'${w.id}\',\'${c.id}\')" aria-label="Excluir capítulo">✕</button>':''}
 </div>
 </article>
 `).join('')}
 ${chapterOrderChanged(w)?`<div class="act" style="margin-top:10px"><button type="button" class="g" onclick="cancelChapterOrder('${w.id}')">Cancelar</button><button type="button" id="save-chapter-order-${w.id}" onclick="saveChapterOrder('${w.id}')">Concluir reordenação</button></div>`:''}
-</div>
+</article>
 `).join('')||'<div class="empty">Nenhuma obra.</div>'}
 
 </section>
@@ -1684,40 +1685,19 @@ async function delW(id){
   }
 }
 
-async function delC(id,n){
+async function delC(workId,chapterId){
   if(!confirm('Excluir este capítulo e todas as suas páginas?'))return;
-
+  const buttons=[...document.querySelectorAll('#almora-studio-works button[aria-label="Excluir capítulo"]')];buttons.forEach(button=>button.disabled=true);
   try{
-    const w=W(id);
-    if(!w)throw new Error('Obra não encontrada.');
-
-    const chapter=w.chapters.find(c=>String(c.n)===String(n));
-    if(!chapter)throw new Error('Capítulo não encontrado.');
-
-    const {error:pagesError}=await almoraDB
-      .from('pages')
-      .delete()
-      .eq('chapter_id',chapter.id);
-
-    if(pagesError)throw pagesError;
-
-    const {error:chapterError}=await almoraDB
-      .from('chapters')
-      .delete()
-      .eq('id',chapter.id);
-
-    if(chapterError)throw chapterError;
-
-    w.chapters=w.chapters.filter(c=>String(c.n)!==String(n));
-    save();
-    toast('Capítulo excluído com sucesso!');
-    ren();
-
-  }catch(e){
-    console.error('Erro ao excluir capítulo:',e);
-    toast('Erro ao excluir capítulo: '+e.message);
-    }
-  }
+    const {data:chapter,error:lookupError}=await almoraDB.from('chapters').select('id,work_id').eq('id',chapterId).eq('work_id',workId).maybeSingle();
+    if(lookupError)throw lookupError;if(!chapter)throw new Error('O capítulo não foi encontrado nesta obra. Atualize o Studio e tente novamente.');
+    const {error:pagesError}=await almoraDB.from('pages').delete().eq('chapter_id',chapter.id);if(pagesError)throw pagesError;
+    const {data:deletedChapter,error:chapterError}=await almoraDB.from('chapters').delete().eq('id',chapter.id).eq('work_id',workId).select('id').maybeSingle();
+    if(chapterError)throw chapterError;if(!deletedChapter)throw new Error('O banco não confirmou a exclusão do capítulo. Verifique as permissões administrativas.');
+    const work=S.works.find(item=>String(item.id)===String(workId));if(work)work.chapters=work.chapters.filter(item=>String(item.id)!==String(chapterId));
+    delete chapterOrderDraft[workId];await loadCatalog();toast('Capítulo e suas páginas excluídos com sucesso!');ren();
+  }catch(e){console.error('Erro ao excluir capítulo:',e);toast('Erro ao excluir capítulo: '+e.message);buttons.forEach(button=>button.disabled=false);}
+}
 function bk(){const d=JSON.stringify({...S,works:S.works.map(w=>({...w,cover:'',chapters:w.chapters.map(c=>({...c,pages:c.pages.length}))}))},null,1);navigator.clipboard?.writeText(d);toast('Backup copiado')}
 async function loadWishlistPage(){
   const app=document.getElementById('app');
@@ -1796,6 +1776,17 @@ function almoraUpdatePageMeta(route,id,chapter){
   }
 }
 let almoraEntryAnimationPlayed=false;
+let almoraStudioPreviewPromise=null;
+async function loadStudioChapterPreviews(){
+  if(almoraStudioPreviewPromise)return almoraStudioPreviewPromise;
+  const chapters=(S.works||[]).flatMap(work=>work.chapters||[]).filter(chapter=>chapter.id&&!chapter.preview);if(!chapters.length)return;
+  almoraStudioPreviewPromise=(async()=>{try{
+    const {data,error}=await almoraDB.from('pages').select('chapter_id,image_url,page_number').in('chapter_id',chapters.map(chapter=>chapter.id)).order('page_number',{ascending:true}).limit(5000);if(error)throw error;
+    const previews=new Map();(data||[]).forEach(page=>{if(!previews.has(String(page.chapter_id)))previews.set(String(page.chapter_id),page.image_url);});
+    (S.works||[]).forEach(work=>(work.chapters||[]).forEach(chapter=>{chapter.preview=previews.get(String(chapter.id))||'';}));
+    if((location.hash.slice(1)||'').split('/')[0]==='studio')ren();
+  }catch(error){console.warn('Pré-visualizações dos capítulos indisponíveis:',error);}finally{almoraStudioPreviewPromise=null;}})();return almoraStudioPreviewPromise;
+}
 function ren(){const h=location.hash.slice(1)||'home',[r,a,b]=h.split('/');nav(r);const A=$('#app');
 A.innerHTML=r==='home'?home():r==='bl'?catalog('BL','BL'):r==='gl'?catalog('GL','GL'):r==='explorar'?catalog('', 'Explorar'):r==='atualizacoes'?sec('Atualizações',pub().filter(w=>w.chapters.length).sort((x,y)=>last(y)-last(x)),upd):r==='biblioteca'?biblio():r==='desejos'?'<div class="empty">Carregando sua lista de desejos...</div>':r==='obra'?obra(a):r==='ler'?reader(a,b):r==='studio'?studio():r==='conta'?conta():r==='comunidade'?'<section class="almora-directory"><h1>Comunidade</h1><div class="empty">Carregando leitores...</div></section>':r==='conexoes'?'<section class="almora-connections-page"><div class="empty">Carregando conexões...</div></section>':home();
 if(!almoraEntryAnimationPlayed){
@@ -1806,6 +1797,7 @@ if(r==='contato') window.almoraInitContactForm?.();
 if(r==='studio'){
   drawD();
   if(draftStatus)setPageStatus(draftStatus);
+  loadStudioChapterPreviews();
 }
 if(r==='desejos') loadWishlistPage();
 if(r==='comunidade'&&window.almoraRenderDirectory) window.almoraRenderDirectory();
@@ -5838,6 +5830,12 @@ window.almoraSavePrivacy = async function() {
   <script src="contact-form.js?v=6"></script>
   <script src="contact-moderation.js?v=6"></script>
 </body>
+<style id="almora-studio-organized-ui">
+.almora-studio-catalog-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:28px 0 12px}.almora-studio-catalog-heading h2{margin:4px 0;border:0;padding:0}.almora-studio-catalog-heading small{color:var(--mu);font-size:12px}
+.almora-studio-work-card{padding:13px;margin:12px 0;border-radius:15px}.almora-studio-work-head{display:flex;align-items:center;gap:13px;min-width:0}.almora-studio-work-cover{width:66px;height:92px;flex:0 0 66px;border-radius:9px;overflow:hidden;background:var(--sf2);display:grid;place-items:center;color:var(--mu);font-size:24px}.almora-studio-work-cover img{width:100%;height:100%;object-fit:cover;display:block}.almora-studio-work-info{display:grid;gap:4px;min-width:0}.almora-studio-work-info>b{font-size:16px;overflow-wrap:anywhere}.almora-studio-work-info>small{color:var(--mu);font-size:12px}.almora-studio-work-category{font-size:10px;font-weight:800;letter-spacing:.1em;color:var(--ac)}.almora-studio-work-card>.act{margin:12px 0 8px}
+.almora-chapter-admin{grid-template-columns:48px minmax(0,1fr) auto;gap:11px}.almora-chapter-admin-preview{width:48px;height:64px;border-radius:7px;overflow:hidden;background:var(--sf2);display:grid;place-items:center;color:var(--mu);font-size:19px}.almora-chapter-admin-preview img{width:100%;height:100%;object-fit:cover;display:block}
+@media(max-width:560px){.almora-chapter-admin{grid-template-columns:42px minmax(0,1fr)}.almora-chapter-admin-preview{width:42px;height:58px}.almora-chapter-admin-actions{grid-column:1/-1}.almora-studio-work-cover{width:58px;height:82px;flex-basis:58px}}
+</style>
 </html>
 
 <style id="almora-motion-refinement">
