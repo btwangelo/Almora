@@ -143,12 +143,12 @@ footer{text-align:center;color:var(--mu);padding:30px 14px;font-size:13px}
 .almora-catalog-filters select{min-width:145px;max-width:100%;flex:1}
 .almora-tag{background:color-mix(in srgb,var(--ac) 18%,var(--sf2));color:var(--tx)}
 
-/* Aviso compacto de desenvolvimento acima do cabeçalho */
-.almora-dev-notice{display:flex;align-items:center;justify-content:center;gap:10px;padding:6px 14px;background:var(--sf);border-bottom:1px solid var(--bd);color:var(--mu);font-size:11px;line-height:1.35;text-align:center}
-.almora-dev-logo{display:flex;align-items:center;flex:0 0 auto;font:700 17px Fredoka,sans-serif;letter-spacing:.4px;color:var(--ac2)}
-.almora-dev-logo svg{width:19px;height:18px;margin:0 1px}
-.almora-dev-notice>span{min-width:0}
-@media(max-width:520px){.almora-dev-notice{gap:7px;padding:6px 9px;font-size:10px}.almora-dev-logo{font-size:14px}.almora-dev-logo svg{width:16px;height:15px}}
+/* Aviso de desenvolvimento em destaque acima do cabeçalho */
+.almora-dev-notice{display:flex;align-items:center;justify-content:center;gap:14px;padding:13px 18px;background:color-mix(in srgb,var(--ac) 13%,var(--sf));border-bottom:2px solid var(--ac);color:var(--tx);font-size:14px;line-height:1.5;text-align:center}
+.almora-dev-logo{display:flex;align-items:center;flex:0 0 auto;font:700 23px Fredoka,sans-serif;letter-spacing:.5px;color:var(--ac)}
+.almora-dev-logo svg{width:26px;height:24px;margin:0 1px}
+.almora-dev-notice>span{min-width:0;max-width:850px}
+@media(max-width:520px){.almora-dev-notice{flex-direction:column;gap:5px;padding:12px 14px;font-size:13px;line-height:1.45}.almora-dev-logo{font-size:21px}.almora-dev-logo svg{width:23px;height:21px}}
 </style>
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="preconnect" href="https://mcdinntggkanmsqubozn.supabase.co" crossorigin>
