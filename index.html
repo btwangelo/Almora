@@ -1779,11 +1779,11 @@ let almoraEntryAnimationPlayed=false;
 let almoraStudioPreviewPromise=null;
 async function loadStudioChapterPreviews(){
   if(almoraStudioPreviewPromise)return almoraStudioPreviewPromise;
-  const chapters=(S.works||[]).flatMap(work=>work.chapters||[]).filter(chapter=>chapter.id&&!chapter.preview);if(!chapters.length)return;
+  const chapters=(S.works||[]).flatMap(work=>work.chapters||[]).filter(chapter=>chapter.id&&!chapter.previewLoaded);if(!chapters.length)return;
   almoraStudioPreviewPromise=(async()=>{try{
     const {data,error}=await almoraDB.from('pages').select('chapter_id,image_url,page_number').in('chapter_id',chapters.map(chapter=>chapter.id)).order('page_number',{ascending:true}).limit(5000);if(error)throw error;
     const previews=new Map();(data||[]).forEach(page=>{if(!previews.has(String(page.chapter_id)))previews.set(String(page.chapter_id),page.image_url);});
-    (S.works||[]).forEach(work=>(work.chapters||[]).forEach(chapter=>{chapter.preview=previews.get(String(chapter.id))||'';}));
+    (S.works||[]).forEach(work=>(work.chapters||[]).forEach(chapter=>{chapter.preview=previews.get(String(chapter.id))||'';chapter.previewLoaded=true;}));
     if((location.hash.slice(1)||'').split('/')[0]==='studio')ren();
   }catch(error){console.warn('Pré-visualizações dos capítulos indisponíveis:',error);}finally{almoraStudioPreviewPromise=null;}})();return almoraStudioPreviewPromise;
 }
