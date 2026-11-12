@@ -1933,8 +1933,8 @@ function almoraBatchRender() {
             onchange="almoraBatchUpdate(${i},'order',this.value)">
           <div style="margin-top:10px">
             <small>${esc(item.status)}</small>
-            ${item.status==='Enviando'?'<progress value="'+item.progress+'" max="100" style="width:100%"></progress><small>'+item.progress+'% · Página '+(item.currentPage||0)+' de '+(item.totalPages||item.pages.length)+' · '+(item.uploadedPages||0)+' enviadas</small>':''}
-            ${item.error?`<small style="display:block;color:#e66">${esc(item.error)}</small>`:''}
+            ${item.status==='Enviando'?'<progress value="'+item.progress+'" max="100" style="width:100%"></progress><small>'+item.progress+'% · '+esc(item.phase||'Processando')+(item.totalPages?' · Página '+(item.currentPage||0)+' de '+item.totalPages+' · '+(item.uploadedPages||0)+' enviadas':'')+'</small>':''}
+            ${item.error?`<small style="display:block;color:#e66;white-space:normal;overflow-wrap:anywhere">${esc(item.error)}</small>`:''}
           </div>
           ${item.status!=='Publicado'?`<button class="d" style="margin-top:8px" ${item.status==='Enviando'?'disabled':''} onclick="almoraBatchRemove(${i})">Remover arquivo</button>`:''}
         </div>
@@ -2053,12 +2053,14 @@ async function almoraPublishBatch() {
     try {
       const uploaded=[];
       let totalUncompressed=0;
+      item.phase='Preparando envio das imagens';
       item.totalPages=item.pages.length;
       item.currentPage=0;
       item.uploadedPages=0;
       almoraBatchRender();
       for(let i=0;i<item.pages.length;i++) {
         item.currentPage=i+1;
+        item.phase='Enviando imagem '+(i+1)+' de '+item.pages.length;
         item.status='Enviando';
         almoraBatchRender();
         const entry=item.pages[i];
@@ -2089,6 +2091,8 @@ async function almoraPublishBatch() {
         almoraBatchRender();
       }
 
+      item.phase='Criando registro do capítulo no Supabase';
+      almoraBatchRender();
       const chapterNumber=item.type==='chapter'?Number(item.number):almoraNextInternalNumber(work);
       const {data:chapter,error:chapterError}=await almoraDB.from('chapters').insert({
         work_id:workId,chapter_number:chapterNumber,
@@ -2098,13 +2102,18 @@ async function almoraPublishBatch() {
       }).select().single();
       if(chapterError) throw chapterError;
 
+      item.phase='Gravando páginas no Supabase';
+      almoraBatchRender();
       const pageRows=uploaded.map(p=>({chapter_id:chapter.id,page_number:p.page_number,image_url:p.image_url,file_size_bytes:p.file_size_bytes}));
       const {error:pagesError}=await almoraDB.from('pages').insert(pageRows);
       if(pagesError) {
-        await almoraDB.from('chapters').delete().eq('id',chapter.id);
+        item.phase='Removendo capítulo incompleto';
+        const {error:cleanupError}=await almoraDB.from('chapters').delete().eq('id',chapter.id);
+        if(cleanupError) throw new Error('Falha ao gravar páginas: '+[pagesError.message,pagesError.details,pagesError.hint].filter(Boolean).join(' | ')+'; e também falhou a remoção do capítulo incompleto: '+[cleanupError.message,cleanupError.details,cleanupError.hint].filter(Boolean).join(' | '));
         throw pagesError;
       }
 
+      item.phase='Finalizando publicação';
       item.status='Publicado'; item.progress=100;
       work.chapters.push({
         id:chapter.id,n:chapterNumber,title:item.title||item.label,
@@ -2112,7 +2121,9 @@ async function almoraPublishBatch() {
         date:Date.now(),archived:false,pages:uploaded.map(p=>p.image_url)
       });
     } catch(error) {
-      item.status='Falhou'; item.error=error.message||'Erro desconhecido';
+      const errorParts=[error?.message||String(error||'Erro desconhecido'),error?.code?'Código: '+error.code:'',error?.details?'Detalhes: '+error.details:'',error?.hint?'Orientação do Supabase: '+error.hint:''].filter(Boolean);
+      item.status='Falhou';
+      item.error=(item.phase?'Etapa: '+item.phase+'. ':'')+errorParts.join(' | ');
     }
     almoraBatchRender();
   }
