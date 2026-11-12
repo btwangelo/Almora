@@ -2072,7 +2072,7 @@ async function almoraPublishBatch() {
         }catch(conversionError){
           throw new Error('Falha ao converter a página '+(i+1)+': '+conversionError.message);
         }
-        blob=new File([blob],pageFile.name.replace(/\\.[^.]+$/,'')+'.jpg',{type:blob.type||'image/jpeg'});
+        blob=new File([blob],pageFile.name.split('.').slice(0,-1).join('.')+'.jpg',{type:blob.type||'image/jpeg'});
         let url;
         try{url=await almoraUploadToR2(blob);}
         catch(uploadError){throw new Error('Página '+(i+1)+': '+uploadError.message);}
